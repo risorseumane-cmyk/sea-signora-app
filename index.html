@@ -654,9 +654,11 @@
 
         function applyLocalConnectionSettings() {
             const localConn = readConnectionSettings();
-            appState.settings.serverUrl = localConn.serverUrl || '';
+            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+            appState.settings.serverUrl = localConn.serverUrl || appState.settings.serverUrl || fallbackOrigin;
             appState.settings.serverApiKey = localConn.serverApiKey || '';
             appState.settings.aiApiKey = localConn.aiApiKey || '';
+            writeConnectionSettings();
         }
 
         function saveState() {
@@ -1306,7 +1308,8 @@
         }
 
         async function notifyAdminEmail(type, data) {
-            const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
+            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+            const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
             const key = (appState.settings.serverApiKey || '').trim();
             if (!url) return;
             try {
@@ -1515,6 +1518,7 @@
             if (clean.includes('secchi')) sub = 'Secchi';
             if (clean.includes('bagno')) sub = 'Bagno clienti';
             if (clean.includes('pulizia')) sub = 'Pulizia cucina';
+            if (clean.includes('spirits') || clean.includes('spirit') || clean.includes('whisky') || clean.includes('rum') || clean.includes('vodka') || clean.includes('tequila')) sub = 'Distillati';
             return { cat, sub };
         }
 
@@ -1522,6 +1526,24 @@
             const l = (line || '').replace(/^[-*•]\s*/, '').trim();
             if (!l) return null;
             const { cat, sub } = inferCategoryAndSub(l, currentCat, currentSub);
+
+            const pipeStyle = l.match(/^(.+?)\s*\|\s*U\.M\.\s*:\s*([^|]+)\|\s*Miglior Prezzo\s*:\s*([0-9]+[.,][0-9]+)\s*€?\s*\|\s*Fornitore\s*:\s*([^|]+)$/i);
+            if (pipeStyle) {
+                const name = pipeStyle[1].trim();
+                const um = pipeStyle[2].trim().toLowerCase();
+                const price = parseNumber(pipeStyle[3]);
+                const supplier = pipeStyle[4].trim().toUpperCase();
+                if (name && Number.isFinite(price)) {
+                    return {
+                        name,
+                        cat,
+                        sub,
+                        um: um || 'pz',
+                        supplier: supplier || 'N/D',
+                        price
+                    };
+                }
+            }
 
             const supplierPriceTail = l.match(/(.+?)\s*[-:]\s*(?:miglior prezzo|prezzo|fornitore)?[^0-9]*([0-9]+[.,][0-9]+)\s*[-–]\s*fornitore[:\s]+([A-Za-z0-9 .'&/-]+)$/i)
                 || l.match(/(.+?)\s+([A-Za-z][A-Za-z0-9 &'./-]{1,})\s+([0-9]+[.,][0-9]+)$/);
@@ -1564,6 +1586,7 @@
                 else if (norm === 'verdure' || norm.startsWith('verdure')) currentCat = 'Verdure';
                 else if (norm === 'consumabili' || norm.startsWith('consumabili')) currentCat = 'Consumabili';
                 else if (norm === 'cleaning' || norm.startsWith('cleaning')) currentCat = 'Cleaning';
+                else if (norm === 'spirits' || norm.startsWith('spirits')) currentCat = 'Spirits';
 
                 const inf = inferCategoryAndSub(line, currentCat, currentSub);
                 currentSub = inf.sub;
@@ -1571,7 +1594,7 @@
                 const parsed = parseRawCatalogLine(line, currentCat, currentSub);
                 if (parsed && upsertProductWithPrice({ ...parsed, source: 'raw-import' })) imported++;
                 else {
-                    if (!/^(ittico|verdure|consumabili|cleaning|bivalvi|crostacei|molluschi|ostriche|pesce|specialita|categoria)/i.test(norm)) {
+                    if (!/^(ittico|verdure|consumabili|cleaning|spirits|bivalvi|crostacei|molluschi|ostriche|pesce|specialita|categoria)/i.test(norm)) {
                         skipped++;
                         if (skippedLines.length < 20) skippedLines.push(line);
                     }
@@ -1645,7 +1668,7 @@
         }
 
         // --- INVIO ORDINE DAI REPARTI ---
-        function submitDeptOrder() {
+        async function submitDeptOrder() {
             const n = document.getElementById('dept-nome').value;
             const c = document.getElementById('dept-cognome').value;
             const t = document.getElementById('dept-raw-text').value;
@@ -1668,7 +1691,8 @@
                 setTimeout(() => status.classList.add('hidden'), 3000);
             }
             saveState();
-            notifyAdminEmail('order', {
+            await saveStateToServer({ silent: true });
+            await notifyAdminEmail('order', {
                 dept: newReq.dept,
                 staff: newReq.staff,
                 text: newReq.text,
@@ -1696,6 +1720,87 @@
                 const qty = parseNumber(m?.[1] || 1);
                 return { product: p, qty: qty > 0 ? qty : 1 };
             }).filter(Boolean).concat(aliasHits);
+        }
+
+        function splitOrderFragments(text) {
+            return String(text || '')
+                .split(/\n|,|;|\+/)
+                .map(x => x.trim())
+                .filter(Boolean)
+                .slice(0, 20);
+        }
+
+        function parseQtyFromFragment(fragment) {
+            const m = String(fragment || '').match(/(\d+[.,]?\d*)\s*(kg|pz|casse|cassa|l|lt|g|ml)?/i);
+            return parseNumber(m?.[1] || 1) || 1;
+        }
+
+        function getProductCandidates(fragment, limit = 6) {
+            const f = normalizeText(fragment);
+            if (!f) return [];
+            const rows = appState.products
+                .map(p => {
+                    const nameNorm = normalizeText(p.name);
+                    const score = similarityScore(f, p.name) + (nameNorm.includes(f) || f.includes(nameNorm) ? 0.2 : 0);
+                    return { product: p, score };
+                })
+                .filter(x => x.score >= 0.2)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, limit);
+            return rows.map(r => r.product);
+        }
+
+        function getUnknownFragmentsForRequest(req) {
+            const fragments = splitOrderFragments(req.text);
+            const covered = new Set(((req.aiAnalysis || []).map(a => String(a.productId))).concat((req.manualAnalysis || []).map(a => String(a.productId))));
+            return fragments.filter(f => {
+                const matched = parseOrderText(f);
+                if (matched.length) return false;
+                const candidates = getProductCandidates(f, 1);
+                if (!candidates.length) return false;
+                if (candidates[0] && covered.has(String(candidates[0].id))) return false;
+                return true;
+            });
+        }
+
+        function applyAlternativeForRequest(reqId, idx) {
+            const req = appState.inbox.find(r => r.id === reqId);
+            if (!req) return;
+            const select = document.getElementById(`alt-${reqId}-${idx}`);
+            if (!select) return;
+            const productId = Number(select.value);
+            if (!productId) return alert('Seleziona un prodotto.');
+            const fragments = getUnknownFragmentsForRequest(req);
+            const fragment = fragments[idx];
+            if (!fragment) return;
+            const qty = parseQtyFromFragment(fragment);
+            req.manualAnalysis = req.manualAnalysis || [];
+            const existing = req.manualAnalysis.find(x => Number(x.productId) === productId);
+            if (existing) existing.qty += qty;
+            else req.manualAnalysis.push({ productId, qty, sourceText: fragment });
+            saveState();
+            renderInbox();
+        }
+
+        function getMatchesForRequest(req) {
+            const aiMatches = (req.aiAnalysis || []).map(a => {
+                const product = appState.products.find(p => p.id === a.productId);
+                return product ? { product, qty: a.qty || 1 } : null;
+            }).filter(Boolean);
+            const manualMatches = (req.manualAnalysis || []).map(a => {
+                const product = appState.products.find(p => p.id === a.productId);
+                return product ? { product, qty: a.qty || 1 } : null;
+            }).filter(Boolean);
+            const fallback = parseOrderText(req.text);
+            const all = aiMatches.concat(manualMatches, fallback);
+            const merged = new Map();
+            all.forEach(({ product, qty }) => {
+                const k = String(product.id);
+                const curr = merged.get(k) || { product, qty: 0 };
+                curr.qty += qty || 1;
+                merged.set(k, curr);
+            });
+            return Array.from(merged.values());
         }
 
         // --- GESTIONE INBOX E "IA" DI ASSEGNAZIONE ---
@@ -1745,17 +1850,30 @@
             const pendingHtml = appState.inbox.length === 0 ? 
                 '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine da approvare</div>' :
                 appState.inbox.map(req => {
-                    const matches = (req.aiAnalysis || []).map(a => {
-                        const product = appState.products.find(p => p.id === a.productId);
-                        return product ? { product, qty: a.qty || 1 } : null;
-                    }).filter(Boolean);
-                    const fallbackMatches = parseOrderText(req.text);
-                    const effectiveMatches = matches.length ? matches : fallbackMatches;
+                    const effectiveMatches = getMatchesForRequest(req);
                     let matchesHtml = '';
                     effectiveMatches.forEach(({ product, qty }) => {
                         const best = getBestSup(product);
                         matchesHtml += `<span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-[9px] font-bold border border-emerald-100">${product.name} x${qty} (${best.name}: €${best.price.toFixed(2)})</span> `;
                     });
+                    const unknownFragments = getUnknownFragmentsForRequest(req);
+                    const alternativesHtml = unknownFragments.length ? `
+                        <div class="mt-4 border-t pt-3">
+                            <span class="text-[10px] font-black uppercase text-amber-700 block mb-2">Prodotti non riconosciuti: scegli alternativa</span>
+                            <div class="space-y-2">
+                                ${unknownFragments.map((fragment, idx) => {
+                                    const options = getProductCandidates(fragment).map(p => `<option value="${p.id}">${p.name} (${p.cat})</option>`).join('');
+                                    return `<div class="grid md:grid-cols-[1fr,1fr,auto] gap-2 items-center">
+                                        <span class="text-xs text-slate-600 italic">"${fragment}"</span>
+                                        <select id="alt-${req.id}-${idx}" class="border rounded-lg px-2 py-1 text-xs">
+                                            <option value="">Seleziona prodotto</option>
+                                            ${options}
+                                        </select>
+                                        <button onclick="applyAlternativeForRequest(${req.id}, ${idx})" class="bg-amber-500 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase">Applica</button>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        </div>` : '';
 
                     return `
                     <div class="glass-card p-8 mb-4">
@@ -1767,6 +1885,7 @@
                         <div class="bg-slate-50 p-4 rounded-xl mb-6">
                             <span class="text-[9px] font-black uppercase text-slate-400 block mb-2">IA Match & Best Price</span>
                             <div class="flex flex-wrap gap-2">${matchesHtml || '<span class="text-xs italic text-slate-400">Nessun match esatto. Inserimento manuale richiesto.</span>'}</div>
+                            ${alternativesHtml}
                             <div class="mt-3 flex items-center gap-2">
                                 <button onclick="analyzeOrderAI(${req.id})" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase">Analizza con AI</button>
                                 <span class="text-[10px] font-bold text-slate-500">${req.aiStatus === 'loading' ? 'Analisi in corso...' : (req.aiStatus === 'done' ? 'Analisi completata' : (req.aiStatus === 'error' ? `Errore AI: ${req.aiError || ''}` : ''))}</span>
@@ -1799,11 +1918,7 @@
         }
 
         function getRowsFromRequest(req) {
-            const aiRows = ((req.aiAnalysis || []).map(a => {
-                const product = appState.products.find(p => p.id === a.productId);
-                return product ? { product, qty: a.qty || 1 } : null;
-            }).filter(Boolean));
-            return (aiRows.length ? aiRows : parseOrderText(req.text)).map(r => ({
+            return getMatchesForRequest(req).map(r => ({
                 product: r.product,
                 qty: r.qty,
                 reqId: req.id,
@@ -2032,11 +2147,7 @@
         function approveRequest(id) {
             const req = appState.inbox.find(r => r.id === id);
             if(!req) return;
-            const parsedRows = ((req.aiAnalysis || []).map(a => {
-                const product = appState.products.find(p => p.id === a.productId);
-                return product ? { product, qty: a.qty || 1 } : null;
-            }).filter(Boolean));
-            const rows = parsedRows.length ? parsedRows : parseOrderText(req.text);
+            const rows = getMatchesForRequest(req);
             const allocationsBySupplier = {};
             let cost = 0;
             const cats = new Set();
