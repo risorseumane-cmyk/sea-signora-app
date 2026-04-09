@@ -457,6 +457,8 @@
     <script>
         const STORAGE_KEY = 'seasignora-v2';
         const CONNECTION_KEY = 'seasignora-connection-v1';
+        const SAFE_MODE_KEY = 'seasignora-safe-mode-v1';
+        const BOOT_HEALTH_KEY = 'seasignora-boot-health-v1';
         const DEFAULT_SETTINGS = {
             brandName: 'Sea Signora',
             accentColor: '#c5a059',
@@ -903,6 +905,50 @@
             catalog: 'Catalogo'
         };
 
+        function readSafeMode() {
+            try {
+                return JSON.parse(localStorage.getItem(SAFE_MODE_KEY) || '{"enabled":false}');
+            } catch {
+                return { enabled: false };
+            }
+        }
+
+        function writeSafeMode(payload) {
+            localStorage.setItem(SAFE_MODE_KEY, JSON.stringify(payload || { enabled: false }));
+        }
+
+        function enterSafeMode(reason) {
+            writeSafeMode({ enabled: true, reason: reason || 'auto-recovery', at: new Date().toISOString() });
+            localStorage.removeItem(STORAGE_KEY);
+        }
+
+        function disableSafeMode() {
+            writeSafeMode({ enabled: false, at: new Date().toISOString() });
+        }
+
+        function isSafeModeRequested() {
+            const urlSafe = new URLSearchParams(window.location.search).get('safe') === '1';
+            return urlSafe || !!readSafeMode().enabled;
+        }
+
+        function markBootState(state) {
+            localStorage.setItem(BOOT_HEALTH_KEY, JSON.stringify({ state, ts: Date.now() }));
+        }
+
+        function recoverFromBrokenPreviousBootIfNeeded() {
+            try {
+                const raw = localStorage.getItem(BOOT_HEALTH_KEY);
+                if (!raw) return;
+                const last = JSON.parse(raw);
+                // If previous session died during boot, self-heal automatically.
+                if (last?.state === 'booting') {
+                    enterSafeMode('previous-boot-interrupted');
+                }
+            } catch {
+                enterSafeMode('boot-health-corrupted');
+            }
+        }
+
         function normalizeText(v) {
             return (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
         }
@@ -911,6 +957,16 @@
             if (typeof v === 'number') return v;
             return parseFloat(String(v || '0').replace(',', '.')) || 0;
         }
+
+        // Global self-healing: if runtime crashes, next reload is safe mode.
+        window.addEventListener('error', () => {
+            if (isSafeModeRequested()) return;
+            enterSafeMode('runtime-error');
+        });
+        window.addEventListener('unhandledrejection', () => {
+            if (isSafeModeRequested()) return;
+            enterSafeMode('runtime-rejection');
+        });
 
         function loadState() {
             try {
@@ -2998,22 +3054,28 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => { 
+            recoverFromBrokenPreviousBootIfNeeded();
+            markBootState('booting');
             // Inizializzazione sicura
             document.querySelectorAll('.view-section').forEach(s => s.style.display = 'none');
             document.getElementById('view-home').style.display = 'block';
+            if (!appState.settings.serverUrl) appState.settings.serverUrl = window.location.origin;
             const deptFromUrl = new URLSearchParams(window.location.search).get('reparto');
             if (deptFromUrl && appState.reparti.includes(deptFromUrl)) {
                 document.getElementById('role-selector').value = deptFromUrl;
                 appState.kioskMode = true;
                 appState.forcedDept = deptFromUrl;
             }
+            const safeMode = isSafeModeRequested();
             applySettings();
             handleRoleChange(); 
-            renderInbox();
-            renderConsolidation();
+            if (isViewActive('inbox')) renderInbox();
+            if (isViewActive('dashboard')) renderConsolidation();
+            if (isViewActive('catalog')) renderCatalogMgmt();
             renderHomeView();
             pullStateFromServerSilently();
-            startAdminRemotePolling();
+            if (!safeMode) startAdminRemotePolling();
+            markBootState('ok');
         });
     </script>
 </body>
