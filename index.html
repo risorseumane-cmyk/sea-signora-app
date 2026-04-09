@@ -379,6 +379,7 @@
                             <div class="flex flex-wrap gap-2">
                                 <button onclick="loadStateFromServer()" class="bg-white border px-4 py-2 rounded-lg text-[10px] font-black uppercase">Scarica dal Server</button>
                                 <button onclick="saveStateToServer()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Invia al Server</button>
+                                <button onclick="initializeFullCatalogOnServer()" class="bg-emerald-700 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Inizializza Catalogo Completo</button>
                             </div>
                         </div>
                         <div class="border rounded-2xl p-4 bg-slate-50">
@@ -601,21 +602,23 @@
         function readConnectionSettings() {
             try {
                 const raw = localStorage.getItem(CONNECTION_KEY);
-                if (!raw) return { serverUrl: '', serverApiKey: '' };
+                if (!raw) return { serverUrl: '', serverApiKey: '', aiApiKey: '' };
                 const parsed = JSON.parse(raw);
                 return {
                     serverUrl: (parsed.serverUrl || '').trim(),
-                    serverApiKey: (parsed.serverApiKey || '').trim()
+                    serverApiKey: (parsed.serverApiKey || '').trim(),
+                    aiApiKey: (parsed.aiApiKey || '').trim()
                 };
             } catch {
-                return { serverUrl: '', serverApiKey: '' };
+                return { serverUrl: '', serverApiKey: '', aiApiKey: '' };
             }
         }
 
         function writeConnectionSettings() {
             const payload = {
                 serverUrl: appState.settings.serverUrl || '',
-                serverApiKey: appState.settings.serverApiKey || ''
+                serverApiKey: appState.settings.serverApiKey || '',
+                aiApiKey: appState.settings.aiApiKey || ''
             };
             localStorage.setItem(CONNECTION_KEY, JSON.stringify(payload));
         }
@@ -624,6 +627,7 @@
             const localConn = readConnectionSettings();
             appState.settings.serverUrl = localConn.serverUrl || '';
             appState.settings.serverApiKey = localConn.serverApiKey || '';
+            appState.settings.aiApiKey = localConn.aiApiKey || '';
         }
 
         function saveState() {
@@ -1199,6 +1203,53 @@
             } catch (e) {
                 alert(`Errore salvataggio server: ${String(e.message || e)}`);
             }
+        }
+
+        function ensureSeedCatalogInCurrentState() {
+            if (!Array.isArray(appState.products)) appState.products = [];
+            if (!Array.isArray(appState.suppliers)) appState.suppliers = [];
+            if (!Array.isArray(appState.reparti) || appState.reparti.length === 0) appState.reparti = ['Cucina', 'Sala', 'Bar', 'Wine'];
+
+            BASE_PRODUCTS.forEach(p => {
+                upsertProductWithPrice({
+                    name: p.name,
+                    cat: p.cat,
+                    sub: p.sub,
+                    um: p.um,
+                    supplier: Object.keys(p.prices || {})[0] || 'METRO',
+                    price: Object.values(p.prices || {})[0] || 0,
+                    source: 'seed-base'
+                });
+            });
+
+            EXTENDED_CATALOG.forEach(row => {
+                upsertProductWithPrice({
+                    name: row.name,
+                    cat: row.cat,
+                    sub: row.sub,
+                    um: row.um,
+                    supplier: row.supplier,
+                    price: parseNumber(row.price),
+                    source: 'seed-extended'
+                });
+            });
+
+            BASE_SUPPLIERS.forEach(s => {
+                if (!appState.suppliers.some(x => x.name === s.name)) appState.suppliers.push({ name: s.name, min: s.min, currentTotal: 0, items: [] });
+            });
+        }
+
+        async function initializeFullCatalogOnServer() {
+            const proceed = confirm('Vuoi inizializzare il catalogo completo sul server? Non elimina ordini esistenti.');
+            if (!proceed) return;
+            const before = appState.products.length;
+            ensureSeedCatalogInCurrentState();
+            const added = Math.max(0, appState.products.length - before);
+            saveState();
+            renderCatalogMgmt();
+            renderConfig();
+            await saveStateToServer();
+            alert(`✓ Catalogo completo inizializzato. Nuovi prodotti inseriti: ${added}.`);
         }
 
         function addSupplier() {
