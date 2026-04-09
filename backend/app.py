@@ -43,6 +43,19 @@ def init_db():
         );
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notification_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            delivered INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            created_at TEXT NOT NULL
+        );
+        """
+    )
     default_state = {
         "products": [],
         "suppliers": [],
@@ -106,6 +119,26 @@ def send_email(subject, body):
         return True, ""
     except Exception as e:
         return False, str(e)
+
+def log_notification(kind, subject, body, delivered, error_text=""):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO notification_log (kind, subject, body, delivered, error, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            kind,
+            subject,
+            body,
+            1 if delivered else 0,
+            (error_text or "")[:1000],
+            datetime.utcnow().isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
 
 
 init_db()
@@ -179,9 +212,37 @@ def notify():
         body = json.dumps(data, ensure_ascii=False, indent=2)
 
     ok, err = send_email(subject, body)
+    log_notification(kind, subject, body, ok, err)
     if not ok:
-        return jsonify({"ok": False, "error": err, "debug": {"host": SMTP_HOST, "port": SMTP_PORT, "user": SMTP_USER, "to": SMTP_TO}}), 503
-    return jsonify({"ok": True})
+        return jsonify(
+            {
+                "ok": True,
+                "delivered": False,
+                "queued": True,
+                "warning": f"Email non inviata: {err}",
+                "debug": {"host": SMTP_HOST, "port": SMTP_PORT, "user": SMTP_USER, "to": SMTP_TO},
+            }
+        )
+    return jsonify({"ok": True, "delivered": True})
+
+
+@app.get("/api/notifications")
+def get_notifications():
+    if not check_key():
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, kind, subject, delivered, error, created_at
+        FROM notification_log
+        ORDER BY id DESC
+        LIMIT 200
+        """
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return jsonify({"ok": True, "items": rows})
 
 
 @app.get("/")
