@@ -1623,6 +1623,16 @@
         function applyRemoteState(remoteState, opts = {}) {
             if (!remoteState || typeof remoteState !== 'object') return;
             const lightweight = !!opts.lightweight;
+            if (lightweight) {
+                // Fast path: during polling update only what is needed on home/inbox.
+                appState.inbox = remoteState.inbox || appState.inbox || [];
+                appState.orderHistory = remoteState.orderHistory || appState.orderHistory || [];
+                appState.archive = remoteState.archive || appState.archive || [];
+                refreshInboxIndicators();
+                if (isViewActive('inbox')) renderInbox();
+                if (isViewActive('home')) renderHomeView();
+                return;
+            }
             appState.products = remoteState.products || appState.products || [];
             appState.suppliers = remoteState.suppliers || appState.suppliers || [];
             appState.reparti = remoteState.reparti || appState.reparti || [];
@@ -1658,21 +1668,6 @@
                 if (remoteUpdatedAt && remoteUpdatedAt === lastRemoteUpdatedAt) return;
                 lastRemoteUpdatedAt = remoteUpdatedAt || lastRemoteUpdatedAt;
                 applyRemoteState(data.state, { lightweight: true });
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    products: appState.products,
-                    suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
-                    reparti: appState.reparti,
-                    inbox: appState.inbox,
-                    orderHistory: appState.orderHistory || [],
-                    archive: appState.archive,
-                    priceHistory: appState.priceHistory || [],
-                    settings: {
-                        ...appState.settings,
-                        aiApiKey: '',
-                        serverUrl: '',
-                        serverApiKey: ''
-                    }
-                }));
             } catch {
                 // silent: keep local state if remote read fails temporarily
             } finally {
@@ -1685,7 +1680,7 @@
             remotePollTimer = setInterval(() => {
                 if (appState.currentUser !== 'admin') return;
                 pullStateFromServerSilently();
-            }, 10000);
+            }, 20000);
         }
 
         async function saveStateToServer(opts = {}) {
