@@ -404,6 +404,7 @@
                                     <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Provider</label>
                                     <select id="ui-ai-provider" onchange="setAiProvider(this.value)" class="w-full p-3 border rounded-xl text-sm font-bold">
                                         <option value="openai">OpenAI</option>
+                                        <option value="gemini">Gemini</option>
                                     </select>
                                 </div>
                                 <div>
@@ -1072,6 +1073,37 @@
             return parsed;
         }
 
+        async function callGeminiForOrder(text) {
+            const key = appState.settings.aiApiKey || '';
+            if (!key) throw new Error('API key Gemini mancante');
+            const catalog = appState.products.slice(0, 200).map(p => ({
+                id: p.id,
+                name: p.name,
+                um: p.um,
+                cat: p.cat,
+                sub: p.sub
+            }));
+            const prompt =
+                `Analizza questa lista spesa e fai il match con il catalogo.\n` +
+                `Restituisci SOLO JSON valido nel formato {"items":[{"productId":number,"qty":number}]}\n` +
+                `Regole: qty default 1.\nCatalogo:\n${JSON.stringify(catalog)}\n\nOrdine:\n${text}`;
+
+            const model = appState.settings.aiModel || 'gemini-1.5-flash';
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.1 }
+                })
+            });
+            if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+            const data = await res.json();
+            const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+            const m = txt.match(/\{[\s\S]*\}/);
+            return JSON.parse(m ? m[0] : txt);
+        }
+
         async function analyzeOrderAI(id) {
             const req = appState.inbox.find(r => r.id === id);
             if (!req) return;
@@ -1079,8 +1111,10 @@
             renderInbox();
             try {
                 let aiItems = [];
-                if (appState.settings.aiEnabled && appState.settings.aiProvider === 'openai') {
-                    const parsed = await callOpenAiForOrder(req.text);
+                if (appState.settings.aiEnabled) {
+                    const parsed = appState.settings.aiProvider === 'gemini'
+                        ? await callGeminiForOrder(req.text)
+                        : await callOpenAiForOrder(req.text);
                     aiItems = (parsed.items || []).map(row => {
                         const product = appState.products.find(p => String(p.id) === String(row.productId));
                         if (!product) return null;
@@ -1630,7 +1664,10 @@
                             <p class="text-[10px] uppercase font-black text-slate-400">Totale stimato</p>
                             <p class="text-lg font-black">€ ${consolidatedPlan.effectiveCost.toFixed(2)} <span class="text-xs text-slate-400">(raw € ${consolidatedPlan.rawCost.toFixed(2)})</span></p>
                         </div>
-                        <button onclick="approveConsolidatedOrder()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva Ordine Accorpato</button>
+                        <div class="flex gap-2">
+                            <button onclick="analyzeAllPendingOrdersAI()" class="bg-white border border-indigo-200 text-indigo-700 px-4 py-3 rounded-xl font-black text-[10px] uppercase">Analizza Tutti con AI</button>
+                            <button onclick="approveConsolidatedOrder()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva Ordine Accorpato</button>
+                        </div>
                     </div>
                 </div>` : '';
 
@@ -1702,6 +1739,16 @@
                 dept: req.dept,
                 staff: req.staff
             }));
+        }
+
+        async function analyzeAllPendingOrdersAI() {
+            if (!appState.inbox.length) return alert('Nessun ordine in attesa.');
+            if (!appState.settings.aiEnabled) return alert('Abilita AI esterna in Impostazioni.');
+            for (const req of appState.inbox) {
+                await analyzeOrderAI(req.id);
+            }
+            alert('✓ Analisi AI completata su tutti gli ordini pending.');
+            renderInbox();
         }
 
         function buildConsolidatedPlan() {
