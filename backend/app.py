@@ -1,0 +1,126 @@
+import json
+import os
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+
+
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "app_data.db"
+FRONTEND_FILE = BASE_DIR.parent / "index.html"
+API_KEY = os.getenv("SEASIGNORA_API_KEY", "cambia-questa-chiave")
+
+app = Flask(__name__)
+CORS(app)
+
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            state_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+    default_state = {
+        "products": [],
+        "suppliers": [],
+        "reparti": ["Cucina", "Sala", "Bar", "Wine"],
+        "inbox": [],
+        "archive": [],
+        "priceHistory": [],
+        "settings": {
+            "brandName": "Sea Signora",
+            "accentColor": "#c5a059",
+            "hiddenModules": {},
+            "allocationMode": "hybrid",
+            "penaltyRate": 0.06,
+            "portoFrancoWindow": "weekly",
+            "aliases": {},
+            "aiEnabled": False,
+            "aiProvider": "openai",
+            "aiModel": "gpt-4o-mini",
+            "aiApiKey": "",
+        },
+    }
+    cur.execute("SELECT id FROM app_state WHERE id = 1")
+    if cur.fetchone() is None:
+        cur.execute(
+            "INSERT INTO app_state (id, state_json, updated_at) VALUES (1, ?, ?)",
+            (json.dumps(default_state), datetime.utcnow().isoformat()),
+        )
+    conn.commit()
+    conn.close()
+
+
+def check_key():
+    auth = request.headers.get("X-API-Key", "")
+    return auth == API_KEY
+
+
+init_db()
+
+
+@app.get("/api/health")
+def health():
+    return jsonify({"ok": True, "time": datetime.utcnow().isoformat()})
+
+
+@app.get("/api/state")
+def get_state():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT state_json, updated_at FROM app_state WHERE id = 1")
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"ok": False, "error": "State not found"}), 404
+    return jsonify({"ok": True, "state": json.loads(row["state_json"]), "updatedAt": row["updated_at"]})
+
+
+@app.post("/api/state")
+def save_state():
+    if not check_key():
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    state = payload.get("state")
+    if not isinstance(state, dict):
+        return jsonify({"ok": False, "error": "Invalid state payload"}), 400
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1",
+        (json.dumps(state), datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.get("/")
+def home():
+    if FRONTEND_FILE.exists():
+        return send_from_directory(FRONTEND_FILE.parent, FRONTEND_FILE.name)
+    return jsonify({"ok": False, "error": "Frontend not found"}), 404
+
+
+if __name__ == "__main__":
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8080"))
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(host=host, port=port, debug=debug_mode)
