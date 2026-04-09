@@ -56,7 +56,8 @@
 
             <nav id="admin-nav" class="flex flex-col gap-1">
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">Monitoraggio</p>
-                <button onclick="switchView('dashboard')" class="tab-btn active flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">KPI Logistica</button>
+                <button onclick="switchView('home')" class="tab-btn active flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">Home</button>
+                <button onclick="switchView('dashboard')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">KPI Logistica</button>
                 <button onclick="switchView('reports')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">Report Analitici</button>
                 
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 mt-4">Gestione</p>
@@ -92,7 +93,19 @@
                 </div>
             </header>
 
-            <div id="view-dashboard" class="view-section active">
+            <div id="view-home" class="view-section active">
+                <div class="max-w-6xl mx-auto">
+                    <div class="rounded-2xl p-6 text-white mb-6 bg-gradient-to-br from-slate-900 to-slate-700 shadow-xl">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Sea Signora Milano</p>
+                        <h3 class="text-2xl font-black uppercase mt-1">Corporate Home</h3>
+                        <p class="text-xs opacity-80 mt-1">Panoramica rapida KPI e accessi operativi.</p>
+                    </div>
+                    <div id="home-widget-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+                    <p class="text-[10px] text-slate-500 mt-4">La personalizzazione dei widget e disponibile in Impostazioni > Personalizza Layout.</p>
+                </div>
+            </div>
+
+            <div id="view-dashboard" class="view-section">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="ui-kpi-cards">
                     <div class="glass-card p-8 flex flex-col justify-between border-l-4 border-amber-400">
                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Ordini in Sospeso (Da Approvare)</span>
@@ -368,6 +381,14 @@
                             </div>
                         </div>
                         <div class="border rounded-2xl p-4 bg-slate-50">
+                            <div class="flex items-center justify-between mb-3">
+                                <p class="text-[10px] font-black uppercase text-slate-500">Widget Home Iniziale</p>
+                                <button onclick="resetHomeWidgets()" class="text-[10px] bg-white border px-3 py-2 rounded-lg font-black uppercase">Reset Layout</button>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mb-3">Scegli i widget visibili nella Home principale dell'amministrazione.</p>
+                            <div id="home-widget-controls" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                        </div>
+                        <div class="border rounded-2xl p-4 bg-slate-50">
                             <p class="text-[10px] font-black uppercase text-slate-500 mb-3">Backup e Ripristino</p>
                             <div class="flex flex-wrap gap-2">
                                 <button onclick="exportDataBackup()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Esporta Backup</button>
@@ -378,24 +399,6 @@
                             <input id="backup-import-input" type="file" accept="application/json" class="hidden" onchange="importDataBackup(event)">
                         </div>
                         <div class="border rounded-2xl p-4 bg-slate-50">
-                            <p class="text-[10px] font-black uppercase text-slate-500 mb-3">Storage Centrale (Dipendenti)</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">URL Server</label>
-                                    <input id="ui-server-url" type="text" placeholder="http://IP-SERVER:8080" class="w-full p-3 border rounded-xl text-xs font-bold" onchange="setServerUrl(this.value)">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">API Key Server</label>
-                                    <input id="ui-server-api-key" type="password" placeholder="chiave server" class="w-full p-3 border rounded-xl text-xs font-bold" onchange="setServerApiKey(this.value)">
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <button onclick="loadStateFromServer()" class="bg-white border px-4 py-2 rounded-lg text-[10px] font-black uppercase">Scarica dal Server</button>
-                                <button onclick="saveStateToServer()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Invia al Server</button>
-                                <button onclick="initializeFullCatalogOnServer()" class="bg-emerald-700 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Inizializza Catalogo Completo</button>
-                            </div>
-                        </div>
-                        <div class="border rounded-2xl p-4 bg-slate-50">
                             <p class="text-[10px] font-black uppercase text-slate-500 mb-3">Sinonimi AI (uno per riga)</p>
                             <p class="text-[10px] text-slate-500 mb-2">Formato: sinonimo => nome prodotto catalogo</p>
                             <textarea id="ui-aliases-area" class="w-full h-28 p-3 border rounded-xl text-xs" placeholder="astice blu => Astice Blu Vivo"></textarea>
@@ -404,32 +407,22 @@
                             </div>
                         </div>
                         <div class="border rounded-2xl p-4 bg-slate-50">
-                            <p class="text-[10px] font-black uppercase text-slate-500 mb-3">AI Provider (facoltativo)</p>
+                            <p class="text-[10px] font-black uppercase text-slate-500 mb-3">AI Gemini Sempre Attiva</p>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Abilita AI esterna</label>
-                                    <select id="ui-ai-enabled" onchange="setAiEnabled(this.value)" class="w-full p-3 border rounded-xl text-sm font-bold">
-                                        <option value="false">No (solo AI locale)</option>
-                                        <option value="true">Si</option>
-                                    </select>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Provider Bloccato</label>
+                                    <input type="text" value="Gemini (fisso)" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" disabled>
                                 </div>
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Provider</label>
-                                    <select id="ui-ai-provider" onchange="setAiProvider(this.value)" class="w-full p-3 border rounded-xl text-sm font-bold">
-                                        <option value="openai">OpenAI</option>
-                                        <option value="gemini">Gemini</option>
-                                    </select>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Modello</label>
+                                    <input type="text" value="gemini-1.5-flash" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" disabled>
                                 </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Model</label>
-                                    <input id="ui-ai-model" type="text" class="w-full p-3 border rounded-xl text-sm font-bold" placeholder="gpt-4o-mini" onchange="setAiModel(this.value)">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">API Key</label>
-                                    <input id="ui-ai-key" type="password" class="w-full p-3 border rounded-xl text-sm font-bold" placeholder="sk-..." onchange="setAiApiKey(this.value)">
+                                <div class="md:col-span-2">
+                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Gemini API Key</label>
+                                    <input id="ui-ai-key" type="password" class="w-full p-3 border rounded-xl text-sm font-bold" placeholder="AIza..." onchange="setAiApiKey(this.value)">
                                 </div>
                             </div>
-                            <p class="text-[10px] text-slate-500 mt-2">Nota: in questa versione frontend la chiave resta nel browser locale.</p>
+                            <p class="text-[10px] text-slate-500 mt-2">L'AI e sempre attiva con Gemini. Inserisci solo la chiave API.</p>
                         </div>
                     </div>
                 </div>
@@ -472,9 +465,17 @@
             penaltyRate: 0.06,
             portoFrancoWindow: 'weekly',
             aliases: {},
-            aiEnabled: false,
-            aiProvider: 'openai',
-            aiModel: 'gpt-4o-mini',
+            aiEnabled: true,
+            aiProvider: 'gemini',
+            aiModel: 'gemini-1.5-flash',
+            homeWidgets: {
+                pending: true,
+                saving: true,
+                suppliers: true,
+                inbox: true,
+                reports: true,
+                catalog: true
+            },
             aiApiKey: ''
         };
         const BASE_PRODUCTS = [
@@ -569,6 +570,14 @@
         let autoSyncTimer = null;
         let autoSyncInFlight = false;
         let autoSyncQueued = false;
+        const HOME_WIDGET_LABELS = {
+            pending: 'Ordini Pending',
+            saving: 'Saving Stimato',
+            suppliers: 'Porto Franco',
+            inbox: 'Vai Inbox',
+            reports: 'Apri Report',
+            catalog: 'Catalogo'
+        };
 
         function normalizeText(v) {
             return (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -733,6 +742,7 @@
             const activeTab = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(viewId.toLowerCase().split('-')[0]));
             if(activeTab) activeTab.classList.add('active');
 
+            if (viewId === 'home') renderHomeView();
             if(viewId === 'dashboard') renderConsolidation();
             if(viewId === 'reports') { populateReportFilters(); updateCharts(); }
             if(viewId === 'config') renderConfig();
@@ -763,7 +773,7 @@
                 sidebar.style.display = 'flex'; 
                 adminHeader.style.display = 'flex'; 
                 if (roleWrap) roleWrap.style.display = 'flex';
-                switchView('dashboard'); 
+                switchView('home'); 
             } else { 
                 sidebar.style.display = 'none'; 
                 adminHeader.style.display = 'none'; 
@@ -810,6 +820,7 @@
             document.getElementById('ui-brand-input').value = appState.settings.brandName || 'Sea Signora';
             renderPriceVersionFilters();
             renderPriceVersions();
+            renderHomeWidgetControls();
         }
 
         function renderPriceVersionFilters() {
@@ -1037,17 +1048,17 @@
         }
 
         function setAiEnabled(val) {
-            appState.settings.aiEnabled = String(val) === 'true';
+            appState.settings.aiEnabled = true;
             saveState();
         }
 
         function setAiProvider(val) {
-            appState.settings.aiProvider = val || 'openai';
+            appState.settings.aiProvider = 'gemini';
             saveState();
         }
 
         function setAiModel(val) {
-            appState.settings.aiModel = val || 'gpt-4o-mini';
+            appState.settings.aiModel = 'gemini-1.5-flash';
             saveState();
         }
 
@@ -1150,16 +1161,12 @@
             renderInbox();
             try {
                 let aiItems = [];
-                if (appState.settings.aiEnabled) {
-                    const parsed = appState.settings.aiProvider === 'gemini'
-                        ? await callGeminiForOrder(req.text)
-                        : await callOpenAiForOrder(req.text);
-                    aiItems = (parsed.items || []).map(row => {
-                        const product = appState.products.find(p => String(p.id) === String(row.productId));
-                        if (!product) return null;
-                        return { product, qty: parseNumber(row.qty || 1) || 1 };
-                    }).filter(Boolean);
-                }
+                const parsed = await callGeminiForOrder(req.text);
+                aiItems = (parsed.items || []).map(row => {
+                    const product = appState.products.find(p => String(p.id) === String(row.productId));
+                    if (!product) return null;
+                    return { product, qty: parseNumber(row.qty || 1) || 1 };
+                }).filter(Boolean);
                 if (aiItems.length === 0) aiItems = parseOrderText(req.text);
                 req.aiAnalysis = aiItems.map(x => ({ productId: x.product.id, qty: x.qty }));
                 req.aiStatus = 'done';
@@ -1807,12 +1814,77 @@
 
         async function analyzeAllPendingOrdersAI() {
             if (!appState.inbox.length) return alert('Nessun ordine in attesa.');
-            if (!appState.settings.aiEnabled) return alert('Abilita AI esterna in Impostazioni.');
             for (const req of appState.inbox) {
                 await analyzeOrderAI(req.id);
             }
             alert('✓ Analisi AI completata su tutti gli ordini pending.');
             renderInbox();
+        }
+
+        function getVisibleHomeWidgets() {
+            const cfg = appState.settings.homeWidgets || {};
+            return {
+                pending: cfg.pending !== false,
+                saving: cfg.saving !== false,
+                suppliers: cfg.suppliers !== false,
+                inbox: cfg.inbox !== false,
+                reports: cfg.reports !== false,
+                catalog: cfg.catalog !== false
+            };
+        }
+
+        function resetHomeWidgets() {
+            appState.settings.homeWidgets = { ...DEFAULT_SETTINGS.homeWidgets };
+            saveState();
+            renderHomeView();
+            renderHomeWidgetControls();
+        }
+
+        function toggleHomeWidget(id) {
+            const current = getVisibleHomeWidgets();
+            current[id] = !current[id];
+            appState.settings.homeWidgets = current;
+            saveState();
+            renderHomeView();
+            renderHomeWidgetControls();
+        }
+
+        function renderHomeView() {
+            const grid = document.getElementById('home-widget-grid');
+            if (!grid) return;
+            const widgets = getVisibleHomeWidgets();
+            const pending = appState.inbox.length;
+            const saving = Number(document.getElementById('kpi-saving')?.innerText || '0');
+            const supplierAlert = appState.suppliers.filter(s => s.currentTotal > 0 && s.currentTotal < s.min).length;
+            const cards = [
+                { id: 'pending', icon: 'IN', title: 'Pending', value: String(pending), sub: 'ordini', action: "switchView('inbox')" },
+                { id: 'saving', icon: 'SV', title: 'Saving', value: `EUR ${saving.toFixed(2)}`, sub: 'stimato', action: "switchView('dashboard')" },
+                { id: 'suppliers', icon: 'PF', title: 'Fornitori', value: String(supplierAlert), sub: 'sotto soglia', action: "switchView('dashboard')" },
+                { id: 'inbox', icon: 'BX', title: 'Inbox', value: 'Apri', sub: 'nuovi ordini', action: "switchView('inbox')" },
+                { id: 'reports', icon: 'RP', title: 'Report', value: 'Apri', sub: 'analytics', action: "switchView('reports')" },
+                { id: 'catalog', icon: 'CT', title: 'Catalogo', value: 'Apri', sub: 'prodotti', action: "switchView('catalog')" }
+            ];
+            const visibleCards = cards.filter(c => widgets[c.id]);
+            grid.innerHTML = visibleCards.map(c => `
+                <button onclick="${c.action}" class="text-left bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md active:scale-[0.98] transition-all">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white text-[10px] font-black flex items-center justify-center mb-2 tracking-wider">${c.icon}</div>
+                    <p class="text-[10px] font-black uppercase text-slate-500 tracking-wider">${c.title}</p>
+                    <p class="text-sm font-black text-slate-900 mt-0.5">${c.value}</p>
+                    <p class="text-[10px] text-slate-500 uppercase tracking-wide">${c.sub}</p>
+                </button>
+            `).join('') || '<div class="md:col-span-2 xl:col-span-3 text-center text-xs text-slate-500 py-6 bg-white rounded-2xl border">Nessun widget attivo</div>';
+        }
+
+        function renderHomeWidgetControls() {
+            const controls = document.getElementById('home-widget-controls');
+            if (!controls) return;
+            const widgets = getVisibleHomeWidgets();
+            controls.innerHTML = Object.keys(HOME_WIDGET_LABELS).map(id => `
+                <label class="flex items-center justify-between bg-slate-50 border rounded-xl px-3 py-2">
+                    <span class="text-xs font-bold uppercase tracking-wide text-slate-700">${HOME_WIDGET_LABELS[id]}</span>
+                    <input type="checkbox" ${widgets[id] ? 'checked' : ''} onchange="toggleHomeWidget('${id}')">
+                </label>
+            `).join('');
         }
 
         function buildConsolidatedPlan() {
@@ -2366,6 +2438,9 @@
         }
 
         function applySettings() {
+            appState.settings.aiEnabled = true;
+            appState.settings.aiProvider = 'gemini';
+            appState.settings.aiModel = 'gemini-1.5-flash';
             document.getElementById('ui-brand-name').innerText = appState.settings.brandName || 'Sea Signora';
             document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor || '#c5a059');
             const accentEl = document.getElementById('ui-accent-input');
@@ -2380,12 +2455,6 @@
             if (aliasesArea) {
                 aliasesArea.value = Object.entries(appState.settings.aliases || {}).map(([k, v]) => `${k} => ${v}`).join('\n');
             }
-            const aiEnabledEl = document.getElementById('ui-ai-enabled');
-            if (aiEnabledEl) aiEnabledEl.value = String(!!appState.settings.aiEnabled);
-            const aiProviderEl = document.getElementById('ui-ai-provider');
-            if (aiProviderEl) aiProviderEl.value = appState.settings.aiProvider || 'openai';
-            const aiModelEl = document.getElementById('ui-ai-model');
-            if (aiModelEl) aiModelEl.value = appState.settings.aiModel || 'gpt-4o-mini';
             const aiKeyEl = document.getElementById('ui-ai-key');
             if (aiKeyEl) aiKeyEl.value = appState.settings.aiApiKey || '';
             const serverUrlEl = document.getElementById('ui-server-url');
@@ -2401,7 +2470,7 @@
         document.addEventListener('DOMContentLoaded', () => { 
             // Inizializzazione sicura
             document.querySelectorAll('.view-section').forEach(s => s.style.display = 'none');
-            document.getElementById('view-dashboard').style.display = 'block';
+            document.getElementById('view-home').style.display = 'block';
             const deptFromUrl = new URLSearchParams(window.location.search).get('reparto');
             if (deptFromUrl && appState.reparti.includes(deptFromUrl)) {
                 document.getElementById('role-selector').value = deptFromUrl;
@@ -2413,6 +2482,7 @@
             renderCatalogMgmt();
             renderInbox();
             renderConsolidation();
+            renderHomeView();
         });
     </script>
 </body>
