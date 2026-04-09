@@ -180,7 +180,7 @@ def notify():
 
     ok, err = send_email(subject, body)
     if not ok:
-        return jsonify({"ok": False, "error": err}), 503
+        return jsonify({"ok": False, "error": err, "debug": {"host": SMTP_HOST, "port": SMTP_PORT, "user": SMTP_USER, "to": SMTP_TO}}), 503
     return jsonify({"ok": True})
 
 
