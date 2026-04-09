@@ -3,6 +3,7 @@ import os
 import sqlite3
 import smtplib
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -179,10 +180,18 @@ def send_email_formspree(subject, body):
         "from": SMTP_FROM,
         "_subject": subject,
     }
+    encoded = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(
         FORMSPREE_ENDPOINT,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        data=encoded,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            # Formspree/Cloudflare may block default python-urllib signature.
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Origin": "https://seasignora-ordini.up.railway.app",
+            "Referer": "https://seasignora-ordini.up.railway.app/",
+        },
         method="POST",
     )
     try:
