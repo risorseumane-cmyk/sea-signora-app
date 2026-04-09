@@ -94,8 +94,8 @@ def init_db():
 
 
 def check_key():
-    auth = request.headers.get("X-API-Key", "")
-    return auth == API_KEY
+    # Authentication disabled by request: keep APIs open without password.
+    return True
 
 
 def sanitize_state(state):

@@ -566,6 +566,9 @@
         applyLocalConnectionSettings();
         hydrateDerivedState();
         let lastAddedProductId = null;
+        let autoSyncTimer = null;
+        let autoSyncInFlight = false;
+        let autoSyncQueued = false;
 
         function normalizeText(v) {
             return (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -664,6 +667,29 @@
                 }
             }));
             writeConnectionSettings();
+            queueAutoSync();
+        }
+
+        function queueAutoSync() {
+            const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
+            if (!url) return;
+            clearTimeout(autoSyncTimer);
+            autoSyncTimer = setTimeout(async () => {
+                if (autoSyncInFlight) {
+                    autoSyncQueued = true;
+                    return;
+                }
+                autoSyncInFlight = true;
+                try {
+                    await saveStateToServer({ silent: true });
+                } finally {
+                    autoSyncInFlight = false;
+                    if (autoSyncQueued) {
+                        autoSyncQueued = false;
+                        queueAutoSync();
+                    }
+                }
+            }, 1200);
         }
 
         function hydrateDerivedState() {
@@ -1248,39 +1274,40 @@
             }
         }
 
-        async function saveStateToServer() {
+        async function saveStateToServer(opts = {}) {
+            const silent = !!opts.silent;
             const url = appState.settings.serverUrl;
-            const key = appState.settings.serverApiKey;
-            if (!url) return alert('Inserisci URL Server nelle impostazioni.');
-            if (!key) return alert('Inserisci API Key server nelle impostazioni.');
+            const key = (appState.settings.serverApiKey || '').trim();
+            if (!url) {
+                if (!silent) alert('Inserisci URL Server nelle impostazioni.');
+                return;
+            }
             try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (key) headers['X-API-Key'] = key;
                 const res = await fetch(`${url}/api/state`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': key
-                    },
+                    headers,
                     body: JSON.stringify({ state: getSerializableState() })
                 });
                 const data = await res.json();
                 if (!res.ok || !data.ok) throw new Error(data.error || 'Errore salvataggio server');
-                alert('✓ Dati inviati al server con successo.');
+                if (!silent) alert('✓ Dati inviati al server con successo.');
             } catch (e) {
-                alert(`Errore salvataggio server: ${String(e.message || e)}`);
+                if (!silent) alert(`Errore salvataggio server: ${String(e.message || e)}`);
             }
         }
 
         async function notifyAdminEmail(type, data) {
             const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
-            const key = appState.settings.serverApiKey || '';
-            if (!url || !key) return;
+            const key = (appState.settings.serverApiKey || '').trim();
+            if (!url) return;
             try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (key) headers['X-API-Key'] = key;
                 await fetch(`${url}/api/notify`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': key
-                    },
+                    headers,
                     body: JSON.stringify({ type, data })
                 });
             } catch {
