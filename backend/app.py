@@ -26,6 +26,7 @@ SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM = os.getenv("RESEND_FROM", SMTP_FROM)
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 app = Flask(__name__)
 CORS(app)
@@ -355,7 +356,14 @@ def create_order():
     ok, err = send_email(subject, body)
     log_notification("order", subject, body, ok, err)
 
-    return jsonify({"ok": True, "id": req_id, "emailDelivered": bool(ok)})
+    return jsonify(
+        {
+            "ok": True,
+            "id": req_id,
+            "emailDelivered": bool(ok),
+            "emailError": "" if ok else (err or "Email delivery failed"),
+        }
+    )
 
 
 @app.post("/api/notify")
@@ -405,6 +413,68 @@ def notify():
             }
         )
     return jsonify({"ok": True, "delivered": True})
+
+
+@app.post("/api/ai/order-parse")
+def ai_order_parse():
+    if not check_key():
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+
+    if not GEMINI_API_KEY:
+        return jsonify({"ok": False, "error": "GEMINI_API_KEY non configurata sul server"}), 503
+
+    payload = request.get_json(silent=True) or {}
+    text = str(payload.get("text") or "").strip()
+    catalog = payload.get("catalog") or []
+    model = str(payload.get("model") or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    if not text:
+        return jsonify({"ok": False, "error": "Missing text"}), 400
+    if not isinstance(catalog, list):
+        catalog = []
+
+    prompt = (
+        "Analizza questa lista spesa e fai il match con il catalogo.\n"
+        'Restituisci SOLO JSON valido nel formato {"items":[{"productId":number,"qty":number}]}\n'
+        f"Regole: qty default 1.\nCatalogo:\n{json.dumps(catalog, ensure_ascii=False)}\n\nOrdine:\n{text}"
+    )
+
+    req = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model)}:generateContent?key={urllib.parse.quote(GEMINI_API_KEY)}",
+        data=json.dumps(
+            {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.1},
+            }
+        ).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+        data = json.loads(raw)
+        txt = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "{}")
+        )
+        start = txt.find("{")
+        end = txt.rfind("}")
+        if start >= 0 and end > start:
+            txt = txt[start : end + 1]
+        parsed = json.loads(txt)
+        return jsonify({"ok": True, "parsed": parsed})
+    except urllib.error.HTTPError as e:
+        details = ""
+        try:
+            details = e.read().decode("utf-8")
+        except Exception:
+            details = str(e)
+        return jsonify({"ok": False, "error": f"Gemini HTTP {e.code}: {details[:300]}"}), 502
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Gemini error: {str(e)}"}), 500
 
 
 @app.get("/api/notifications")

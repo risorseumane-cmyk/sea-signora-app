@@ -431,7 +431,7 @@
                                     <input id="ui-ai-key" type="password" class="w-full p-3 border rounded-xl text-sm font-bold" placeholder="AIza..." onchange="setAiApiKey(this.value)">
                                 </div>
                             </div>
-                            <p class="text-[10px] text-slate-500 mt-2">L'AI e sempre attiva con Gemini. Inserisci solo la chiave API.</p>
+                            <p class="text-[10px] text-slate-500 mt-2">Gemini e sempre attiva via server (consigliato). La chiave locale e solo fallback.</p>
                         </div>
                     </div>
                 </div>
@@ -579,6 +579,9 @@
         let autoSyncTimer = null;
         let autoSyncInFlight = false;
         let autoSyncQueued = false;
+        let adminPullTimer = null;
+        let adminPullInFlight = false;
+        let globalPullTimer = null;
         const HOME_WIDGET_LABELS = {
             pending: 'Ordini Pending',
             saving: 'Saving Stimato',
@@ -784,14 +787,17 @@
                 sidebar.style.display = 'flex'; 
                 adminHeader.style.display = 'flex'; 
                 if (roleWrap) roleWrap.style.display = 'flex';
-                switchView('home'); 
+                switchView('home');
+                startAdminInboxPolling();
+                pullStateFromServerSilently();
             } else { 
                 sidebar.style.display = 'none'; 
                 adminHeader.style.display = 'none'; 
                 if (roleWrap) roleWrap.style.display = 'none';
                 appState.currentDept = role;
                 document.getElementById('dept-name-display').innerText = `Reparto: ${role}`;
-                switchView('department'); 
+                switchView('department');
+                if (adminPullTimer) clearInterval(adminPullTimer);
             }
         }
 
@@ -1135,8 +1141,6 @@
         }
 
         async function callGeminiForOrder(text) {
-            const key = appState.settings.aiApiKey || '';
-            if (!key) throw new Error('API key Gemini mancante');
             const catalog = appState.products.slice(0, 200).map(p => ({
                 id: p.id,
                 name: p.name,
@@ -1144,13 +1148,29 @@
                 cat: p.cat,
                 sub: p.sub
             }));
+            const model = appState.settings.aiModel || 'gemini-1.5-flash';
+            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+            const base = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
+            const key = (appState.settings.serverApiKey || '').trim();
+            if (base) {
+                const headers = { 'Content-Type': 'application/json' };
+                if (key) headers['X-API-Key'] = key;
+                const res = await fetch(`${base}/api/ai/order-parse`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ text, catalog, model })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data?.ok && data?.parsed) return data.parsed;
+            }
+
+            const localKey = appState.settings.aiApiKey || '';
+            if (!localKey) throw new Error('Gemini server non configurato e API key locale mancante');
             const prompt =
                 `Analizza questa lista spesa e fai il match con il catalogo.\n` +
                 `Restituisci SOLO JSON valido nel formato {"items":[{"productId":number,"qty":number}]}\n` +
                 `Regole: qty default 1.\nCatalogo:\n${JSON.stringify(catalog)}\n\nOrdine:\n${text}`;
-
-            const model = appState.settings.aiModel || 'gemini-1.5-flash';
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+            const res2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(localKey)}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1158,9 +1178,9 @@
                     generationConfig: { temperature: 0.1 }
                 })
             });
-            if (!res.ok) throw new Error(`Gemini error ${res.status}`);
-            const data = await res.json();
-            const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+            if (!res2.ok) throw new Error(`Gemini error ${res2.status}`);
+            const data2 = await res2.json();
+            const txt = data2?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
             const m = txt.match(/\{[\s\S]*\}/);
             return JSON.parse(m ? m[0] : txt);
         }
@@ -1261,6 +1281,7 @@
                 suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
                 reparti: appState.reparti,
                 inbox: appState.inbox,
+                orderHistory: appState.orderHistory || [],
                 archive: appState.archive,
                 priceHistory: appState.priceHistory || [],
                 settings: safeSettings
@@ -1290,6 +1311,63 @@
             } catch (e) {
                 alert(`Errore caricamento server: ${String(e.message || e)}`);
             }
+        }
+
+        function applyRemoteState(remote) {
+            if (!remote || typeof remote !== 'object') return;
+            if (Array.isArray(remote.products)) appState.products = remote.products;
+            if (Array.isArray(remote.suppliers)) appState.suppliers = remote.suppliers;
+            if (Array.isArray(remote.reparti)) appState.reparti = remote.reparti;
+            if (Array.isArray(remote.inbox)) appState.inbox = remote.inbox;
+            if (Array.isArray(remote.orderHistory)) appState.orderHistory = remote.orderHistory;
+            if (Array.isArray(remote.archive)) appState.archive = remote.archive;
+            if (Array.isArray(remote.priceHistory)) appState.priceHistory = remote.priceHistory;
+            if (remote.settings && typeof remote.settings === 'object') {
+                appState.settings = {
+                    ...appState.settings,
+                    ...remote.settings,
+                    aiApiKey: appState.settings.aiApiKey || '',
+                    serverUrl: appState.settings.serverUrl || '',
+                    serverApiKey: appState.settings.serverApiKey || ''
+                };
+            }
+        }
+
+        async function pullStateFromServerSilently() {
+            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+            const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
+            if (!url || adminPullInFlight) return;
+            adminPullInFlight = true;
+            try {
+                const res = await fetch(`${url}/api/state`);
+                const data = await res.json();
+                if (!res.ok || !data.ok || !data.state) return;
+                applyRemoteState(data.state);
+                const inboxVisible = document.getElementById('view-inbox')?.style.display !== 'none';
+                if (inboxVisible) renderInbox();
+                const catVisible = document.getElementById('view-catalog')?.style.display !== 'none';
+                if (catVisible) renderCatalogMgmt();
+                const dashboardVisible = document.getElementById('view-dashboard')?.style.display !== 'none';
+                if (dashboardVisible) renderConsolidation();
+            } catch {
+                // do nothing, non-blocking background sync
+            } finally {
+                adminPullInFlight = false;
+            }
+        }
+
+        function startAdminInboxPolling() {
+            if (adminPullTimer) clearInterval(adminPullTimer);
+            adminPullTimer = setInterval(() => {
+                pullStateFromServerSilently();
+            }, 8000);
+        }
+
+        function startGlobalStatePolling() {
+            if (globalPullTimer) clearInterval(globalPullTimer);
+            globalPullTimer = setInterval(() => {
+                pullStateFromServerSilently();
+            }, 10000);
         }
 
         async function saveStateToServer(opts = {}) {
@@ -1338,7 +1416,7 @@
             const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
             const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
             const key = (appState.settings.serverApiKey || '').trim();
-            if (!url) return false;
+            if (!url) return { ok: false, emailDelivered: false, error: 'Server URL mancante' };
             try {
                 const headers = { 'Content-Type': 'application/json' };
                 if (key) headers['X-API-Key'] = key;
@@ -1348,9 +1426,13 @@
                     body: JSON.stringify(orderPayload)
                 });
                 const data = await res.json().catch(() => ({}));
-                return !!(res.ok && data && data.ok);
+                return {
+                    ok: !!(res.ok && data && data.ok),
+                    emailDelivered: !!(data && data.emailDelivered),
+                    error: (data && data.emailError) ? data.emailError : ''
+                };
             } catch {
-                return false;
+                return { ok: false, emailDelivered: false, error: 'Errore rete invio ordine' };
             }
         }
 
@@ -1736,14 +1818,22 @@
                 setTimeout(() => status.classList.add('hidden'), 3000);
             }
             saveState();
-            const deliveredViaOrderApi = await submitOrderDirectlyToServer({
+            const orderApi = await submitOrderDirectlyToServer({
                 dept: newReq.dept,
                 staff: newReq.staff,
                 text: newReq.text,
                 date: new Date().toLocaleString('it-IT')
             });
-            if (!deliveredViaOrderApi) {
+            if (!orderApi.ok) {
                 await saveStateToServer({ silent: true });
+                await notifyAdminEmail('order', {
+                    dept: newReq.dept,
+                    staff: newReq.staff,
+                    text: newReq.text,
+                    date: new Date().toLocaleString('it-IT')
+                });
+            } else if (!orderApi.emailDelivered) {
+                // Second attempt only for email when order is saved but delivery failed.
                 await notifyAdminEmail('order', {
                     dept: newReq.dept,
                     staff: newReq.staff,
@@ -2455,6 +2545,7 @@
             saveState();
             renderCatalogMgmt();
         }
+        
 
         function showPriceHistory(productId) {
             const p = appState.products.find(x => x.id === productId);
@@ -2647,6 +2738,8 @@
             renderInbox();
             renderConsolidation();
             renderHomeView();
+            startGlobalStatePolling();
+            pullStateFromServerSilently();
         });
     </script>
 </body>
