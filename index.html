@@ -892,6 +892,7 @@
         let remotePollTimer = null;
         let lastRemoteUpdatedAt = '';
         let remotePollInFlight = false;
+        const CATALOG_RENDER_LIMIT = 220;
         const HOME_WIDGET_LABELS = {
             pending: 'Ordini Pending',
             saving: 'Saving Stimato',
@@ -2759,8 +2760,11 @@
 
         function renderCatalogMgmt() {
             const body = document.getElementById('catalog-table-body');
+            if (!body) return;
             const s = (document.getElementById('catalog-mgmt-search')?.value || "").toLowerCase();
-            body.innerHTML = appState.products.filter(p => p.name.toLowerCase().includes(s)).map(p => `
+            const filtered = appState.products.filter(p => p.name.toLowerCase().includes(s));
+            const limited = filtered.slice(0, CATALOG_RENDER_LIMIT);
+            body.innerHTML = limited.map(p => `
                 <tr id="product-row-${p.id}" class="hover:bg-slate-50 border-b border-slate-50 ${p.id === lastAddedProductId ? 'bg-emerald-50/60' : ''}">
                     <td class="px-6 py-3">
                         <p class="font-bold text-xs text-slate-900">${p.name}</p>
@@ -2773,6 +2777,9 @@
                         <button onclick="deleteCatalogProduct(${p.id})" class="text-[9px] px-2 py-1 border rounded-lg font-bold uppercase text-rose-600">Elimina</button>
                     </td>
                 </tr>`).join('');
+            if (filtered.length > CATALOG_RENDER_LIMIT && !s) {
+                body.innerHTML += `<tr><td colspan="2" class="px-6 py-4 text-[10px] font-bold uppercase text-slate-500 bg-slate-50">Mostrati i primi ${CATALOG_RENDER_LIMIT} prodotti su ${filtered.length}. Usa la ricerca per filtrare rapidamente.</td></tr>`;
+            }
             if (lastAddedProductId) {
                 const el = document.getElementById(`product-row-${lastAddedProductId}`);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2990,7 +2997,6 @@
             }
             applySettings();
             handleRoleChange(); 
-            renderCatalogMgmt();
             renderInbox();
             renderConsolidation();
             renderHomeView();
