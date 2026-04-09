@@ -155,6 +155,19 @@
                     <div class="glass-card p-8"><h4 id="trend-title" class="text-[10px] font-black uppercase text-slate-400 mb-6">Andamento Costi</h4><div class="chart-container"><canvas id="analyticsTrendChart"></canvas></div></div>
                     <div class="glass-card p-8"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-6">Ripartizione Spese</h4><div class="chart-container"><canvas id="analyticsPieChart"></canvas></div></div>
                 </div>
+                <div class="glass-card p-8 mt-8">
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                        <h4 class="text-[10px] font-black uppercase text-slate-400">Heatmap Prezzi (Prodotti x Fornitori)</h4>
+                        <input id="heatmap-search" oninput="renderPriceHeatmap()" type="text" placeholder="Filtra prodotto..." class="p-2 border rounded-lg text-xs font-bold">
+                    </div>
+                    <div class="overflow-auto border rounded-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead id="heatmap-head" class="bg-slate-50 border-b"></thead>
+                            <tbody id="heatmap-body" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-3">Verde: prezzo sotto media storica. Rosso: oltre +10% media storica. Giallo: fascia intermedia.</p>
+                </div>
             </div>
 
             <div id="view-inbox" class="view-section"><div id="inbox-container" class="max-w-4xl mx-auto space-y-6"></div></div>
@@ -1257,6 +1270,24 @@
             }
         }
 
+        async function notifyAdminEmail(type, data) {
+            const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
+            const key = appState.settings.serverApiKey || '';
+            if (!url || !key) return;
+            try {
+                await fetch(`${url}/api/notify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': key
+                    },
+                    body: JSON.stringify({ type, data })
+                });
+            } catch {
+                // silently ignore, main flow must continue
+            }
+        }
+
         function ensureSeedCatalogInCurrentState() {
             if (!Array.isArray(appState.products)) appState.products = [];
             if (!Array.isArray(appState.suppliers)) appState.suppliers = [];
@@ -1603,6 +1634,12 @@
                 setTimeout(() => status.classList.add('hidden'), 3000);
             }
             saveState();
+            notifyAdminEmail('order', {
+                dept: newReq.dept,
+                staff: newReq.staff,
+                text: newReq.text,
+                date: new Date().toLocaleString('it-IT')
+            });
             alert("✓ Ordine Inviato");
             if (!appState.kioskMode) handleRoleChange();
         }
@@ -2073,6 +2110,41 @@
                 data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: ['#0a2540', '#c5a059', '#16406b', '#e2e8f0', '#ff8a71'] }] }, 
                 options: { responsive: true, maintainAspectRatio: false, cutout: '70%' } 
             });
+            renderPriceHeatmap();
+        }
+
+        function getHistoricalAverage(productId, supplier) {
+            const hist = (appState.priceHistory || []).filter(h => h.productId === productId && h.supplier === supplier);
+            if (!hist.length) return null;
+            const avg = hist.reduce((sum, h) => sum + parseNumber(h.newPrice), 0) / hist.length;
+            return Number.isFinite(avg) ? avg : null;
+        }
+
+        function renderPriceHeatmap() {
+            const head = document.getElementById('heatmap-head');
+            const body = document.getElementById('heatmap-body');
+            if (!head || !body) return;
+            const search = normalizeText(document.getElementById('heatmap-search')?.value || '');
+            const suppliers = [...new Set(appState.products.flatMap(p => Object.keys(p.prices || {})))].slice(0, 12);
+            const products = appState.products
+                .filter(p => !search || normalizeText(p.name).includes(search))
+                .slice(0, 120);
+
+            head.innerHTML = `<tr><th class="px-3 py-2 text-[10px] font-black uppercase text-slate-400">Prodotto</th>${suppliers.map(s => `<th class="px-3 py-2 text-[10px] font-black uppercase text-slate-400">${s}</th>`).join('')}</tr>`;
+
+            body.innerHTML = products.map(p => {
+                const cells = suppliers.map(s => {
+                    const cur = p.prices?.[s];
+                    if (cur === undefined) return `<td class="px-3 py-2 bg-slate-50 text-slate-300">-</td>`;
+                    const avg = getHistoricalAverage(p.id, s);
+                    let cls = 'bg-amber-50 text-amber-800';
+                    if (avg === null) cls = 'bg-slate-100 text-slate-600';
+                    else if (cur < avg) cls = 'bg-emerald-100 text-emerald-800';
+                    else if (cur > avg * 1.1) cls = 'bg-rose-100 text-rose-800';
+                    return `<td class="px-3 py-2 ${cls} font-black">€${parseNumber(cur).toFixed(2)}</td>`;
+                }).join('');
+                return `<tr><td class="px-3 py-2 font-bold">${p.name}</td>${cells}</tr>`;
+            }).join('');
         }
 
         function renderCatalogMgmt() {
@@ -2177,6 +2249,11 @@
                 ? `✓ ${count} prezzi aggiornati.\n\nAttenzione aumenti >10%:\n- ${alerts.slice(0, 10).join('\n- ')}`
                 : `✓ ${count} prezzi aggiornati nel Listino Master.`;
             alert(msg);
+            if (alerts.length) {
+                notifyAdminEmail('price_alert', {
+                    message: alerts.slice(0, 30).join('\n')
+                });
+            }
             renderPriceUpdateTable();
         }
 

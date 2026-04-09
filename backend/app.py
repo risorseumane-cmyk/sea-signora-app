@@ -1,7 +1,9 @@
 import json
 import os
 import sqlite3
+import smtplib
 from datetime import datetime
+from email.mime.text import MIMEText
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -12,6 +14,12 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "app_data.db"
 FRONTEND_FILE = BASE_DIR.parent / "index.html"
 API_KEY = os.getenv("SEASIGNORA_API_KEY", "cambia-questa-chiave")
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "noreply@seasignorarest.com")
+SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
 
 app = Flask(__name__)
 CORS(app)
@@ -83,6 +91,23 @@ def sanitize_state(state):
     return safe
 
 
+def send_email(subject, body):
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
+        return False, "SMTP non configurato"
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM
+    msg["To"] = SMTP_TO
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_FROM, [SMTP_TO], msg.as_string())
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+
+
 init_db()
 
 
@@ -123,6 +148,39 @@ def save_state():
     )
     conn.commit()
     conn.close()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/notify")
+def notify():
+    if not check_key():
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+    payload = request.get_json(silent=True) or {}
+    kind = payload.get("type", "generic")
+    data = payload.get("data", {})
+
+    if kind == "order":
+        subject = "[Sea Signora] Nuovo ordine reparto"
+        body = (
+            f"Nuovo ordine ricevuto\n\n"
+            f"Reparto: {data.get('dept', '-')}\n"
+            f"Operatore: {data.get('staff', '-')}\n"
+            f"Testo: {data.get('text', '-')}\n"
+            f"Data: {data.get('date', '-')}\n"
+        )
+    elif kind == "price_alert":
+        subject = "[Sea Signora] Alert aumento prezzi"
+        body = (
+            f"Sono stati rilevati aumenti prezzo > soglia.\n\n"
+            f"Dettagli:\n{data.get('message', '-')}\n"
+        )
+    else:
+        subject = "[Sea Signora] Notifica"
+        body = json.dumps(data, ensure_ascii=False, indent=2)
+
+    ok, err = send_email(subject, body)
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 503
     return jsonify({"ok": True})
 
 
