@@ -1,0 +1,6 @@
+.DS_Store
+.localized
+__pycache__/
+*.pyc
+backend/app_data.db
+backend/.env
