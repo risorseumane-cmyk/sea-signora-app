@@ -1601,6 +1601,39 @@
             badge.style.display = appState.inbox.length > 0 ? 'block' : 'none';
             document.getElementById('kpi-pending-count').innerText = appState.inbox.length;
 
+            const consolidatedPlan = buildConsolidatedPlan();
+            const consolidatedHtml = consolidatedPlan.linesCount > 0 ? `
+                <div class="glass-card p-8 mb-6 border-2 border-indigo-100 bg-indigo-50/40">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-500">AI Ordine Accorpato</p>
+                            <h4 class="text-lg font-black text-slate-900">Accorpamento automatico ordini reparti</h4>
+                        </div>
+                        <span class="text-xs font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">${consolidatedPlan.requestIds.length} ordini</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        ${consolidatedPlan.allocations.map(a => {
+                            const sup = appState.suppliers.find(s => s.name === a.supplier);
+                            const min = sup?.min || 0;
+                            const below = a.total < min;
+                            return `<div class="bg-white border rounded-xl p-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-black uppercase">${a.supplier}</span>
+                                    <span class="text-xs font-black">€ ${a.total.toFixed(2)}</span>
+                                </div>
+                                <p class="text-[10px] ${below ? 'text-amber-700' : 'text-emerald-700'} font-bold mt-1">${below ? `Sotto porto franco (€ ${min.toFixed(2)})` : 'Porto franco ok'}</p>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <div class="flex flex-wrap justify-between items-center gap-3 border-t pt-4">
+                        <div>
+                            <p class="text-[10px] uppercase font-black text-slate-400">Totale stimato</p>
+                            <p class="text-lg font-black">€ ${consolidatedPlan.effectiveCost.toFixed(2)} <span class="text-xs text-slate-400">(raw € ${consolidatedPlan.rawCost.toFixed(2)})</span></p>
+                        </div>
+                        <button onclick="approveConsolidatedOrder()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva Ordine Accorpato</button>
+                    </div>
+                </div>` : '';
+
             const pendingHtml = appState.inbox.length === 0 ? 
                 '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine da approvare</div>' :
                 appState.inbox.map(req => {
@@ -1654,7 +1687,118 @@
                         }).join('')}</div>`}
                 </div>`;
 
-            container.innerHTML = pendingHtml + historyHtml;
+            container.innerHTML = consolidatedHtml + pendingHtml + historyHtml;
+        }
+
+        function getRowsFromRequest(req) {
+            const aiRows = ((req.aiAnalysis || []).map(a => {
+                const product = appState.products.find(p => p.id === a.productId);
+                return product ? { product, qty: a.qty || 1 } : null;
+            }).filter(Boolean));
+            return (aiRows.length ? aiRows : parseOrderText(req.text)).map(r => ({
+                product: r.product,
+                qty: r.qty,
+                reqId: req.id,
+                dept: req.dept,
+                staff: req.staff
+            }));
+        }
+
+        function buildConsolidatedPlan() {
+            const allocationsBySupplier = {};
+            const stagedTotals = {};
+            const requestIds = new Set();
+            const cats = new Set();
+            let rawCost = 0;
+            let linesCount = 0;
+
+            appState.inbox.forEach(req => {
+                const rows = getRowsFromRequest(req);
+                rows.forEach(({ product, qty, reqId, dept, staff }) => {
+                    const best = chooseSupplierForLine(product, qty, stagedTotals);
+                    const rowTotal = best.price * qty;
+                    if (!allocationsBySupplier[best.name]) allocationsBySupplier[best.name] = [];
+                    allocationsBySupplier[best.name].push({
+                        productId: product.id,
+                        productName: product.name,
+                        qty,
+                        unitPrice: best.price,
+                        total: rowTotal,
+                        cat: product.cat,
+                        sub: product.sub,
+                        reqId,
+                        dept,
+                        staff
+                    });
+                    stagedTotals[best.name] = (stagedTotals[best.name] || 0) + rowTotal;
+                    requestIds.add(reqId);
+                    rawCost += rowTotal;
+                    linesCount += 1;
+                    cats.add(product.cat);
+                });
+            });
+
+            const allocations = Object.entries(allocationsBySupplier).map(([supplier, items]) => ({
+                supplier,
+                items,
+                total: items.reduce((sum, i) => sum + i.total, 0)
+            }));
+
+            const effectiveCost = allocations.reduce((sum, a) => {
+                const supObj = appState.suppliers.find(s => s.name === a.supplier);
+                if(!supObj) return sum + a.total;
+                const penaltyRate = Number(appState.settings.penaltyRate || 0.06);
+                const penalty = a.total < supObj.min ? (supObj.min - a.total) * penaltyRate : 0;
+                return sum + a.total + penalty;
+            }, 0);
+
+            return {
+                allocations,
+                rawCost,
+                effectiveCost,
+                requestIds: Array.from(requestIds),
+                linesCount,
+                cat: Array.from(cats)[0] || 'Varie'
+            };
+        }
+
+        function approveConsolidatedOrder() {
+            const plan = buildConsolidatedPlan();
+            if (!plan.linesCount) return alert('Nessun ordine da accorpare.');
+
+            plan.allocations.forEach(a => {
+                const supObj = appState.suppliers.find(s => s.name === a.supplier);
+                if (supObj) {
+                    supObj.currentTotal += a.total;
+                    a.items.forEach(i => supObj.items.push(`${i.productName} x${i.qty}`));
+                }
+            });
+
+            appState.archive.unshift({
+                id: Date.now(),
+                date: new Date().toLocaleDateString('it-IT'),
+                dateISO: new Date().toISOString(),
+                requester: 'AI Consolidation',
+                dept: 'Multi-Reparto',
+                text: `Ordine accorpato da ${plan.requestIds.length} richieste`,
+                cost: Number(plan.effectiveCost.toFixed(2)),
+                rawCost: Number(plan.rawCost.toFixed(2)),
+                cat: plan.cat,
+                allocations: plan.allocations,
+                consolidated: true
+            });
+
+            plan.requestIds.forEach(id => {
+                const h = (appState.orderHistory || []).find(x => x.id === id);
+                if (h) {
+                    h.status = 'approvato';
+                    h.updatedAt = new Date().toISOString();
+                }
+            });
+            appState.inbox = [];
+            saveState();
+            alert('✓ Ordine accorpato approvato e inviato in logistica.');
+            switchView('dashboard');
         }
 
         function rejectRequest(id) {
