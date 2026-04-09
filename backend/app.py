@@ -286,6 +286,78 @@ def save_state():
     return jsonify({"ok": True})
 
 
+@app.post("/api/order")
+def create_order():
+    if not check_key():
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    dept = str(payload.get("dept") or "").strip()
+    staff = str(payload.get("staff") or "").strip()
+    text = str(payload.get("text") or "").strip()
+    if not staff or not text:
+        return jsonify({"ok": False, "error": "Missing required fields"}), 400
+    if not dept:
+        dept = "Reparto"
+
+    now_iso = datetime.utcnow().isoformat()
+    req_id = int(datetime.utcnow().timestamp() * 1000)
+    req_item = {
+        "id": req_id,
+        "staff": staff,
+        "dept": dept,
+        "createdAt": now_iso,
+        "date": datetime.utcnow().strftime("%H:%M:%S"),
+        "text": text,
+    }
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT state_json FROM app_state WHERE id = 1")
+    row = cur.fetchone()
+    state = json.loads(row["state_json"]) if row and row["state_json"] else {}
+    if not isinstance(state, dict):
+        state = {}
+    inbox = state.get("inbox")
+    if not isinstance(inbox, list):
+        inbox = []
+    order_history = state.get("orderHistory")
+    if not isinstance(order_history, list):
+        order_history = []
+
+    inbox.append(req_item)
+    order_history.insert(
+        0,
+        {
+            **req_item,
+            "status": "in_attesa",
+            "updatedAt": now_iso,
+        },
+    )
+    state["inbox"] = inbox
+    state["orderHistory"] = order_history
+
+    cur.execute(
+        "UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1",
+        (json.dumps(state), now_iso),
+    )
+    conn.commit()
+    conn.close()
+
+    subject = "[Sea Signora] Nuovo ordine reparto"
+    body = (
+        f"Nuovo ordine ricevuto\n\n"
+        f"Reparto: {dept}\n"
+        f"Operatore: {staff}\n"
+        f"Testo: {text}\n"
+        f"Data: {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')} UTC\n"
+    )
+    ok, err = send_email(subject, body)
+    log_notification("order", subject, body, ok, err)
+
+    return jsonify({"ok": True, "id": req_id, "emailDelivered": bool(ok)})
+
+
 @app.post("/api/notify")
 def notify():
     if not check_key():

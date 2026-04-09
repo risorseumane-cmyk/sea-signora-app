@@ -1334,6 +1334,26 @@
             }
         }
 
+        async function submitOrderDirectlyToServer(orderPayload) {
+            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+            const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
+            const key = (appState.settings.serverApiKey || '').trim();
+            if (!url) return false;
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (key) headers['X-API-Key'] = key;
+                const res = await fetch(`${url}/api/order`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(orderPayload)
+                });
+                const data = await res.json().catch(() => ({}));
+                return !!(res.ok && data && data.ok);
+            } catch {
+                return false;
+            }
+        }
+
         function ensureSeedCatalogInCurrentState() {
             if (!Array.isArray(appState.products)) appState.products = [];
             if (!Array.isArray(appState.suppliers)) appState.suppliers = [];
@@ -1716,13 +1736,21 @@
                 setTimeout(() => status.classList.add('hidden'), 3000);
             }
             saveState();
-            await saveStateToServer({ silent: true });
-            await notifyAdminEmail('order', {
+            const deliveredViaOrderApi = await submitOrderDirectlyToServer({
                 dept: newReq.dept,
                 staff: newReq.staff,
                 text: newReq.text,
                 date: new Date().toLocaleString('it-IT')
             });
+            if (!deliveredViaOrderApi) {
+                await saveStateToServer({ silent: true });
+                await notifyAdminEmail('order', {
+                    dept: newReq.dept,
+                    staff: newReq.staff,
+                    text: newReq.text,
+                    date: new Date().toLocaleString('it-IT')
+                });
+            }
             alert("✓ Ordine Inviato");
             if (!appState.kioskMode) handleRoleChange();
         }
