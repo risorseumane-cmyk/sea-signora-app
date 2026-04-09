@@ -71,6 +71,18 @@ def check_key():
     return auth == API_KEY
 
 
+def sanitize_state(state):
+    if not isinstance(state, dict):
+        return {}
+    safe = dict(state)
+    settings = dict(safe.get("settings") or {})
+    settings.pop("serverApiKey", None)
+    settings.pop("aiApiKey", None)
+    settings.pop("serverUrl", None)
+    safe["settings"] = settings
+    return safe
+
+
 init_db()
 
 
@@ -88,7 +100,8 @@ def get_state():
     conn.close()
     if not row:
         return jsonify({"ok": False, "error": "State not found"}), 404
-    return jsonify({"ok": True, "state": json.loads(row["state_json"]), "updatedAt": row["updated_at"]})
+    state = sanitize_state(json.loads(row["state_json"]))
+    return jsonify({"ok": True, "state": state, "updatedAt": row["updated_at"]})
 
 
 @app.post("/api/state")
@@ -100,6 +113,7 @@ def save_state():
     state = payload.get("state")
     if not isinstance(state, dict):
         return jsonify({"ok": False, "error": "Invalid state payload"}), 400
+    state = sanitize_state(state)
 
     conn = get_conn()
     cur = conn.cursor()

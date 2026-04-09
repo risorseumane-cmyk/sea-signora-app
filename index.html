@@ -447,6 +447,7 @@
 
     <script>
         const STORAGE_KEY = 'seasignora-v2';
+        const CONNECTION_KEY = 'seasignora-connection-v1';
         const DEFAULT_SETTINGS = {
             brandName: 'Sea Signora',
             accentColor: '#c5a059',
@@ -458,9 +459,7 @@
             aiEnabled: false,
             aiProvider: 'openai',
             aiModel: 'gpt-4o-mini',
-            aiApiKey: '',
-            serverUrl: '',
-            serverApiKey: ''
+            aiApiKey: ''
         };
         const BASE_PRODUCTS = [
             { id: 1, name: 'Tartufi di Mare', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 11.12 } },
@@ -548,6 +547,7 @@
         ];
 
         const appState = loadState();
+        applyLocalConnectionSettings();
         hydrateDerivedState();
         let lastAddedProductId = null;
 
@@ -598,6 +598,34 @@
             }
         }
 
+        function readConnectionSettings() {
+            try {
+                const raw = localStorage.getItem(CONNECTION_KEY);
+                if (!raw) return { serverUrl: '', serverApiKey: '' };
+                const parsed = JSON.parse(raw);
+                return {
+                    serverUrl: (parsed.serverUrl || '').trim(),
+                    serverApiKey: (parsed.serverApiKey || '').trim()
+                };
+            } catch {
+                return { serverUrl: '', serverApiKey: '' };
+            }
+        }
+
+        function writeConnectionSettings() {
+            const payload = {
+                serverUrl: appState.settings.serverUrl || '',
+                serverApiKey: appState.settings.serverApiKey || ''
+            };
+            localStorage.setItem(CONNECTION_KEY, JSON.stringify(payload));
+        }
+
+        function applyLocalConnectionSettings() {
+            const localConn = readConnectionSettings();
+            appState.settings.serverUrl = localConn.serverUrl || '';
+            appState.settings.serverApiKey = localConn.serverApiKey || '';
+        }
+
         function saveState() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 products: appState.products,
@@ -606,8 +634,14 @@
                 inbox: appState.inbox,
                 archive: appState.archive,
                 priceHistory: appState.priceHistory || [],
-                settings: appState.settings
+                settings: {
+                    ...appState.settings,
+                    aiApiKey: '',
+                    serverUrl: '',
+                    serverApiKey: ''
+                }
             }));
+            writeConnectionSettings();
         }
 
         function hydrateDerivedState() {
@@ -1103,6 +1137,12 @@
         }
 
         function getSerializableState() {
+            const safeSettings = {
+                ...appState.settings,
+                aiApiKey: '',
+                serverUrl: '',
+                serverApiKey: ''
+            };
             return {
                 products: appState.products,
                 suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
@@ -1110,7 +1150,7 @@
                 inbox: appState.inbox,
                 archive: appState.archive,
                 priceHistory: appState.priceHistory || [],
-                settings: appState.settings
+                settings: safeSettings
             };
         }
 
@@ -1121,7 +1161,17 @@
                 const res = await fetch(`${url}/api/state`);
                 const data = await res.json();
                 if (!res.ok || !data.ok) throw new Error(data.error || 'Errore lettura server');
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.state));
+                const merged = {
+                    ...data.state,
+                    settings: {
+                        ...DEFAULT_SETTINGS,
+                        ...(data.state?.settings || {}),
+                        aiApiKey: appState.settings.aiApiKey || '',
+                        serverUrl: appState.settings.serverUrl || '',
+                        serverApiKey: appState.settings.serverApiKey || ''
+                    }
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
                 alert('✓ Dati caricati dal server. La pagina verra ricaricata.');
                 window.location.reload();
             } catch (e) {
