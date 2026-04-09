@@ -3069,10 +3069,14 @@
             const safeMode = isSafeModeRequested();
             applySettings();
             handleRoleChange(); 
+            if (safeMode && appState.currentUser === 'admin') {
+                // Emergency path: skip Home bootstrap and open immediately usable view.
+                switchView('dashboard');
+            }
             if (isViewActive('inbox')) renderInbox();
             if (isViewActive('dashboard')) renderConsolidation();
             if (isViewActive('catalog')) renderCatalogMgmt();
-            renderHomeView();
+            if (isViewActive('home')) renderHomeView();
             pullStateFromServerSilently();
             if (!safeMode) startAdminRemotePolling();
             markBootState('ok');
