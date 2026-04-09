@@ -893,6 +893,7 @@
         let lastRemoteUpdatedAt = '';
         let remotePollInFlight = false;
         const CATALOG_RENDER_LIMIT = 220;
+        const INBOX_RENDER_LIMIT = 30;
         const HOME_WIDGET_LABELS = {
             pending: 'Ordini Pending',
             saving: 'Saving Stimato',
@@ -1072,6 +1073,21 @@
             if(viewId === 'inbox') renderInbox();
             if(viewId === 'catalog') renderCatalogMgmt();
             if(viewId === 'price-update') populateSupplierSelect();
+        }
+
+        function isViewActive(viewId) {
+            const el = document.getElementById(`view-${viewId}`);
+            return !!el && (el.classList.contains('active') || el.classList.contains('active-flex'));
+        }
+
+        function refreshInboxIndicators() {
+            const badge = document.getElementById('inbox-badge');
+            if (badge) {
+                badge.innerText = appState.inbox.length;
+                badge.style.display = appState.inbox.length > 0 ? 'block' : 'none';
+            }
+            const pending = document.getElementById('kpi-pending-count');
+            if (pending) pending.innerText = appState.inbox.length;
         }
 
         function handleRoleChange() {
@@ -1623,10 +1639,11 @@
             };
             hydrateDerivedState();
             applySettings();
-            renderInbox();
-            renderConsolidation();
-            if (!lightweight) renderCatalogMgmt();
-            renderHomeView();
+            refreshInboxIndicators();
+            if (isViewActive('inbox')) renderInbox();
+            if (isViewActive('dashboard')) renderConsolidation();
+            if (isViewActive('home')) renderHomeView();
+            if (!lightweight && isViewActive('catalog')) renderCatalogMgmt();
         }
 
         async function pullStateFromServerSilently() {
@@ -2178,10 +2195,8 @@
         // --- GESTIONE INBOX E "IA" DI ASSEGNAZIONE ---
         function renderInbox() {
             const container = document.getElementById('inbox-container');
-            const badge = document.getElementById('inbox-badge');
-            badge.innerText = appState.inbox.length;
-            badge.style.display = appState.inbox.length > 0 ? 'block' : 'none';
-            document.getElementById('kpi-pending-count').innerText = appState.inbox.length;
+            if (!container) return;
+            refreshInboxIndicators();
 
             const consolidatedPlan = buildConsolidatedPlan();
             const consolidatedHtml = consolidatedPlan.linesCount > 0 ? `
@@ -2219,15 +2234,15 @@
                     </div>
                 </div>` : '';
 
+            const pendingList = appState.inbox.slice(0, INBOX_RENDER_LIMIT);
             const pendingHtml = appState.inbox.length === 0 ? 
                 '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine da approvare</div>' :
-                appState.inbox.map(req => {
+                pendingList.map(req => {
                     const matches = (req.aiAnalysis || []).map(a => {
                         const product = appState.products.find(p => p.id === a.productId);
                         return product ? { product, qty: a.qty || 1 } : null;
                     }).filter(Boolean);
-                    const parsed = parseOrderWithAlternatives(req.text);
-                    const fallbackMatches = parsed.matched;
+                    const fallbackMatches = parseOrderText(req.text);
                     const manualMatches = (req.manualSelections || []).map(ms => {
                         const product = appState.products.find(p => String(p.id) === String(ms.productId));
                         return product ? { product, qty: ms.qty || 1 } : null;
@@ -2238,7 +2253,7 @@
                         const best = getBestSup(product);
                         matchesHtml += `<span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-[9px] font-bold border border-emerald-100">${product.name} x${qty} (${best.name}: €${best.price.toFixed(2)})</span> `;
                     });
-                    const unresolved = parsed.unresolved || [];
+                    const unresolved = effectiveMatches.length ? [] : (parseOrderWithAlternatives(req.text).unresolved || []);
                     const unresolvedHtml = unresolved.length ? `
                         <div class="mt-4 border-t pt-4">
                             <span class="text-[9px] font-black uppercase text-amber-600 block mb-2">Riconoscimento non completo: scegli alternativa prodotto</span>
@@ -2276,7 +2291,9 @@
                         </div>
                         <button onclick="approveRequest(${req.id})" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva e Aggiorna Logistica</button>
                     </div>`;
-                }).join('');
+                }).join('') + (appState.inbox.length > INBOX_RENDER_LIMIT
+                    ? `<div class="mt-3 text-[10px] font-bold uppercase text-slate-500">Mostrati i primi ${INBOX_RENDER_LIMIT} ordini su ${appState.inbox.length}. Approva/rifiuta per ridurre la coda.</div>`
+                    : '');
 
             const hist = (appState.orderHistory || []).slice(0, 20);
             const historyHtml = `
