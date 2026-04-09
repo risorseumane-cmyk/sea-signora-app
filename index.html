@@ -889,6 +889,7 @@
         let autoSyncTimer = null;
         let autoSyncInFlight = false;
         let autoSyncQueued = false;
+        let remotePollTimer = null;
         const HOME_WIDGET_LABELS = {
             pending: 'Ordini Pending',
             saving: 'Saving Stimato',
@@ -973,7 +974,7 @@
 
         function applyLocalConnectionSettings() {
             const localConn = readConnectionSettings();
-            appState.settings.serverUrl = localConn.serverUrl || '';
+            appState.settings.serverUrl = localConn.serverUrl || window.location.origin;
             appState.settings.serverApiKey = localConn.serverApiKey || '';
             appState.settings.aiApiKey = localConn.aiApiKey || '';
         }
@@ -1598,6 +1599,66 @@
             } catch (e) {
                 alert(`Errore caricamento server: ${String(e.message || e)}`);
             }
+        }
+
+        function applyRemoteState(remoteState) {
+            if (!remoteState || typeof remoteState !== 'object') return;
+            appState.products = remoteState.products || appState.products || [];
+            appState.suppliers = remoteState.suppliers || appState.suppliers || [];
+            appState.reparti = remoteState.reparti || appState.reparti || [];
+            appState.inbox = remoteState.inbox || appState.inbox || [];
+            appState.orderHistory = remoteState.orderHistory || appState.orderHistory || [];
+            appState.archive = remoteState.archive || appState.archive || [];
+            appState.priceHistory = remoteState.priceHistory || appState.priceHistory || [];
+            appState.settings = {
+                ...DEFAULT_SETTINGS,
+                ...(remoteState.settings || {}),
+                aiApiKey: appState.settings.aiApiKey || '',
+                serverUrl: appState.settings.serverUrl || window.location.origin,
+                serverApiKey: appState.settings.serverApiKey || ''
+            };
+            hydrateDerivedState();
+            applySettings();
+            renderInbox();
+            renderConsolidation();
+            renderCatalogMgmt();
+            renderHomeView();
+        }
+
+        async function pullStateFromServerSilently() {
+            const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
+            if (!url) return;
+            try {
+                const res = await fetch(`${url}/api/state`);
+                const data = await res.json();
+                if (!res.ok || !data.ok || !data.state) return;
+                applyRemoteState(data.state);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    products: appState.products,
+                    suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
+                    reparti: appState.reparti,
+                    inbox: appState.inbox,
+                    orderHistory: appState.orderHistory || [],
+                    archive: appState.archive,
+                    priceHistory: appState.priceHistory || [],
+                    settings: {
+                        ...appState.settings,
+                        aiApiKey: '',
+                        serverUrl: '',
+                        serverApiKey: ''
+                    }
+                }));
+            } catch {
+                // silent: keep local state if remote read fails temporarily
+            }
+        }
+
+        function startAdminRemotePolling() {
+            if (remotePollTimer) clearInterval(remotePollTimer);
+            remotePollTimer = setInterval(() => {
+                if (appState.currentUser !== 'admin') return;
+                pullStateFromServerSilently();
+            }, 10000);
         }
 
         async function saveStateToServer(opts = {}) {
@@ -2923,6 +2984,8 @@
             renderInbox();
             renderConsolidation();
             renderHomeView();
+            pullStateFromServerSilently();
+            startAdminRemotePolling();
         });
     </script>
 </body>
