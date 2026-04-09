@@ -426,7 +426,7 @@ def ai_order_parse():
     payload = request.get_json(silent=True) or {}
     text = str(payload.get("text") or "").strip()
     catalog = payload.get("catalog") or []
-    model = str(payload.get("model") or "gemini-1.5-flash").strip() or "gemini-1.5-flash"
+    model = str(payload.get("model") or "gemini-2.0-flash").strip() or "gemini-2.0-flash"
     if not text:
         return jsonify({"ok": False, "error": "Missing text"}), 400
     if not isinstance(catalog, list):
@@ -438,43 +438,53 @@ def ai_order_parse():
         f"Regole: qty default 1.\nCatalogo:\n{json.dumps(catalog, ensure_ascii=False)}\n\nOrdine:\n{text}"
     )
 
-    req = urllib.request.Request(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model)}:generateContent?key={urllib.parse.quote(GEMINI_API_KEY)}",
-        data=json.dumps(
-            {
-                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.1},
-            }
-        ).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    model_candidates = []
+    for m in [model, "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
+        if m and m not in model_candidates:
+            model_candidates.append(m)
 
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-        data = json.loads(raw)
-        txt = (
-            data.get("candidates", [{}])[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "{}")
+    last_err = "No model candidates available"
+    for m in model_candidates:
+        req = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(GEMINI_API_KEY)}",
+            data=json.dumps(
+                {
+                    "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.1},
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
-        start = txt.find("{")
-        end = txt.rfind("}")
-        if start >= 0 and end > start:
-            txt = txt[start : end + 1]
-        parsed = json.loads(txt)
-        return jsonify({"ok": True, "parsed": parsed})
-    except urllib.error.HTTPError as e:
-        details = ""
         try:
-            details = e.read().decode("utf-8")
-        except Exception:
-            details = str(e)
-        return jsonify({"ok": False, "error": f"Gemini HTTP {e.code}: {details[:300]}"}), 502
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Gemini error: {str(e)}"}), 500
+            with urllib.request.urlopen(req, timeout=30) as response:
+                raw = response.read().decode("utf-8")
+            data = json.loads(raw)
+            txt = (
+                data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "{}")
+            )
+            start = txt.find("{")
+            end = txt.rfind("}")
+            if start >= 0 and end > start:
+                txt = txt[start : end + 1]
+            parsed = json.loads(txt)
+            return jsonify({"ok": True, "parsed": parsed, "modelUsed": m})
+        except urllib.error.HTTPError as e:
+            details = ""
+            try:
+                details = e.read().decode("utf-8")
+            except Exception:
+                details = str(e)
+            last_err = f"{m}: HTTP {e.code} {details[:220]}"
+            continue
+        except Exception as e:
+            last_err = f"{m}: {str(e)}"
+            continue
+
+    return jsonify({"ok": False, "error": f"Gemini error: {last_err}"}), 502
 
 
 @app.get("/api/notifications")

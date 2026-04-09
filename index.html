@@ -424,7 +424,7 @@
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Modello</label>
-                                    <input type="text" value="gemini-1.5-flash" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" disabled>
+                                    <input type="text" value="gemini-2.0-flash" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" disabled>
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Gemini API Key</label>
@@ -476,7 +476,7 @@
             aliases: {},
             aiEnabled: true,
             aiProvider: 'gemini',
-            aiModel: 'gemini-1.5-flash',
+            aiModel: 'gemini-2.0-flash',
             homeWidgets: {
                 pending: true,
                 saving: true,
@@ -1075,7 +1075,7 @@
         }
 
         function setAiModel(val) {
-            appState.settings.aiModel = 'gemini-1.5-flash';
+            appState.settings.aiModel = 'gemini-2.0-flash';
             saveState();
         }
 
@@ -1148,7 +1148,7 @@
                 cat: p.cat,
                 sub: p.sub
             }));
-            const model = appState.settings.aiModel || 'gemini-1.5-flash';
+            const model = appState.settings.aiModel || 'gemini-2.0-flash';
             const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
             const base = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
             const key = (appState.settings.serverApiKey || '').trim();
@@ -2695,7 +2695,7 @@
         function applySettings() {
             appState.settings.aiEnabled = true;
             appState.settings.aiProvider = 'gemini';
-            appState.settings.aiModel = 'gemini-1.5-flash';
+            appState.settings.aiModel = 'gemini-2.0-flash';
             document.getElementById('ui-brand-name').innerText = appState.settings.brandName || 'Sea Signora';
             document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor || '#c5a059');
             const accentEl = document.getElementById('ui-accent-input');
