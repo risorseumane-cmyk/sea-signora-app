@@ -80,7 +80,7 @@
                         <p class="text-xs font-medium text-slate-400">Gestione acquisti, compliance fornitori e controllo costi</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm z-50">
+                <div id="role-switcher-wrap" class="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm z-50">
                     <span class="text-[9px] font-black uppercase text-slate-400 px-3 tracking-widest border-r">Visualizza come:</span>
                     <select id="role-selector" onchange="handleRoleChange()" class="bg-transparent text-slate-900 text-[10px] font-black uppercase py-2 px-4 outline-none cursor-pointer">
                         <option value="admin">Amministratore</option>
@@ -436,6 +436,7 @@
                             <input id="dept-cognome" type="text" placeholder="Cognome" class="p-4 bg-slate-50 border rounded-xl text-sm font-bold outline-none">
                         </div>
                         <textarea id="dept-raw-text" placeholder="Elenca i prodotti e le quantità. Es: 5kg Astice Blu, 2 casse Gin Mare, 3kg Patate..." class="w-full h-40 p-6 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium mb-6 resize-none outline-none focus:border-amber-400"></textarea>
+                        <p id="dept-submit-status" class="hidden mb-4 text-xs font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">Ordine inviato</p>
                         <button onclick="submitDeptOrder()" class="w-full py-5 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-transform">
                             Invia all'Ufficio Acquisti
                         </button>
@@ -572,6 +573,7 @@
                         suppliers: BASE_SUPPLIERS.map(s => ({ ...s })),
                         reparti: ['Cucina', 'Sala', 'Bar', 'Wine'],
                         inbox: [],
+                        orderHistory: [],
                         archive: [],
                         priceHistory: [],
                         pendingUpdates: {},
@@ -587,6 +589,7 @@
                     suppliers: parsed.suppliers || BASE_SUPPLIERS.map(s => ({ ...s })),
                     reparti: parsed.reparti || ['Cucina', 'Sala', 'Bar', 'Wine'],
                     inbox: parsed.inbox || [],
+                    orderHistory: parsed.orderHistory || [],
                     archive: parsed.archive || [],
                     priceHistory: parsed.priceHistory || [],
                     pendingUpdates: {},
@@ -636,6 +639,7 @@
                 suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
                 reparti: appState.reparti,
                 inbox: appState.inbox,
+                orderHistory: appState.orderHistory || [],
                 archive: appState.archive,
                 priceHistory: appState.priceHistory || [],
                 settings: {
@@ -702,14 +706,28 @@
             appState.currentUser = role;
             const sidebar = document.getElementById('sidebar');
             const adminHeader = document.getElementById('admin-header');
+            const roleWrap = document.getElementById('role-switcher-wrap');
+
+            if (appState.kioskMode) {
+                appState.currentUser = appState.forcedDept;
+                appState.currentDept = appState.forcedDept;
+                sidebar.style.display = 'none';
+                adminHeader.style.display = 'none';
+                if (roleWrap) roleWrap.style.display = 'none';
+                document.getElementById('dept-name-display').innerText = `Reparto: ${appState.forcedDept}`;
+                switchView('department');
+                return;
+            }
             
             if (role === 'admin') { 
                 sidebar.style.display = 'flex'; 
                 adminHeader.style.display = 'flex'; 
+                if (roleWrap) roleWrap.style.display = 'flex';
                 switchView('dashboard'); 
             } else { 
                 sidebar.style.display = 'none'; 
                 adminHeader.style.display = 'none'; 
+                if (roleWrap) roleWrap.style.display = 'none';
                 appState.currentDept = role;
                 document.getElementById('dept-name-display').innerText = `Reparto: ${role}`;
                 switchView('department'); 
@@ -1535,11 +1553,24 @@
             if(!n || !t) return alert("Compila Nome Operatore e inserisci i prodotti.");
             
             // Simula elaborazione AI dell'ordine (ricerca stringhe nei prodotti e calcolo best price)
-            appState.inbox.push({ id: Date.now(), staff: `${n} ${c}`.trim(), dept: appState.currentDept, createdAt: new Date().toISOString(), date: new Date().toLocaleTimeString(), text: t });
+            const reqId = Date.now();
+            const staff = `${n} ${c}`.trim();
+            const newReq = { id: reqId, staff, dept: appState.currentDept, createdAt: new Date().toISOString(), date: new Date().toLocaleTimeString(), text: t };
+            appState.inbox.push(newReq);
+            appState.orderHistory = appState.orderHistory || [];
+            appState.orderHistory.unshift({ ...newReq, status: 'in_attesa', updatedAt: new Date().toISOString() });
             document.getElementById('dept-raw-text').value = ""; 
+            document.getElementById('dept-nome').value = "";
+            document.getElementById('dept-cognome').value = "";
+            const status = document.getElementById('dept-submit-status');
+            if (status) {
+                status.classList.remove('hidden');
+                status.textContent = 'Ordine inviato';
+                setTimeout(() => status.classList.add('hidden'), 3000);
+            }
             saveState();
-            alert("✓ Ordine Inviato all'Amministrazione."); 
-            handleRoleChange(); // Resetta vista
+            alert("✓ Ordine Inviato");
+            if (!appState.kioskMode) handleRoleChange();
         }
 
         function parseOrderText(text) {
@@ -1570,7 +1601,7 @@
             badge.style.display = appState.inbox.length > 0 ? 'block' : 'none';
             document.getElementById('kpi-pending-count').innerText = appState.inbox.length;
 
-            container.innerHTML = appState.inbox.length === 0 ? 
+            const pendingHtml = appState.inbox.length === 0 ? 
                 '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine da approvare</div>' :
                 appState.inbox.map(req => {
                     const matches = (req.aiAnalysis || []).map(a => {
@@ -1589,7 +1620,7 @@
                     <div class="glass-card p-8 mb-4">
                         <div class="flex justify-between items-center border-b pb-4 mb-4">
                             <div><span class="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-[9px] font-black uppercase">${req.dept}</span><span class="ml-2 text-xs font-bold text-slate-500">${req.staff} - ${req.date}</span></div>
-                            <button onclick="appState.inbox = appState.inbox.filter(r => r.id !== ${req.id}); switchView('inbox')" class="text-rose-500 font-bold text-xs">Rifiuta</button>
+                            <button onclick="rejectRequest(${req.id})" class="text-rose-500 font-bold text-xs">Rifiuta</button>
                         </div>
                         <p class="text-sm font-medium italic text-slate-700 mb-6">"${req.text}"</p>
                         <div class="bg-slate-50 p-4 rounded-xl mb-6">
@@ -1603,6 +1634,41 @@
                         <button onclick="approveRequest(${req.id})" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva e Aggiorna Logistica</button>
                     </div>`;
                 }).join('');
+
+            const hist = (appState.orderHistory || []).slice(0, 20);
+            const historyHtml = `
+                <div class="glass-card p-6">
+                    <h4 class="text-[11px] font-black uppercase tracking-widest mb-4 text-slate-500">Storico Ordini</h4>
+                    ${hist.length === 0
+                        ? '<p class="text-xs text-slate-400 font-bold uppercase">Nessuno storico disponibile</p>'
+                        : `<div class="space-y-2">${hist.map(h => {
+                            const clr = h.status === 'approvato' ? 'text-emerald-700 bg-emerald-50' : (h.status === 'rifiutato' ? 'text-rose-700 bg-rose-50' : 'text-amber-700 bg-amber-50');
+                            return `<div class="border rounded-xl p-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] font-black uppercase px-2 py-1 rounded ${clr}">${h.status}</span>
+                                    <span class="text-[10px] text-slate-400 font-bold">${new Date(h.updatedAt || h.createdAt || Date.now()).toLocaleString('it-IT')}</span>
+                                </div>
+                                <p class="text-xs font-bold mt-2">${h.dept} - ${h.staff}</p>
+                                <p class="text-xs text-slate-500 italic mt-1">"${h.text}"</p>
+                            </div>`;
+                        }).join('')}</div>`}
+                </div>`;
+
+            container.innerHTML = pendingHtml + historyHtml;
+        }
+
+        function rejectRequest(id) {
+            const req = appState.inbox.find(r => r.id === id);
+            appState.inbox = appState.inbox.filter(r => r.id !== id);
+            const h = (appState.orderHistory || []).find(x => x.id === id);
+            if (h) {
+                h.status = 'rifiutato';
+                h.updatedAt = new Date().toISOString();
+            } else if (req) {
+                appState.orderHistory.unshift({ ...req, status: 'rifiutato', updatedAt: new Date().toISOString() });
+            }
+            saveState();
+            switchView('inbox');
         }
 
         function getBestSup(p) {
@@ -1694,6 +1760,13 @@
                 allocations
             });
             appState.inbox = appState.inbox.filter(r => r.id !== id);
+            const h = (appState.orderHistory || []).find(x => x.id === id);
+            if (h) {
+                h.status = 'approvato';
+                h.updatedAt = new Date().toISOString();
+            } else {
+                appState.orderHistory.unshift({ ...req, status: 'approvato', updatedAt: new Date().toISOString() });
+            }
             saveState();
             switchView('dashboard');
         }
@@ -2037,6 +2110,8 @@
             const deptFromUrl = new URLSearchParams(window.location.search).get('reparto');
             if (deptFromUrl && appState.reparti.includes(deptFromUrl)) {
                 document.getElementById('role-selector').value = deptFromUrl;
+                appState.kioskMode = true;
+                appState.forcedDept = deptFromUrl;
             }
             applySettings();
             handleRoleChange(); 
