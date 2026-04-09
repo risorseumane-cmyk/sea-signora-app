@@ -277,14 +277,13 @@ def save_state():
 
     conn = get_conn()
     cur = conn.cursor()
-    now_iso = datetime.utcnow().isoformat()
     cur.execute(
         "UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1",
-        (json.dumps(state), now_iso),
+        (json.dumps(state), datetime.utcnow().isoformat()),
     )
     conn.commit()
     conn.close()
-    return jsonify({"ok": True, "updatedAt": now_iso})
+    return jsonify({"ok": True})
 
 
 @app.post("/api/notify")
@@ -360,78 +359,6 @@ def home():
     if FRONTEND_FILE.exists():
         return send_from_directory(FRONTEND_FILE.parent, FRONTEND_FILE.name)
     return jsonify({"ok": False, "error": "Frontend not found"}), 404
-
-
-@app.get("/lite")
-def lite_home():
-    return """
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sea Signora - Lite Admin</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f3f6fb; color: #0f172a; }
-    .wrap { max-width: 920px; margin: 0 auto; padding: 16px; }
-    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-    .btn { border: 0; background: #10233f; color: #fff; padding: 10px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; }
-    .muted { color: #64748b; font-size: 12px; }
-    .tag { display: inline-block; background: #e2e8f0; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
-    pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0 0; font-size: 13px; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <h2 style="margin:0 0 6px 0;">Sea Signora - Lite Admin</h2>
-      <p class="muted" style="margin:0;">Modalita emergenza anti-blocco. Aggiornamento automatico ogni 5 secondi.</p>
-      <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <button class="btn" onclick="loadState()">Aggiorna ora</button>
-        <a href="/" class="btn" style="text-decoration:none;">Apri App Completa</a>
-        <span id="status" class="muted"></span>
-      </div>
-    </div>
-    <div class="card">
-      <strong>Ordini in Inbox:</strong> <span id="count" class="tag">0</span>
-    </div>
-    <div id="list"></div>
-  </div>
-  <script>
-    async function loadState() {
-      const status = document.getElementById('status');
-      status.textContent = 'Carico...';
-      try {
-        const res = await fetch('/api/state');
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || 'Errore stato');
-        const inbox = (data.state && data.state.inbox) ? data.state.inbox : [];
-        document.getElementById('count').textContent = String(inbox.length);
-        const list = document.getElementById('list');
-        if (!inbox.length) {
-          list.innerHTML = '<div class="card"><span class="muted">Nessun ordine in attesa.</span></div>';
-        } else {
-          list.innerHTML = inbox.map((o) => `
-            <div class="card">
-              <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-                <div><span class="tag">${o.dept || '-'}</span> <strong>${o.staff || '-'}</strong></div>
-                <div class="muted">${o.date || ''}</div>
-              </div>
-              <pre>${o.text || ''}</pre>
-            </div>
-          `).join('');
-        }
-        status.textContent = 'Aggiornato';
-      } catch (e) {
-        status.textContent = 'Errore: ' + String(e.message || e);
-      }
-    }
-    loadState();
-    setInterval(loadState, 5000);
-  </script>
-</body>
-</html>
-"""
 
 
 if __name__ == "__main__":
