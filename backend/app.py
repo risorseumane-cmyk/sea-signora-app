@@ -2,6 +2,8 @@ import json
 import os
 import sqlite3
 import smtplib
+import urllib.error
+import urllib.request
 from datetime import datetime
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -20,6 +22,9 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "noreply@seasignorarest.com")
 SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM = os.getenv("RESEND_FROM", SMTP_FROM)
+FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
 
 app = Flask(__name__)
 CORS(app)
@@ -104,21 +109,109 @@ def sanitize_state(state):
     return safe
 
 
-def send_email(subject, body):
+def _recipient_list():
+    return [addr.strip() for addr in SMTP_TO.split(",") if addr.strip()]
+
+
+def send_email_smtp(subject, body):
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
         return False, "SMTP non configurato"
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
+    recipients = _recipient_list() or [SMTP_TO]
     msg["From"] = SMTP_FROM
-    msg["To"] = SMTP_TO
+    msg["To"] = ", ".join(recipients)
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
             server.starttls()
             server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_FROM, [SMTP_TO], msg.as_string())
+            server.sendmail(SMTP_FROM, recipients, msg.as_string())
         return True, ""
     except Exception as e:
         return False, str(e)
+
+
+def send_email_resend(subject, body):
+    if not RESEND_API_KEY:
+        return False, "RESEND_API_KEY non configurata"
+    recipients = _recipient_list()
+    if not recipients:
+        return False, "SMTP_TO non configurato"
+
+    payload = {
+        "from": RESEND_FROM,
+        "to": recipients,
+        "subject": subject,
+        "text": body,
+    }
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            if 200 <= response.status < 300:
+                return True, ""
+            return False, f"Resend status {response.status}"
+    except urllib.error.HTTPError as e:
+        details = ""
+        try:
+            details = e.read().decode("utf-8")
+        except Exception:
+            details = str(e)
+        return False, f"Resend HTTP {e.code}: {details[:300]}"
+    except Exception as e:
+        return False, f"Resend error: {str(e)}"
+
+
+def send_email_formspree(subject, body):
+    if not FORMSPREE_ENDPOINT:
+        return False, "FORMSPREE_ENDPOINT non configurato"
+    payload = {
+        "subject": subject,
+        "message": body,
+        "to": SMTP_TO,
+        "from": SMTP_FROM,
+        "_subject": subject,
+    }
+    req = urllib.request.Request(
+        FORMSPREE_ENDPOINT,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            if 200 <= response.status < 300:
+                return True, ""
+            return False, f"Formspree status {response.status}"
+    except urllib.error.HTTPError as e:
+        details = ""
+        try:
+            details = e.read().decode("utf-8")
+        except Exception:
+            details = str(e)
+        return False, f"Formspree HTTP {e.code}: {details[:300]}"
+    except Exception as e:
+        return False, f"Formspree error: {str(e)}"
+
+
+def send_email(subject, body):
+    ok, err = send_email_formspree(subject, body)
+    if ok:
+        return True, "formspree"
+    resend_ok, resend_err = send_email_resend(subject, body)
+    if resend_ok:
+        return True, "resend"
+    smtp_ok, smtp_err = send_email_smtp(subject, body)
+    if smtp_ok:
+        return True, "smtp"
+    return False, f"Formspree: {err} | Resend: {resend_err} | SMTP: {smtp_err}"
 
 def log_notification(kind, subject, body, delivered, error_text=""):
     conn = get_conn()
@@ -220,7 +313,14 @@ def notify():
                 "delivered": False,
                 "queued": True,
                 "warning": f"Email non inviata: {err}",
-                "debug": {"host": SMTP_HOST, "port": SMTP_PORT, "user": SMTP_USER, "to": SMTP_TO},
+                "debug": {
+                    "formspreeConfigured": bool(FORMSPREE_ENDPOINT),
+                    "resendConfigured": bool(RESEND_API_KEY),
+                    "host": SMTP_HOST,
+                    "port": SMTP_PORT,
+                    "user": SMTP_USER,
+                    "to": SMTP_TO,
+                },
             }
         )
     return jsonify({"ok": True, "delivered": True})
