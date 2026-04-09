@@ -277,13 +277,14 @@ def save_state():
 
     conn = get_conn()
     cur = conn.cursor()
+    now_iso = datetime.utcnow().isoformat()
     cur.execute(
         "UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1",
-        (json.dumps(state), datetime.utcnow().isoformat()),
+        (json.dumps(state), now_iso),
     )
     conn.commit()
     conn.close()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "updatedAt": now_iso})
 
 
 @app.post("/api/notify")

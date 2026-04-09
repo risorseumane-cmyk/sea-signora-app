@@ -890,6 +890,8 @@
         let autoSyncInFlight = false;
         let autoSyncQueued = false;
         let remotePollTimer = null;
+        let lastRemoteUpdatedAt = '';
+        let remotePollInFlight = false;
         const HOME_WIDGET_LABELS = {
             pending: 'Ordini Pending',
             saving: 'Saving Stimato',
@@ -1601,8 +1603,9 @@
             }
         }
 
-        function applyRemoteState(remoteState) {
+        function applyRemoteState(remoteState, opts = {}) {
             if (!remoteState || typeof remoteState !== 'object') return;
+            const lightweight = !!opts.lightweight;
             appState.products = remoteState.products || appState.products || [];
             appState.suppliers = remoteState.suppliers || appState.suppliers || [];
             appState.reparti = remoteState.reparti || appState.reparti || [];
@@ -1621,18 +1624,22 @@
             applySettings();
             renderInbox();
             renderConsolidation();
-            renderCatalogMgmt();
+            if (!lightweight) renderCatalogMgmt();
             renderHomeView();
         }
 
         async function pullStateFromServerSilently() {
             const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
-            if (!url) return;
+            if (!url || remotePollInFlight) return;
+            remotePollInFlight = true;
             try {
                 const res = await fetch(`${url}/api/state`);
                 const data = await res.json();
                 if (!res.ok || !data.ok || !data.state) return;
-                applyRemoteState(data.state);
+                const remoteUpdatedAt = String(data.updatedAt || '');
+                if (remoteUpdatedAt && remoteUpdatedAt === lastRemoteUpdatedAt) return;
+                lastRemoteUpdatedAt = remoteUpdatedAt || lastRemoteUpdatedAt;
+                applyRemoteState(data.state, { lightweight: true });
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
                     products: appState.products,
                     suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
@@ -1650,6 +1657,8 @@
                 }));
             } catch {
                 // silent: keep local state if remote read fails temporarily
+            } finally {
+                remotePollInFlight = false;
             }
         }
 
@@ -1679,6 +1688,7 @@
                 });
                 const data = await res.json();
                 if (!res.ok || !data.ok) throw new Error(data.error || 'Errore salvataggio server');
+                if (data.updatedAt) lastRemoteUpdatedAt = String(data.updatedAt);
                 if (!silent) alert('✓ Dati inviati al server con successo.');
             } catch (e) {
                 if (!silent) alert(`Errore salvataggio server: ${String(e.message || e)}`);
