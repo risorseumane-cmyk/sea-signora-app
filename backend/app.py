@@ -26,7 +26,7 @@ SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM = os.getenv("RESEND_FROM", SMTP_FROM)
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyAM9BA5AvXsyu2RWWJSLh_xQ55isa2sp94").strip()
 
 app = Flask(__name__)
 CORS(app)
