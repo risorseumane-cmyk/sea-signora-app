@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&display=swap');
         
         :root {
             --brand-blue: #10233f;
@@ -39,6 +40,11 @@
         .config-sub-tab { border-bottom: 3px solid transparent; cursor: pointer; padding: 10px 15px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; }
         .config-sub-tab.active { border-color: var(--brand-accent); color: var(--brand-blue); }
         .corp-eyebrow { color: #64748b; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; font-size: 10px; }
+
+        .ss-wordmark { font-family: 'Bodoni Moda', serif; color: #fff; text-align: center; line-height: 1; }
+        .ss-wordmark .sea { font-size: 20px; font-weight: 400; letter-spacing: 0.02em; }
+        .ss-wordmark .signora { font-size: 22px; font-weight: 600; letter-spacing: 0.14em; margin-top: 4px; }
+        .ss-wordmark .milano { font-size: 12px; font-weight: 400; letter-spacing: 0.34em; margin-top: 8px; opacity: 0.95; }
     </style>
 </head>
 <body class="antialiased">
@@ -47,8 +53,12 @@
         
         <aside id="sidebar" class="w-full md:w-72 bg-white border-r border-slate-200 p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-50">
             <div class="flex flex-col items-center gap-4 py-4 border-b pb-8">
-                <div class="w-20 h-20 bg-black rounded-2xl flex items-center justify-center shadow-xl border border-slate-200 overflow-hidden">
-                    <img src="/assets/logo-sea-signora.png" alt="Sea Signora Milano" class="w-full h-full object-contain p-2">
+                <div class="w-40 bg-black rounded-2xl flex items-center justify-center shadow-xl border border-slate-200 overflow-hidden px-4 py-4">
+                    <div class="ss-wordmark">
+                        <div class="sea">Sea,</div>
+                        <div class="signora">SIGNORA</div>
+                        <div class="milano">MILANO</div>
+                    </div>
                 </div>
                 <div class="text-center">
                     <h1 id="ui-brand-name" class="text-base font-black tracking-widest uppercase">Sea Signora</h1>
@@ -76,8 +86,12 @@
             
             <header id="admin-header" class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-200">
                 <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-black rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center">
-                        <img src="/assets/logo-sea-signora.png" alt="Sea Signora Milano" class="w-full h-full object-contain p-1.5">
+                    <div class="bg-black rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center px-4 py-3">
+                        <div class="ss-wordmark" style="transform: translateY(1px);">
+                            <div class="sea" style="font-size: 14px;">Sea,</div>
+                            <div class="signora" style="font-size: 15px; letter-spacing: 0.16em; margin-top: 2px;">SIGNORA</div>
+                            <div class="milano" style="font-size: 9px; letter-spacing: 0.34em; margin-top: 6px;">MILANO</div>
+                        </div>
                     </div>
                     <div>
                         <p class="corp-eyebrow">Procurement Control Center</p>
@@ -445,8 +459,12 @@
                 <div class="h-full flex flex-col justify-center w-full">
                     <div class="max-w-2xl mx-auto w-full glass-card p-10 shadow-2xl border-0">
                         <div class="flex items-center gap-6 mb-8">
-                            <div class="w-16 h-16 bg-black rounded-2xl flex items-center justify-center shadow-xl border border-slate-200 overflow-hidden">
-                                <img src="/assets/logo-sea-signora.png" alt="Sea Signora Milano" class="w-full h-full object-contain p-2">
+                            <div class="bg-black rounded-2xl flex items-center justify-center shadow-xl border border-slate-200 overflow-hidden px-4 py-3">
+                                <div class="ss-wordmark">
+                                    <div class="sea" style="font-size: 14px;">Sea,</div>
+                                    <div class="signora" style="font-size: 15px; letter-spacing: 0.16em; margin-top: 2px;">SIGNORA</div>
+                                    <div class="milano" style="font-size: 9px; letter-spacing: 0.34em; margin-top: 6px;">MILANO</div>
+                                </div>
                             </div>
                             <div>
                                 <h3 class="text-3xl font-black uppercase tracking-tighter leading-none text-slate-900">Nuovo Ordine</h3>
