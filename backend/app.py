@@ -487,6 +487,86 @@ def ai_order_parse():
     return jsonify({"ok": False, "error": f"Gemini error: {last_err}"}), 502
 
 
+@app.post("/api/ai/help")
+def ai_help():
+    if not check_key():
+        return jsonify({"ok": False, "error": "Invalid API key"}), 401
+
+    if not GEMINI_API_KEY:
+        return jsonify({"ok": False, "error": "GEMINI_API_KEY non configurata sul server"}), 503
+
+    payload = request.get_json(silent=True) or {}
+    question = str(payload.get("question") or "").strip()
+    page = str(payload.get("page") or "").strip()
+    context = payload.get("context") or {}
+    model = str(payload.get("model") or "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+
+    if not question:
+        return jsonify({"ok": False, "error": "Missing question"}), 400
+    if not isinstance(context, dict):
+        context = {}
+
+    safe_ctx = {
+        "page": page[:80],
+        "context": context,
+    }
+
+    prompt = (
+        "Sei un assistente per l'app Sea Signora (ordini, catalogo, fornitori, report, configurazione).\n"
+        "Rispondi in italiano, in modo pratico e breve.\n"
+        "Se la domanda richiede passi operativi, usa una lista di 3-7 punti.\n"
+        "Non inventare dati: usa SOLO il contesto fornito.\n\n"
+        f"CONTESTO:\n{json.dumps(safe_ctx, ensure_ascii=False)}\n\n"
+        f"DOMANDA:\n{question}"
+    )
+
+    model_candidates = []
+    for m in [model, "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
+        if m and m not in model_candidates:
+            model_candidates.append(m)
+
+    last_err = "No model candidates available"
+    for m in model_candidates:
+        req = urllib.request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(GEMINI_API_KEY)}",
+            data=json.dumps(
+                {
+                    "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.2},
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                raw = response.read().decode("utf-8")
+            data = json.loads(raw)
+            txt = (
+                data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+            )
+            txt = (txt or "").strip()
+            if txt:
+                return jsonify({"ok": True, "answer": txt, "modelUsed": m})
+            last_err = f"{m}: empty answer"
+        except urllib.error.HTTPError as e:
+            details = ""
+            try:
+                details = e.read().decode("utf-8")
+            except Exception:
+                details = str(e)
+            last_err = f"{m}: HTTP {e.code} {details[:220]}"
+            continue
+        except Exception as e:
+            last_err = f"{m}: {str(e)}"
+            continue
+
+    return jsonify({"ok": False, "error": f"Gemini error: {last_err}"}), 502
+
+
 @app.get("/api/notifications")
 def get_notifications():
     if not check_key():

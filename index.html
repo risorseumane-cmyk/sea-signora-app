@@ -460,6 +460,35 @@
                 </div>
             </div>
 
+            <!-- AI Help Widget (Gemini via server) -->
+            <div class="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-3">
+                <div id="ai-help-panel" class="hidden w-[92vw] max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
+                    <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest opacity-70">Assistente</p>
+                            <p id="ai-help-title" class="text-sm font-black">Chiedi aiuto a Gemini</p>
+                        </div>
+                        <button onclick="closeAiHelp()" class="text-xs font-black uppercase bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl">Chiudi</button>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <p id="ai-help-subtitle" class="text-[11px] text-slate-500">Suggerimenti e azioni relative alla pagina attuale.</p>
+                        <textarea id="ai-help-question" class="w-full h-24 p-3 border rounded-xl text-sm" placeholder="Es: Come importo il catalogo? Come correggo un ordine? Come leggo questo report?"></textarea>
+                        <div class="flex items-center gap-2">
+                            <button id="ai-help-send" onclick="sendAiHelp()" class="flex-1 bg-slate-900 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Invia a Gemini</button>
+                            <button onclick="fillAiHelpExample()" class="bg-white border px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Esempio</button>
+                        </div>
+                        <div id="ai-help-status" class="hidden text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-xl"></div>
+                        <div id="ai-help-answer-wrap" class="hidden">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Risposta</p>
+                            <div id="ai-help-answer" class="whitespace-pre-wrap text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl p-3"></div>
+                        </div>
+                    </div>
+                </div>
+                <button id="ai-help-fab" onclick="toggleAiHelp()" class="brand-gradient text-white shadow-2xl rounded-2xl px-5 py-4 text-[10px] font-black uppercase tracking-widest">
+                    Chiedi aiuto a Gemini
+                </button>
+            </div>
+
         </main>
     </div>
 
@@ -740,6 +769,7 @@
 
         // --- SISTEMA DI NAVIGAZIONE BLINDATO ---
         function switchView(viewId) {
+            appState.activeView = viewId;
             document.querySelectorAll('.view-section').forEach(s => {
                 s.style.display = 'none';
                 s.classList.remove('active', 'active-flex');
@@ -763,6 +793,7 @@
             if(viewId === 'inbox') renderInbox();
             if(viewId === 'catalog') renderCatalogMgmt();
             if(viewId === 'price-update') populateSupplierSelect();
+            updateAiHelpCopy();
         }
 
         function handleRoleChange() {
@@ -780,6 +811,7 @@
                 if (roleWrap) roleWrap.style.display = 'none';
                 document.getElementById('dept-name-display').innerText = `Reparto: ${appState.forcedDept}`;
                 switchView('department');
+                updateAiHelpCopy();
                 return;
             }
             
@@ -790,6 +822,7 @@
                 switchView('home');
                 startAdminInboxPolling();
                 pullStateFromServerSilently();
+                updateAiHelpCopy();
             } else { 
                 sidebar.style.display = 'none'; 
                 adminHeader.style.display = 'none'; 
@@ -798,6 +831,143 @@
                 document.getElementById('dept-name-display').innerText = `Reparto: ${role}`;
                 switchView('department');
                 if (adminPullTimer) clearInterval(adminPullTimer);
+                updateAiHelpCopy();
+            }
+        }
+
+        // --- AI HELP (Gemini via server) ---
+        const AI_HELP_EXAMPLES = {
+            home: "Riassumimi i KPI principali e cosa devo controllare oggi.",
+            dashboard: "Perché vedo 'Ordini in sospeso'? Cosa devo fare per chiuderli?",
+            reports: "Come interpreto questi grafici? Quali azioni consigli?",
+            inbox: "Come approvo e assegno correttamente un ordine ai fornitori?",
+            catalog: "Come importo un nuovo catalogo e come evito duplicati?",
+            "price-update": "Come aggiorno le fatture e verifico aumenti prezzi?",
+            config: "Come aggiungo un nuovo reparto e genero il QR?",
+            department: "Come scrivo un ordine chiaro? Fai un esempio in 3 righe."
+        };
+
+        function getActiveViewId() {
+            if (appState && appState.activeView) return appState.activeView;
+            const el = Array.from(document.querySelectorAll('.view-section')).find(s => s.style.display !== 'none');
+            if (!el || !el.id) return 'home';
+            return el.id.replace(/^view-/, '') || 'home';
+        }
+
+        function updateAiHelpCopy() {
+            const viewId = getActiveViewId();
+            const titleEl = document.getElementById('ai-help-title');
+            const subEl = document.getElementById('ai-help-subtitle');
+            if (titleEl) titleEl.innerText = "Chiedi aiuto a Gemini";
+            if (subEl) subEl.innerText = `Contesto: ${viewId}`;
+        }
+
+        function toggleAiHelp() {
+            const panel = document.getElementById('ai-help-panel');
+            if (!panel) return;
+            const isOpen = !panel.classList.contains('hidden');
+            if (isOpen) closeAiHelp();
+            else openAiHelp();
+        }
+
+        function openAiHelp() {
+            const panel = document.getElementById('ai-help-panel');
+            if (!panel) return;
+            panel.classList.remove('hidden');
+            updateAiHelpCopy();
+            setTimeout(() => {
+                const q = document.getElementById('ai-help-question');
+                if (q) q.focus();
+            }, 50);
+        }
+
+        function closeAiHelp() {
+            const panel = document.getElementById('ai-help-panel');
+            if (!panel) return;
+            panel.classList.add('hidden');
+        }
+
+        function fillAiHelpExample() {
+            const viewId = getActiveViewId();
+            const q = document.getElementById('ai-help-question');
+            if (!q) return;
+            q.value = AI_HELP_EXAMPLES[viewId] || "Aiutami con questa pagina: cosa devo fare e quali errori evitare?";
+        }
+
+        function setAiHelpStatus(kind, text) {
+            const el = document.getElementById('ai-help-status');
+            if (!el) return;
+            el.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'bg-amber-50', 'text-amber-700', 'border-amber-200', 'bg-rose-50', 'text-rose-700', 'border-rose-200');
+            el.classList.add('border');
+            if (kind === 'ok') el.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+            else if (kind === 'warn') el.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+            else el.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+            el.innerText = text || '';
+        }
+
+        function buildAiHelpContext() {
+            const viewId = getActiveViewId();
+            return {
+                view: viewId,
+                currentUser: appState.currentUser || '',
+                currentDept: appState.currentDept || '',
+                counts: {
+                    products: Array.isArray(appState.products) ? appState.products.length : 0,
+                    suppliers: Array.isArray(appState.suppliers) ? appState.suppliers.length : 0,
+                    inbox: Array.isArray(appState.inbox) ? appState.inbox.length : 0,
+                    archive: Array.isArray(appState.archive) ? appState.archive.length : 0
+                },
+                settings: {
+                    portoFrancoWindow: (appState.settings || {}).portoFrancoWindow,
+                    allocationMode: (appState.settings || {}).allocationMode
+                }
+            };
+        }
+
+        async function sendAiHelp() {
+            const btn = document.getElementById('ai-help-send');
+            const qEl = document.getElementById('ai-help-question');
+            const ansWrap = document.getElementById('ai-help-answer-wrap');
+            const ansEl = document.getElementById('ai-help-answer');
+            const viewId = getActiveViewId();
+            const question = (qEl?.value || '').trim();
+            if (!question) {
+                setAiHelpStatus('warn', 'Scrivi una domanda.');
+                return;
+            }
+            if (ansWrap) ansWrap.classList.add('hidden');
+            if (btn) btn.disabled = true;
+            setAiHelpStatus('ok', 'Gemini sta rispondendo...');
+
+            try {
+                const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
+                const base = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
+                if (!base) throw new Error('Server non configurato');
+                const headers = { 'Content-Type': 'application/json' };
+                const key = (appState.settings.serverApiKey || '').trim();
+                if (key) headers['X-API-Key'] = key;
+
+                const res = await fetch(`${base}/api/ai/help`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        page: viewId,
+                        question,
+                        context: buildAiHelpContext(),
+                        model: 'gemini-2.0-flash'
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.ok) {
+                    throw new Error(data?.error || `AI error ${res.status}`);
+                }
+                if (ansEl) ansEl.innerText = (data.answer || '').trim();
+                if (ansWrap) ansWrap.classList.remove('hidden');
+                setAiHelpStatus('ok', 'Risposta pronta.');
+            } catch (e) {
+                setAiHelpStatus('error', (e && e.message) ? e.message : 'Errore AI');
+            } finally {
+                if (btn) btn.disabled = false;
             }
         }
 
@@ -2713,6 +2883,7 @@
             }
             applySettings();
             handleRoleChange(); 
+            updateAiHelpCopy();
             renderCatalogMgmt();
             renderInbox();
             renderConsolidation();
