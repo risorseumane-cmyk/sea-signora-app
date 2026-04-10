@@ -16,6 +16,7 @@ from flask_cors import CORS
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "app_data.db"
 FRONTEND_FILE = BASE_DIR.parent / "index.html"
+ASSETS_DIR = BASE_DIR.parent / "assets"
 API_KEY = os.getenv("SEASIGNORA_API_KEY", "cambia-questa-chiave")
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -591,6 +592,13 @@ def home():
     if FRONTEND_FILE.exists():
         return send_from_directory(FRONTEND_FILE.parent, FRONTEND_FILE.name)
     return jsonify({"ok": False, "error": "Frontend not found"}), 404
+
+
+@app.get("/assets/<path:filename>")
+def assets(filename):
+    if ASSETS_DIR.exists():
+        return send_from_directory(ASSETS_DIR, filename)
+    return jsonify({"ok": False, "error": "Assets not found"}), 404
 
 
 if __name__ == "__main__":
