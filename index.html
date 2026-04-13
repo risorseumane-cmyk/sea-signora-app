@@ -430,8 +430,8 @@
             
             // Dati demo se l'archivio è vuoto per mostrare che funziona
             const effectiveArchive = appState.archive.length > 0 ? appState.archive : [
-                { dept: 'Cucina', total: 450, text: 'Aragosta', items: [{ name: 'Aragosta Viva', supplier: 'METRO', cat: 'Ittico' }] },
-                { dept: 'Bar', total: 120, text: 'Gin', items: [{ name: 'Gin Tonic', supplier: 'N/D', cat: 'Spirits' }] }
+                { dept: 'Cucina', total: 450, text: 'Aragosta', items: [{ name: 'Aragosta Viva', supplier: 'METRO', cat: 'Ittico', qty: 2 }] },
+                { dept: 'Bar', total: 120, text: 'Gin', items: [{ name: 'Gin Tonic', supplier: 'N/D', cat: 'Spirits', qty: 10 }] }
             ];
 
             let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="p-2 border-b"></th>`;
@@ -446,15 +446,30 @@
                         let matchX = false;
                         let matchY = false;
                         
+                        // Calcola il totale dell'ordine basato sui prezzi del catalogo master
+                        let orderTotalFromMaster = 0;
+                        (a.items || []).forEach(item => {
+                            const masterProduct = appState.products.find(p => p.name === item.name || p.id == item.productId);
+                            if(masterProduct) {
+                                // Trova il miglior prezzo nel catalogo master
+                                const bestPrice = Math.min(...Object.values(masterProduct.prices));
+                                const itemTotal = bestPrice * (item.qty || 1);
+                                orderTotalFromMaster += itemTotal;
+
+                                // Verifica match per asse X/Y basato sul prodotto master
+                                if(axisX === 'sup' && item.supplier === x) matchX = true;
+                                if(axisX === 'cat' && masterProduct.cat === x) matchX = true;
+                                if(axisY === 'cat' && masterProduct.cat === y) matchY = true;
+                                if(axisY === 'prod' && masterProduct.name === y) matchY = true;
+                                if(axisY === 'sup' && item.supplier === y) matchY = true;
+                            }
+                        });
+
                         if(axisX === 'dept' && a.dept === x) matchX = true;
-                        else if(axisX === 'sup' && (a.items || []).some(i => i.supplier === x)) matchX = true;
-                        else if(axisX === 'cat' && (a.items || []).some(i => (i.cat === x || (appState.products.find(p => p.name === i.name)?.cat === x)))) matchX = true;
-                        
-                        if(axisY === 'cat' && (a.items || []).some(i => (i.cat === y || (appState.products.find(p => p.name === i.name)?.cat === y)))) matchY = true;
-                        else if(axisY === 'prod' && (a.items || []).some(i => i.name === y)) matchY = true;
-                        else if(axisY === 'sup' && (a.items || []).some(i => i.supplier === y)) matchY = true;
-                        
-                        if(matchX && matchY) total += (a.total || 0);
+
+                        if(matchX && matchY) {
+                            total += (orderTotalFromMaster || a.total || 0);
+                        }
                     });
                     
                     const intensity = total > 500 ? 'bg-amber-600 text-white' : (total > 100 ? 'bg-amber-400 text-white' : (total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
@@ -464,7 +479,7 @@
             });
             
             html += `</tbody></table>`;
-            if(appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Dati Demo (Archivio Reale Vuoto)</p>`;
+            if(appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Dati Demo basati su Catalogo Master</p>`;
             wrap.innerHTML = html;
         }
 
