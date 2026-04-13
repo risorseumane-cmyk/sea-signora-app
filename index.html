@@ -656,7 +656,14 @@
                 document.getElementById('dept-display').innerText = repartoParam;
                 switchView('department');
             } else {
-                sync();
+                const migrated = localStorage.getItem('ss_seed_brand_v1');
+                if(!migrated) {
+                    fetch(`${API_BASE}/api/admin/migrate`, { method: 'POST' })
+                        .then(() => localStorage.setItem('ss_seed_brand_v1', '1'))
+                        .finally(() => sync());
+                } else {
+                    sync();
+                }
             }
             
             setInterval(sync, 10000); 

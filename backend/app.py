@@ -333,6 +333,45 @@ def update_suppliers():
         conn.commit()
     return jsonify({"ok": True})
 
+@app.post("/api/admin/migrate")
+def migrate_state():
+    try:
+        default_settings = {
+            "brandName": "Sea Signora",
+            "color": "#EF7818",
+            "homeTitle": "Corporate Home",
+            "homeSubtitle": "Benvenuto. Il database è sincronizzato in tempo reale su Railway.",
+            "homeVisuals": True,
+            "homeCardsEnabled": True,
+            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"}
+        }
+
+        with get_conn() as conn:
+            row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+            if not row:
+                return jsonify({"ok": False, "error": "No state found"}), 404
+            state = json.loads(row["state"])
+            state.setdefault("seedVersion", "brand_v1")
+            state.setdefault("seededAt", datetime.now().isoformat())
+
+            settings = state.get("settings") or {}
+            if "brandName" not in settings and "brand" in settings and isinstance(settings["brand"], str):
+                settings["brandName"] = settings["brand"]
+            for k, v in default_settings.items():
+                if k == "homeCards":
+                    current_cards = settings.get("homeCards") or {}
+                    settings["homeCards"] = {**default_settings["homeCards"], **current_cards}
+                else:
+                    settings.setdefault(k, v)
+            state["settings"] = settings
+
+            conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+            conn.commit()
+
+        return jsonify({"ok": True, "seedVersion": state.get("seedVersion")})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 # --- SERVING FRONTEND ---
 @app.route("/")
 def index():
