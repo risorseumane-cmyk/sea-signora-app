@@ -217,24 +217,61 @@
         }
 
         function refresh() {
+            // KPI principali
             document.getElementById('kpi-pending').innerText = appState.inbox.length;
             document.getElementById('inbox-badge').innerText = appState.inbox.length;
             document.getElementById('inbox-badge').style.display = appState.inbox.length ? 'block' : 'none';
-            const saving = appState.archive.reduce((s,a) => s + (a.total * 0.12), 0);
+            
+            const totalSpent = appState.archive.reduce((s,a) => s + (a.total || 0), 0);
+            const saving = totalSpent * 0.12; // Stimato 12% saving ottimizzando fornitori
             document.getElementById('kpi-saving').innerText = saving.toFixed(2);
             
+            // Griglia Home con Alerts
+            const alerts = [];
+            appState.suppliers.forEach(s => {
+                if(s.current > 0 && s.current < s.min) {
+                    alerts.push(`<div class="bg-amber-100 p-2 rounded text-[9px] font-bold text-amber-700">⚠️ ${s.name}: Sotto Porto Franco (€${(s.min - s.current).toFixed(2)} mancanti)</div>`);
+                }
+            });
+
             const hg = document.getElementById('home-grid');
             hg.innerHTML = `
-                <div onclick="switchView('inbox')" class="glass-card p-8 border-l-4 border-amber-400 cursor-pointer"><b>Ordini Inbox</b><p class="text-3xl font-black">${appState.inbox.length}</p></div>
-                <div onclick="switchView('dashboard')" class="glass-card p-8 border-l-4 border-emerald-500 cursor-pointer"><b>Saving Stimato</b><p class="text-3xl font-black">€ ${saving.toFixed(2)}</p></div>
-                <div onclick="switchView('catalog')" class="glass-card p-8 border-l-4 border-slate-800 cursor-pointer"><b>Master Data</b><p class="text-3xl font-black">${appState.products.length} Articoli</p></div>
+                <div onclick="switchView('inbox')" class="glass-card p-8 border-l-4 border-amber-400 cursor-pointer hover:shadow-xl transition-all">
+                    <div class="flex justify-between items-start">
+                        <b>Ordini Inbox</b>
+                        <span class="bg-amber-400 text-white text-[10px] px-2 py-1 rounded-full font-black">${appState.inbox.length}</span>
+                    </div>
+                    <p class="text-3xl font-black mt-2">${appState.inbox.length}</p>
+                </div>
+                <div onclick="switchView('dashboard')" class="glass-card p-8 border-l-4 border-emerald-500 cursor-pointer hover:shadow-xl transition-all">
+                    <b>Saving Ottimizzato</b>
+                    <p class="text-3xl font-black">€ ${saving.toFixed(2)}</p>
+                </div>
+                <div onclick="switchView('catalog')" class="glass-card p-8 border-l-4 border-slate-800 cursor-pointer hover:shadow-xl transition-all">
+                    <b>Master Data</b>
+                    <p class="text-3xl font-black">${appState.products.length} Articoli</p>
+                </div>
             `;
 
+            // Griglia Logistica
             const lg = document.getElementById('logistics-grid');
             lg.innerHTML = appState.suppliers.map(s => {
                 const cur = s.current || 0;
                 const pct = Math.min((cur/s.min)*100, 100);
-                return `<div class="p-6 border rounded-3xl bg-white"><div class="flex justify-between mb-3"><b>${s.name}</b><span class="text-xs font-black">€ ${cur.toFixed(2)}</span></div><div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ${pct<100?'bg-amber-400':'bg-emerald-500'}" style="width:${pct}%"></div></div><p class="text-[9px] mt-2 font-bold text-slate-400 uppercase">Minimo PF: €${s.min}</p></div>`;
+                const color = pct >= 100 ? 'bg-emerald-500' : (pct > 70 ? 'bg-amber-400' : 'bg-rose-400');
+                return `
+                    <div class="p-6 border rounded-3xl bg-white shadow-sm hover:shadow-md transition-all">
+                        <div class="flex justify-between mb-3">
+                            <b class="text-xs uppercase tracking-wider">${s.name}</b>
+                            <span class="text-xs font-black">€ ${cur.toFixed(2)} / €${s.min}</span>
+                        </div>
+                        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full ${color}" style="width:${pct}%"></div>
+                        </div>
+                        <p class="text-[9px] mt-2 font-bold text-slate-400 uppercase">
+                            ${pct >= 100 ? '✅ Porto Franco raggiunto' : `Mancano €${(s.min - cur).toFixed(2)}`}
+                        </p>
+                    </div>`;
             }).join('');
 
             renderCatalog();
@@ -243,6 +280,13 @@
             initCharts();
             populateSupplierSelect();
         }
+
+        // Caricamento iniziale
+        window.onload = () => {
+            sync();
+            // Refresh periodico
+            setInterval(sync, 60000); 
+        };
 
         function renderCatalog() {
             const term = document.getElementById('cat-search').value.toLowerCase();
@@ -271,15 +315,33 @@
 
         async function askAI() {
             const q = document.getElementById('chat-q').value; if(!q) return;
-            const btn = document.getElementById('chat-btn'); btn.innerText = "IA sta pensando..."; btn.disabled = true;
+            const btn = document.getElementById('chat-btn'); 
+            const oldText = btn.innerText;
+            btn.innerText = "IA sta pensando..."; btn.disabled = true;
             try {
-                const res = await fetch('/api/ai/help', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({question: q}) });
+                const res = await fetch('/api/ai/help', { 
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'}, 
+                    body: JSON.stringify({
+                        question: q,
+                        context: {
+                            currentView: document.querySelector('.view-section.active')?.id,
+                            productsCount: appState.products.length,
+                            suppliers: appState.suppliers.map(s => ({ name: s.name, current: s.current, min: s.min })),
+                            inboxCount: appState.inbox.length,
+                            lastOrders: appState.archive.slice(0, 5)
+                        }
+                    }) 
+                });
                 const d = await res.json();
                 const box = document.getElementById('chat-a');
-                box.innerText = d.answer || d.response || "L'IA non ha risposto correttamente."; 
+                box.innerText = d.answer || "L'IA non ha risposto correttamente."; 
                 box.classList.remove('hidden');
-            } catch(e) { alert("Errore connessione IA."); }
-            btn.innerText = "Chiedi a Gemini"; btn.disabled = false;
+                document.getElementById('chat-q').value = "";
+            } catch(e) { 
+                alert("Errore connessione IA."); 
+            }
+            btn.innerText = oldText; btn.disabled = false;
         }
 
         function renderInbox() {
@@ -290,18 +352,65 @@
             `).join('') || '<p class="text-center py-20 text-slate-400 font-bold uppercase text-xs">Nessun ordine da gestire.</p>';
         }
 
-        function approveReq(id) {
+        async function approveReq(id) {
             const req = appState.inbox.find(r => r.id === id); if(!req) return;
+            
+            // Mostra caricamento
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "IA sta analizzando...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/ai/order-parse', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text: req.text, catalog: appState.products })
+                });
+                const data = await res.json();
+                
+                if(data.ok && data.parsed && data.parsed.items) {
+                    let total = 0;
+                    data.parsed.items.forEach(item => {
+                        const product = appState.products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name?.toLowerCase());
+                        if(product) {
+                            const bestPrice = Object.entries(product.prices).sort((a,b) => a[1]-b[1])[0];
+                            const supplier = appState.suppliers.find(s => s.name === bestPrice[0]);
+                            if(supplier) {
+                                supplier.current = (supplier.current || 0) + (bestPrice[1] * (item.qty || 1));
+                                total += (bestPrice[1] * (item.qty || 1));
+                            }
+                        }
+                    });
+                    appState.archive.unshift({ dept: req.dept, total: total, date: new Date().toLocaleDateString(), text: req.text });
+                    appState.inbox = appState.inbox.filter(r => r.id !== id);
+                    await push();
+                    switchView('dashboard');
+                } else {
+                    alert("L'IA non è riuscita a mappare l'ordine. Procedo con il match manuale.");
+                    fallbackApprove(req);
+                }
+            } catch(e) {
+                console.error(e);
+                fallbackApprove(req);
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
+            }
+        }
+
+        function fallbackApprove(req) {
             let total = 0;
-            // Esegue un match base se l'IA ha fallito o non è presente
             const match = appState.products.filter(p => req.text.toLowerCase().includes(p.name.toLowerCase().split(' ')[0]));
             match.forEach(p => {
                 const best = Object.entries(p.prices).sort((a,b)=>a[1]-b[1])[0];
                 const sup = appState.suppliers.find(s => s.name === best[0]);
                 if(sup) { sup.current = (sup.current||0) + best[1]; total += best[1]; }
             });
-            appState.archive.unshift({ dept: req.dept, total: total, cat: match[0]?.cat || 'Vario' });
-            appState.inbox = appState.inbox.filter(r => r.id !== id); push(); switchView('dashboard');
+            appState.archive.unshift({ dept: req.dept, total: total, cat: match[0]?.cat || 'Vario', date: new Date().toLocaleDateString() });
+            appState.inbox = appState.inbox.filter(r => r.id !== req.id);
+            push();
+            refresh();
         }
 
         function applyUI() {
@@ -344,7 +453,30 @@
             const sup = document.getElementById('update-supplier-select').value;
             const body = document.getElementById('update-table-body');
             if(!sup) { body.innerHTML = ''; return; }
-            body.innerHTML = appState.products.filter(p => p.prices[sup]).map(p => `<tr><td class="py-3 font-bold">${p.name}</td><td class="text-center text-slate-400">€ ${p.prices[sup].toFixed(2)}</td><td><input type="number" step="0.01" value="${p.prices[sup]}" oninput="appState.products.find(x=>x.id==${p.id}).prices['${sup}']=parseFloat(this.value)" class="w-20 p-2 border rounded-lg text-xs font-bold text-center"></td></tr>`).join('');
+            body.innerHTML = appState.products.filter(p => p.prices[sup]).map(p => {
+                const oldPrice = p.prices[sup];
+                return `
+                    <tr>
+                        <td class="py-3 font-bold">${p.name}</td>
+                        <td class="text-center text-slate-400">€ ${oldPrice.toFixed(2)}</td>
+                        <td>
+                            <input type="number" step="0.01" value="${oldPrice}" 
+                                onchange="updatePrice(${p.id}, '${sup}', this.value, ${oldPrice})" 
+                                class="w-20 p-2 border rounded-lg text-xs font-bold text-center focus:ring-2 focus:ring-amber-400 outline-none">
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+
+        function updatePrice(id, supplier, newVal, oldVal) {
+            const val = parseFloat(newVal);
+            if(isNaN(val)) return;
+            const product = appState.products.find(x => x.id == id);
+            product.prices[supplier] = val;
+            
+            if(val > oldVal * 1.05) { // Aumento > 5%
+                alert(`⚠️ Attenzione: Aumento prezzo rilevato per ${product.name} (+${(((val/oldVal)-1)*100).toFixed(1)}%)`);
+            }
         }
         function savePrices() { push(); alert("Listino aggiornato!"); }
 

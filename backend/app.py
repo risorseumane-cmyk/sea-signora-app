@@ -11,6 +11,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+import google.generativeai as genai
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -28,6 +29,10 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM = os.getenv("RESEND_FROM", SMTP_FROM)
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyAM9BA5AvXsyu2RWWJSLh_xQ55isa2sp94").strip()
+
+# Configurazione Gemini
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
 CORS(app)
@@ -65,24 +70,33 @@ def init_db():
         """
     )
     default_state = {
-        "products": [],
-        "suppliers": [],
+        "products": [
+            {"id":1, "name":"Tartufi di Mare", "cat":"Ittico", "um":"kg", "prices":{"METRO":11.12}},
+            {"id":2, "name":"Astice Blu Vivo", "cat":"Ittico", "um":"kg", "prices":{"OROBICA":65.90}},
+            {"id":3, "name":"Gambero Rosso 2°", "cat":"Ittico", "um":"kg", "prices":{"OROBICA":59.00}},
+            {"id":4, "name":"Branzino Grecia", "cat":"Ittico", "um":"kg", "prices":{"METRO":11.71}},
+            {"id":5, "name":"Carciofi Mammola", "cat":"Verdure", "um":"pz", "prices":{"OROBICA":1.18}},
+            {"id":6, "name":"Patate", "cat":"Verdure", "um":"kg", "prices":{"ORTOLANO":0.90}},
+            {"id":7, "name":"Carne Trita 80/20", "cat":"Carne", "um":"kg", "prices":{"CARNI NOBILI":10.00}},
+            {"id":8, "name":"Pasta Staff", "cat":"Secchi", "um":"kg", "prices":{"METRO":1.16}},
+            {"id":11, "name":"Ostriche Gillardeau", "cat":"Ittico", "um":"pz", "prices":{"LINEA MARE":2.44}},
+            {"id":12, "name":"Tonno Rosso Fuentes", "cat":"Ittico", "um":"kg", "prices":{"OROBICA":29.00}}
+        ],
+        "suppliers": [
+            {"name":"METRO", "min":150, "current": 0},
+            {"name":"OROBICA", "min":250, "current": 0},
+            {"name":"LINEA MARE", "min":200, "current": 0},
+            {"name":"REACH FOOD", "min":300, "current": 0},
+            {"name":"MARR", "min":200, "current": 0},
+            {"name":"ORTOLANO", "min":100, "current": 0}
+        ],
         "reparti": ["Cucina", "Sala", "Bar", "Wine"],
         "inbox": [],
         "archive": [],
-        "priceHistory": [],
         "settings": {
             "brandName": "Sea Signora",
             "accentColor": "#c5a059",
-            "hiddenModules": {},
-            "allocationMode": "hybrid",
-            "penaltyRate": 0.06,
-            "portoFrancoWindow": "weekly",
-            "aliases": {},
-            "aiEnabled": False,
-            "aiProvider": "openai",
-            "aiModel": "gpt-4o-mini",
-            "aiApiKey": "",
+            "aiEnabled": True
         },
     }
     cur.execute("SELECT id FROM app_state WHERE id = 1")
@@ -416,76 +430,52 @@ def notify():
     return jsonify({"ok": True, "delivered": True})
 
 
+def get_gemini_response(prompt, model_name="gemini-1.5-flash"):
+    try:
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"Errore Gemini ({model_name}): {e}")
+        return None
+
+
 @app.post("/api/ai/order-parse")
 def ai_order_parse():
     if not check_key():
         return jsonify({"ok": False, "error": "Invalid API key"}), 401
 
     if not GEMINI_API_KEY:
-        return jsonify({"ok": False, "error": "GEMINI_API_KEY non configurata sul server"}), 503
+        return jsonify({"ok": False, "error": "GEMINI_API_KEY non configurata"}), 503
 
     payload = request.get_json(silent=True) or {}
     text = str(payload.get("text") or "").strip()
     catalog = payload.get("catalog") or []
-    model = str(payload.get("model") or "gemini-2.0-flash").strip() or "gemini-2.0-flash"
+
     if not text:
-        return jsonify({"ok": False, "error": "Missing text"}), 400
-    if not isinstance(catalog, list):
-        catalog = []
+        return jsonify({"ok": False, "error": "Testo mancante"}), 400
 
     prompt = (
-        "Analizza questa lista spesa e fai il match con il catalogo.\n"
-        'Restituisci SOLO JSON valido nel formato {"items":[{"productId":number,"qty":number}]}\n'
-        f"Regole: qty default 1.\nCatalogo:\n{json.dumps(catalog, ensure_ascii=False)}\n\nOrdine:\n{text}"
+        "Sei l'assistente smart di Sea Signora.\n"
+        "Analizza questa richiesta di ordine e associala ai prodotti del catalogo.\n"
+        "Restituisci SOLO un JSON con questo formato: {\"items\": [{\"productId\": ID, \"qty\": NUMERO, \"name\": \"NOME\"}]}\n"
+        f"CATALOGO:\n{json.dumps(catalog, ensure_ascii=False)}\n\n"
+        f"ORDINE:\n{text}"
     )
 
-    model_candidates = []
-    for m in [model, "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
-        if m and m not in model_candidates:
-            model_candidates.append(m)
+    response_text = get_gemini_response(prompt)
+    if not response_text:
+        return jsonify({"ok": False, "error": "Errore AI"}), 502
 
-    last_err = "No model candidates available"
-    for m in model_candidates:
-        req = urllib.request.Request(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(GEMINI_API_KEY)}",
-            data=json.dumps(
-                {
-                    "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.1},
-                }
-            ).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            txt = (
-                data.get("candidates", [{}])[0]
-                .get("content", {})
-                .get("parts", [{}])[0]
-                .get("text", "{}")
-            )
-            start = txt.find("{")
-            end = txt.rfind("}")
-            if start >= 0 and end > start:
-                txt = txt[start : end + 1]
-            parsed = json.loads(txt)
-            return jsonify({"ok": True, "parsed": parsed, "modelUsed": m})
-        except urllib.error.HTTPError as e:
-            details = ""
-            try:
-                details = e.read().decode("utf-8")
-            except Exception:
-                details = str(e)
-            last_err = f"{m}: HTTP {e.code} {details[:220]}"
-            continue
-        except Exception as e:
-            last_err = f"{m}: {str(e)}"
-            continue
-
-    return jsonify({"ok": False, "error": f"Gemini error: {last_err}"}), 502
+    try:
+        start = response_text.find("{")
+        end = response_text.rfind("}")
+        if start >= 0 and end > start:
+            response_text = response_text[start : end + 1]
+        parsed = json.loads(response_text)
+        return jsonify({"ok": True, "parsed": parsed})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Errore parsing AI: {str(e)}"}), 502
 
 
 @app.post("/api/ai/help")
@@ -494,78 +484,27 @@ def ai_help():
         return jsonify({"ok": False, "error": "Invalid API key"}), 401
 
     if not GEMINI_API_KEY:
-        return jsonify({"ok": False, "error": "GEMINI_API_KEY non configurata sul server"}), 503
+        return jsonify({"ok": False, "error": "GEMINI_API_KEY non configurata"}), 503
 
     payload = request.get_json(silent=True) or {}
     question = str(payload.get("question") or "").strip()
-    page = str(payload.get("page") or "").strip()
     context = payload.get("context") or {}
-    model = str(payload.get("model") or "gemini-2.0-flash").strip() or "gemini-2.0-flash"
 
     if not question:
-        return jsonify({"ok": False, "error": "Missing question"}), 400
-    if not isinstance(context, dict):
-        context = {}
-
-    safe_ctx = {
-        "page": page[:80],
-        "context": context,
-    }
+        return jsonify({"ok": False, "error": "Domanda mancante"}), 400
 
     prompt = (
-        "Sei un assistente per l'app Sea Signora (ordini, catalogo, fornitori, report, configurazione).\n"
-        "Rispondi in italiano, in modo pratico e breve.\n"
-        "Se la domanda richiede passi operativi, usa una lista di 3-7 punti.\n"
-        "Non inventare dati: usa SOLO il contesto fornito.\n\n"
-        f"CONTESTO:\n{json.dumps(safe_ctx, ensure_ascii=False)}\n\n"
-        f"DOMANDA:\n{question}"
+        "Sei l'assistente smart di Sea Signora.\n"
+        "Rispondi in modo professionale e utile in italiano.\n"
+        f"CONTESTO: {json.dumps(context, ensure_ascii=False)}\n"
+        f"DOMANDA: {question}"
     )
 
-    model_candidates = []
-    for m in [model, "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b"]:
-        if m and m not in model_candidates:
-            model_candidates.append(m)
-
-    last_err = "No model candidates available"
-    for m in model_candidates:
-        req = urllib.request.Request(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(GEMINI_API_KEY)}",
-            data=json.dumps(
-                {
-                    "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.2},
-                }
-            ).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            txt = (
-                data.get("candidates", [{}])[0]
-                .get("content", {})
-                .get("parts", [{}])[0]
-                .get("text", "")
-            )
-            txt = (txt or "").strip()
-            if txt:
-                return jsonify({"ok": True, "answer": txt, "modelUsed": m})
-            last_err = f"{m}: empty answer"
-        except urllib.error.HTTPError as e:
-            details = ""
-            try:
-                details = e.read().decode("utf-8")
-            except Exception:
-                details = str(e)
-            last_err = f"{m}: HTTP {e.code} {details[:220]}"
-            continue
-        except Exception as e:
-            last_err = f"{m}: {str(e)}"
-            continue
-
-    return jsonify({"ok": False, "error": f"Gemini error: {last_err}"}), 502
+    response_text = get_gemini_response(prompt)
+    if response_text:
+        return jsonify({"ok": True, "answer": response_text.strip()})
+    
+    return jsonify({"ok": False, "error": "Impossibile ottenere risposta dall'IA"}), 502
 
 
 @app.get("/api/notifications")
