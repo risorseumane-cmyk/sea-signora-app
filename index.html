@@ -131,9 +131,12 @@
                             <button onclick="processImport()" class="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase">Elabora Database</button>
                         </div>
                         <div class="bg-rose-50 p-6 rounded-2xl border border-rose-200 mt-8">
-                            <h4 class="font-black uppercase text-xs mb-4 text-rose-700">🚨 Pericolo: Reset Database</h4>
-                            <p class="text-[10px] text-rose-600 mb-4 font-bold uppercase">Questa azione cancellerà TUTTI i dati (ordini, modifiche prezzi) e caricherà il catalogo originale.</p>
-                            <button onclick="resetDatabase()" class="bg-rose-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Reset Totale</button>
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="font-black uppercase text-xs text-rose-700">🚨 Pericolo: Reset Database</h4>
+                                <button onclick="checkDiagnostics()" class="bg-slate-800 text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase">Test Sistema</button>
+                            </div>
+                            <p class="text-[10px] text-rose-600 mb-4 font-bold uppercase">Questa azione cancellerà TUTTI i dati (ordini, modifiche prezzi) e ricaricherà il catalogo originale. I file non verranno cancellati, solo i dati interni.</p>
+                            <button onclick="resetDatabase()" class="bg-rose-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Reset Totale Sicuro</button>
                         </div>
                     </div>
 
@@ -345,8 +348,12 @@
         async function askAI() {
             const q = document.getElementById('chat-q').value; if(!q) return;
             const btn = document.getElementById('chat-btn'); 
+            const box = document.getElementById('chat-a');
             const oldText = btn.innerText;
+            
             btn.innerText = "IA sta pensando..."; btn.disabled = true;
+            box.classList.add('hidden');
+
             try {
                 const res = await fetch('/api/ai/help', { 
                     method: 'POST', 
@@ -363,14 +370,20 @@
                     }) 
                 });
                 const d = await res.json();
-                const box = document.getElementById('chat-a');
-                box.innerText = d.answer || "L'IA non ha risposto correttamente."; 
+                if(d.ok) {
+                    box.innerText = d.answer;
+                    box.classList.remove('hidden');
+                    document.getElementById('chat-q').value = "";
+                } else {
+                    box.innerText = "Errore IA: " + (d.error || "Risposta non valida");
+                    box.classList.remove('hidden');
+                }
+            } catch(e) {
+                box.innerText = "Errore di connessione con il server IA."; 
                 box.classList.remove('hidden');
-                document.getElementById('chat-q').value = "";
-            } catch(e) { 
-                alert("Errore connessione IA."); 
+            } finally {
+                btn.innerText = oldText; btn.disabled = false;
             }
-            btn.innerText = oldText; btn.disabled = false;
         }
 
         function renderInbox() {
@@ -629,6 +642,10 @@
 
         async function resetDatabase() {
             if(!confirm("ATTENZIONE: Questa azione è irreversibile. Resettare il database ai valori iniziali?")) return;
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "Reset in corso..."; btn.disabled = true;
+
             try {
                 const res = await fetch('/api/admin/reset-db', { method: 'POST' });
                 const d = await res.json();
@@ -636,10 +653,22 @@
                     alert("Database resettato con successo. Ricarico l'app...");
                     window.location.reload();
                 } else {
-                    alert("Errore nel reset: " + d.error);
+                    alert("Errore nel reset: " + (d.error || "Errore sconosciuto"));
                 }
             } catch(e) {
-                alert("Errore di connessione al server.");
+                alert("Errore di connessione al server durante il reset.");
+            } finally {
+                btn.innerText = oldText; btn.disabled = false;
+            }
+        }
+
+        async function checkDiagnostics() {
+            try {
+                const res = await fetch('/api/diag');
+                const d = await res.json();
+                alert(`DIAGNOSTICA:\nDB: ${d.db}\nGEMINI: ${d.gemini}\nKEY: ${d.key_present ? 'Presente' : 'Assente'}`);
+            } catch(e) {
+                alert("Errore nel recupero diagnostica.");
             }
         }
 
