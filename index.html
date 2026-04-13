@@ -9,24 +9,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        :root { --brand-blue: #10233f; --brand-accent: #b9954f; --brand-light: #f3f6fb; }
+        :root { --brand-blue: #10233f; --brand-accent: #c5a059; --brand-light: #f3f6fb; }
         body { font-family: 'Inter', sans-serif; background-color: var(--brand-light); color: #1e293b; }
         .chart-container { position: relative; width: 100%; height: 320px; }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
         
-        /* View Management Stagno */
+        /* Navigazione Stagna */
         .view-section { display: none !important; }
         .view-section.active { display: block !important; }
         .view-section.active-flex { display: flex !important; }
         
-        .tab-btn { transition: all 0.2s ease; border-radius: 12px; border: 1px solid transparent; }
+        .tab-btn { transition: all 0.2s ease; border-radius: 12px; border: 1px solid transparent; cursor: pointer; }
         .tab-btn:hover { background: #f8fafc; }
         .tab-btn.active { background-color: var(--brand-blue); color: white; box-shadow: 0 12px 24px -10px rgba(16, 35, 63, 0.45); }
         .glass-card { background: white; border: 1px solid rgba(226, 232, 240, 0.95); box-shadow: 0 12px 30px -18px rgba(15, 23, 42, 0.35); border-radius: 20px; }
-        .premium-input { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; outline: none; transition: border-color 0.2s; }
+        .premium-input { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; outline: none; transition: border-color 0.2s; width: 100%; }
         .premium-input:focus { border-color: var(--brand-accent); }
-        .brand-gradient { background: linear-gradient(135deg, var(--brand-blue) 0%, #1c3a66 100%); }
+        .brand-gradient { background: linear-gradient(135deg, var(--brand-accent) 0%, #000000 100%); }
         .config-sub-tab { border-bottom: 3px solid transparent; cursor: pointer; padding: 10px 15px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; }
         .config-sub-tab.active { border-color: var(--brand-accent); color: var(--brand-blue); }
     </style>
@@ -35,12 +33,12 @@
 
     <div class="min-h-screen flex flex-col md:flex-row">
         
-        <aside id="sidebar" class="w-full md:w-72 bg-white border-r border-slate-200 p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-40">
+        <aside id="sidebar" class="w-full md:w-72 bg-white border-r border-slate-200 p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-40 hidden md:flex">
             <div class="flex flex-col items-center gap-4 py-4 border-b pb-8">
-                <div id="ui-logo-circle" class="w-16 h-16 brand-gradient rounded-full flex items-center justify-center text-white text-2xl shadow-xl border-2 border-white font-black italic">SS</div>
+                <div id="ui-logo-circle" class="w-16 h-16 brand-gradient rounded-xl flex items-center justify-center text-white text-2xl shadow-xl border-2 border-slate-800 font-black italic">SS</div>
                 <div class="text-center">
                     <h1 id="ui-brand-name" class="text-base font-black tracking-widest uppercase">Sea Signora</h1>
-                    <p class="text-[9px] font-bold text-amber-600 uppercase tracking-[0.3em]">Milano</p>
+                    <p id="ui-brand-sub" class="text-[9px] font-bold text-amber-600 uppercase tracking-[0.3em]">Milano</p>
                 </div>
             </div>
 
@@ -52,8 +50,9 @@
                 
                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 mt-4">Gestione</p>
                 <button onclick="switchView('price-update')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">🧾 Aggiorna Fatture</button>
-                <button onclick="switchView('inbox')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500 relative">
-                    📬 Inbox Ordini <span id="inbox-badge" class="absolute right-4 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden">0</span>
+                <button onclick="switchView('inbox')" class="tab-btn flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-500 relative">
+                    <div class="flex items-center gap-3">📬 Inbox Ordini</div>
+                    <span id="inbox-badge" class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full hidden">0</span>
                 </button>
                 <button onclick="switchView('catalog')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">📦 Catalogo Master</button>
                 <button onclick="switchView('archive')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">📁 Storico Ordini</button>
@@ -66,29 +65,28 @@
             <header id="admin-header" class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-200">
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Procurement Control Center</p>
-                    <h2 class="text-2xl font-black uppercase tracking-tighter text-slate-900">Dashboard Direzionale</h2>
+                    <h2 id="ui-page-title" class="text-2xl font-black uppercase tracking-tighter text-slate-900">Dashboard Master</h2>
                 </div>
                 <div id="role-switcher-wrap" class="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm z-50">
                     <span class="text-[9px] font-black uppercase text-slate-400 px-3 tracking-widest border-r">Visualizza come:</span>
                     <select id="role-selector" onchange="handleRoleChange()" class="bg-transparent text-slate-900 text-[10px] font-black uppercase py-2 px-4 outline-none cursor-pointer">
                         <option value="admin">Amministratore</option>
-                        <option value="Cucina">Reparto: Cucina</option>
-                        <option value="Sala">Reparto: Sala</option>
-                        <option value="Bar">Reparto: Bar</option>
-                        <option value="Wine">Reparto: Wine</option>
+                        <option value="Cucina">Cucina</option>
+                        <option value="Sala">Sala</option>
+                        <option value="Bar">Bar</option>
+                        <option value="Wine">Wine</option>
                     </select>
                 </div>
             </header>
 
             <div id="view-home" class="view-section active animate-in fade-in">
                 <div class="max-w-6xl mx-auto">
-                    <div class="rounded-2xl p-6 text-white mb-6 bg-gradient-to-br from-slate-900 to-slate-700 shadow-xl">
+                    <div class="rounded-2xl p-6 text-white mb-6 bg-slate-900 shadow-xl brand-gradient">
                         <p class="text-[10px] font-black uppercase tracking-[0.2em] opacity-80" id="home-brand-sub">Sea Signora Milano</p>
                         <h3 class="text-2xl font-black uppercase mt-1">Corporate Home</h3>
-                        <p class="text-xs opacity-80 mt-1">Panoramica rapida KPI e accessi operativi (Sincronizzato in Cloud).</p>
+                        <p class="text-xs opacity-80 mt-1">Panoramica rapida KPI e accessi operativi. Il sistema salva automaticamente sul server.</p>
                     </div>
                     <div id="home-widget-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-                    <p class="text-[10px] text-slate-500 mt-4">Personalizza questi widget in Impostazioni > Personalizza Layout.</p>
                 </div>
             </div>
 
@@ -104,7 +102,7 @@
                     </div>
                     <div class="brand-gradient p-8 rounded-3xl text-white shadow-xl flex flex-col justify-center">
                         <span class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-2 block">Motore Logistica AI</span>
-                        <p class="text-sm font-semibold italic">"Algoritmo in funzione: ottimizzazione listini e consolidamento Porto Franco."</p>
+                        <p class="text-sm font-semibold italic">"Algoritmo attivo: ottimizzazione listini e consolidamento Porto Franco."</p>
                     </div>
                 </div>
                 <div class="glass-card p-10" id="ui-logistica-card">
@@ -117,23 +115,18 @@
                 <div class="glass-card p-6 mb-8 flex flex-wrap gap-4 items-end bg-slate-50">
                     <div class="flex-1 min-w-[150px]">
                         <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Periodo</label>
-                        <select id="filter-period" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none">
-                            <option value="mensile">Ultimi 30 Giorni</option><option value="trimestrale">Ultimo Trimestre</option>
-                        </select>
+                        <select id="filter-period" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"><option value="mensile">Ultimi 30 Giorni</option><option value="trimestrale">Ultimo Trimestre</option></select>
                     </div>
                     <div class="flex-1 min-w-[150px]">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Livello di Analisi</label>
-                        <select id="filter-level" onchange="toggleReportFilters(); updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none">
-                            <option value="generale">Generale</option><option value="reparto">Per Reparto</option><option value="categoria">Per Categoria</option><option value="sottocategoria">Per Sottocategoria</option><option value="prodotto">Per Prodotto</option>
-                        </select>
+                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Livello Analisi</label>
+                        <select id="filter-level" onchange="toggleReportFilters(); updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"><option value="generale">Generale</option><option value="reparto">Per Reparto</option><option value="categoria">Per Categoria</option><option value="sottocategoria">Per Sottocategoria</option></select>
                     </div>
                     <div id="filter-wrap-reparto" class="flex-1 min-w-[150px] hidden"><select id="filter-reparto" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white"></select></div>
                     <div id="filter-wrap-categoria" class="flex-1 min-w-[150px] hidden"><select id="filter-categoria" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white"></select></div>
                     <div id="filter-wrap-sottocategoria" class="flex-1 min-w-[150px] hidden"><select id="filter-sottocategoria" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white"></select></div>
-                    <div id="filter-wrap-prodotto" class="flex-1 min-w-[150px] hidden"><select id="filter-prodotto" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white"></select></div>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="glass-card p-8"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-6" id="trend-title">Andamento Costi</h4><div class="chart-container"><canvas id="analyticsTrendChart"></canvas></div></div>
+                    <div class="glass-card p-8"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-6">Andamento Costi</h4><div class="chart-container"><canvas id="analyticsTrendChart"></canvas></div></div>
                     <div class="glass-card p-8"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-6">Ripartizione Spese</h4><div class="chart-container"><canvas id="analyticsPieChart"></canvas></div></div>
                 </div>
             </div>
@@ -142,7 +135,7 @@
 
             <div id="view-catalog" class="view-section animate-in fade-in">
                 <div class="glass-card p-10">
-                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Catalogo Master (150+ Prodotti)</h3>
+                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Catalogo Master</h3>
                     <input id="catalog-mgmt-search" oninput="renderCatalogMgmt()" type="text" placeholder="Filtra catalogo..." class="w-full p-4 bg-slate-50 border-none rounded-xl text-sm font-bold mb-8 shadow-inner focus:outline-none">
                     <div class="overflow-x-auto border rounded-xl">
                         <table class="w-full text-left text-sm">
@@ -167,25 +160,17 @@
                 </div>
             </div>
 
-            <div id="view-archive" class="view-section animate-in fade-in"><div class="glass-card p-10"><h3 class="text-xl font-black uppercase tracking-tighter mb-6">Storico Ordini Approvati</h3><div class="overflow-hidden border rounded-xl"><table class="w-full text-left text-sm"><tbody id="archive-table-body" class="divide-y"></tbody></table></div></div></div>
+            <div id="view-archive" class="view-section animate-in fade-in"><div class="glass-card p-10"><h3 class="text-xl font-black uppercase tracking-tighter mb-6">Storico Ordini Approvati</h3><div class="overflow-hidden border rounded-xl"><table class="w-full text-left text-sm"><thead class="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><tr><th class="px-6 py-4">Data</th><th class="px-6 py-4">Reparto / Staff</th><th class="px-6 py-4">Dettaglio</th><th class="px-6 py-4 text-right">Costo Consolidato</th></tr></thead><tbody id="archive-table-body" class="divide-y"></tbody></table></div></div></div>
 
             <div id="view-config" class="view-section animate-in fade-in">
                 <div class="glass-card p-10">
                     <div class="flex gap-6 border-b mb-8 overflow-x-auto pb-2 custom-scroll">
-                        <div onclick="switchConfigTab('prodotti')" id="config-btn-prodotti" class="config-sub-tab active">Prodotti & Excel</div>
+                        <div onclick="switchConfigTab('prodotti')" id="config-btn-prodotti" class="config-sub-tab active">Prodotti & Cataloghi</div>
                         <div onclick="switchConfigTab('fornitori')" id="config-btn-fornitori" class="config-sub-tab">Fornitori & Reparti</div>
                         <div onclick="switchConfigTab('ui')" id="config-btn-ui" class="config-sub-tab">Personalizza UI & Backup</div>
                     </div>
 
                     <div id="config-sec-prodotti" class="config-inner space-y-8">
-                        <div class="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div><h4 class="text-sm font-black text-emerald-900 uppercase">Importazione Rapida Excel</h4><p class="text-[10px] text-emerald-600">Formato: Nome; Categoria; Sottocategoria; UM; Prezzo; Fornitore</p></div>
-                            <button onclick="document.getElementById('excel-box').classList.toggle('hidden')" class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-black text-[10px] uppercase">Apri Import</button>
-                        </div>
-                        <div id="excel-box" class="hidden">
-                            <textarea id="excel-area" class="w-full h-32 p-4 border rounded-xl mb-3 text-sm font-medium" placeholder="Esempio: Tartufi di Mare; Ittico; Bivalvi; kg; 11.12; METRO"></textarea>
-                            <button onclick="processExcelImport()" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Elabora e Aggiungi</button>
-                        </div>
                         <div class="bg-slate-50 p-6 rounded-2xl border">
                             <h4 class="text-[10px] font-black uppercase mb-4 tracking-widest text-slate-500">Aggiungi Singolo Prodotto</h4>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -196,16 +181,35 @@
                             </div>
                             <button onclick="addSingleProduct()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Prodotto</button>
                         </div>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
+                                <h4 class="text-sm font-black text-emerald-900 uppercase mb-2">Importazione Excel</h4>
+                                <p class="text-[10px] text-emerald-600 mb-4">Formato: Nome; Categoria; Sottocategoria; UM; Prezzo; Fornitore</p>
+                                <textarea id="excel-area" class="w-full h-32 p-4 border rounded-xl mb-3 text-xs font-medium" placeholder="Esempio: Tartufi di Mare; Ittico; Bivalvi; kg; 11.12; METRO"></textarea>
+                                <button onclick="processExcelImport()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Elabora e Aggiungi</button>
+                            </div>
+                            <div class="bg-amber-50 p-6 rounded-2xl border border-amber-100">
+                                <h4 class="text-sm font-black text-amber-900 uppercase mb-2">Importa Elenco Puntato / Testo</h4>
+                                <p class="text-[10px] text-amber-700 mb-4">Incolla listini testuali liberi. Il sistema proverà a estrarre in automatico prodotto, UM, prezzo e fornitore.</p>
+                                <textarea id="raw-catalog-area" class="w-full h-32 p-4 border rounded-xl mb-3 text-xs" placeholder="- Branzino Grecia kg METRO 11.71"></textarea>
+                                <button onclick="processRawCatalogImport()" class="w-full bg-amber-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Elabora Testo Libero</button>
+                            </div>
+                        </div>
+
                         <div class="overflow-hidden border rounded-xl h-64 overflow-y-auto"><table class="w-full text-left text-sm"><tbody id="config-products-list" class="divide-y bg-white"></tbody></table></div>
                     </div>
 
                     <div id="config-sec-fornitori" class="config-inner hidden space-y-8">
                         <div>
-                            <div class="flex justify-between items-center mb-6"><h4 class="text-sm font-black uppercase">Soglie Porto Franco Fornitori</h4></div>
+                            <div class="flex justify-between items-center mb-6"><h4 class="text-sm font-black uppercase">Soglie Porto Franco</h4></div>
                             <div id="suppliers-config-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                         </div>
                         <div class="border-t pt-8">
-                            <h4 class="text-sm font-black uppercase mb-4">QR Code Ordini per i Reparti</h4>
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-sm font-black uppercase">QR Code Ordini per i Reparti</h4>
+                                <button onclick="printQRCodes()" class="bg-slate-900 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg hover:scale-105 transition-all">🖨️ Stampa QR Code</button>
+                            </div>
                             <p class="text-xs text-slate-500 mb-6">Stampa questi QR. Il cameriere lo inquadra per aprire direttamente il modulo d'ordine della sua postazione.</p>
                             <div id="config-qr-list" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
                         </div>
@@ -225,17 +229,16 @@
 
                         <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100">
                             <h4 class="text-[10px] font-black uppercase text-blue-900 mb-2">Sinonimi / Alias AI</h4>
-                            <p class="text-[10px] text-blue-700 mb-3">Per aiutare l'algoritmo. Formato: sinonimo => nome prodotto ufficiale.</p>
+                            <p class="text-[10px] text-blue-700 mb-3">Per aiutare l'algoritmo di fallback. Formato: sinonimo => nome ufficiale.</p>
                             <textarea id="ui-aliases-area" class="w-full h-24 p-3 border rounded-xl text-xs" placeholder="astice => Astice Blu Vivo"></textarea>
-                            <button onclick="saveAliases()" class="mt-3 bg-blue-700 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Salva Sinonimi</button>
+                            <button onclick="saveAliases()" class="mt-3 bg-blue-700 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Salva Alias</button>
                         </div>
 
                         <div class="bg-rose-50 p-6 rounded-2xl border border-rose-100">
-                            <h4 class="text-[10px] font-black uppercase text-rose-900 mb-4">Gestione Dati Locali (Backup)</h4>
+                            <h4 class="text-[10px] font-black uppercase text-rose-900 mb-4">Gestione Dati Locali (Backup JSON)</h4>
                             <div class="flex gap-2">
                                 <button onclick="exportDataBackup()" class="bg-rose-700 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Esporta JSON</button>
                                 <button onclick="document.getElementById('backup-import-input').click()" class="bg-white border border-rose-200 text-rose-700 px-4 py-2 rounded-lg text-[10px] font-black uppercase">Importa JSON</button>
-                                <button onclick="resetAllData()" class="bg-red-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase ml-auto">Reset Dati</button>
                             </div>
                             <input id="backup-import-input" type="file" accept="application/json" class="hidden" onchange="importDataBackup(event)">
                         </div>
@@ -246,23 +249,13 @@
             <div id="view-department" class="view-section h-full">
                 <div class="h-full flex flex-col justify-center w-full max-w-2xl mx-auto">
                     <div class="glass-card p-10 shadow-2xl border-0 relative bg-white">
-                        <div class="flex items-center gap-6 mb-10">
-                            <div class="w-16 h-16 brand-gradient rounded-2xl flex items-center justify-center text-white shadow-xl rotate-3 font-black text-2xl italic">SS</div>
-                            <div>
-                                <h3 class="text-3xl font-black uppercase tracking-tighter leading-none text-slate-900">Nuovo Ordine</h3>
-                                <p id="dept-name-display" class="text-amber-600 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Sea Signora</p>
-                            </div>
+                        <div class="flex items-center gap-5 mb-8">
+                            <div class="w-16 h-16 brand-gradient rounded-xl flex items-center justify-center text-white text-2xl font-black italic">SS</div>
+                            <div><h3 class="text-3xl font-black uppercase tracking-tighter leading-none">Invia Ordine</h3><p id="dept-name-display" class="text-amber-600 font-bold uppercase text-[10px] mt-1">Sea Signora</p></div>
                         </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <input id="dept-nome" type="text" placeholder="Nome Operatore" class="p-4 bg-slate-50 border rounded-xl text-sm font-bold outline-none">
-                            <input id="dept-cognome" type="text" placeholder="Cognome" class="p-4 bg-slate-50 border rounded-xl text-sm font-bold outline-none">
-                        </div>
-                        <textarea id="dept-raw-text" placeholder="Scrivi liberamente. Il sistema lo trasformerà in un ordine standard... (es: 10kg Astice Blu, 2 casse Gin Mare, 5 carciofi...)" class="w-full h-48 p-6 bg-slate-50 border border-slate-200 rounded-2xl text-base font-medium mb-6 resize-none outline-none focus:border-amber-400"></textarea>
-                        
-                        <button onclick="submitDeptOrder()" id="btn-submit-order" class="w-full py-6 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-transform">
-                            🚀 Invia Ordine all'Ufficio Acquisti
-                        </button>
+                        <div class="grid grid-cols-2 gap-4 mb-6"><input id="dept-nome" type="text" placeholder="Nome" class="premium-input bg-slate-50"><input id="dept-cognome" type="text" placeholder="Cognome" class="premium-input bg-slate-50"></div>
+                        <textarea id="dept-raw-text" placeholder="Scrivi la tua lista liberamente. Es: 5kg Astice Blu, 2 casse Gin Mare. L'IA Gemini la analizzerà." class="w-full h-40 premium-input bg-slate-50 resize-none mb-6"></textarea>
+                        <button onclick="submitDeptOrder()" id="btn-submit-order" class="w-full py-6 brand-gradient text-white rounded-xl font-black text-xs uppercase shadow-xl active:scale-95 transition-transform">🚀 Invia Ordine</button>
                     </div>
                 </div>
             </div>
@@ -270,24 +263,16 @@
             <div class="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-3">
                 <div id="ai-help-panel" class="hidden w-[92vw] max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
                     <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-widest opacity-70">Assistente</p>
-                            <p class="text-sm font-black">Chiedi a Gemini</p>
-                        </div>
-                        <button onclick="document.getElementById('ai-help-panel').classList.add('hidden')" class="text-xs font-black uppercase bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl">Chiudi</button>
+                        <div><p class="text-[10px] font-black uppercase opacity-70">Assistente</p><p class="text-sm font-black">Chiedi a Gemini</p></div>
+                        <button onclick="document.getElementById('ai-help-panel').classList.add('hidden')" class="text-xs font-black uppercase bg-white/10 px-3 py-2 rounded-xl">Chiudi</button>
                     </div>
                     <div class="p-4 space-y-3">
-                        <textarea id="ai-help-question" class="w-full h-24 p-3 border rounded-xl text-sm" placeholder="Es: Come importo il catalogo? Come leggo questo report?"></textarea>
-                        <button onclick="sendAiHelp()" id="btn-ai-help" class="w-full bg-slate-900 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Invia a Gemini</button>
-                        <div id="ai-help-answer-wrap" class="hidden mt-3">
-                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Risposta</p>
-                            <div id="ai-help-answer" class="text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl p-3"></div>
-                        </div>
+                        <textarea id="ai-help-question" class="w-full h-24 p-3 border rounded-xl text-sm" placeholder="Es: Come si usa questo report?"></textarea>
+                        <button onclick="sendAiHelp()" id="btn-ai-help" class="w-full bg-slate-900 text-white py-3 rounded-xl text-[10px] font-black uppercase">Invia a Gemini</button>
+                        <div id="ai-help-answer-wrap" class="hidden mt-3"><p class="text-[10px] font-black text-slate-400 mb-2">Risposta</p><div id="ai-help-answer" class="text-sm text-slate-900 bg-slate-50 border rounded-xl p-3"></div></div>
                     </div>
                 </div>
-                <button onclick="document.getElementById('ai-help-panel').classList.toggle('hidden')" class="brand-gradient text-white shadow-2xl rounded-2xl px-5 py-4 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                    ✨ Aiuto Gemini
-                </button>
+                <button onclick="document.getElementById('ai-help-panel').classList.toggle('hidden')" class="brand-gradient text-white shadow-2xl rounded-2xl px-5 py-4 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">✨ Aiuto Gemini</button>
             </div>
 
         </main>
@@ -300,94 +285,29 @@
         let appState = {
             currentUser: 'admin',
             settings: { ...DEFAULT_SETTINGS },
-            // DATABASE INTEGRALE SEA SIGNORA MILANO MAPPATO
+            // DATABASE INTEGRALE SEA SIGNORA MILANO MAPPATO (150+ Prodotti)
             products: [
-                { id: 1, name: 'Tartufi di Mare', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 11.12 } },
-                { id: 2, name: 'Cannolicchi Estero', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 7.50 } },
-                { id: 3, name: 'Cappasanta 1/2 guscio fresca', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'OROBICA': 11.90 } },
-                { id: 4, name: 'Cockles', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 3.67 } },
-                { id: 5, name: 'Cozze', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 3.50 } },
-                { id: 6, name: 'Vongola Lupino', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 8.09 } },
-                { id: 7, name: 'Vongola Tellina', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 10.49 } },
-                { id: 8, name: 'Vongola Verace', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'LINEA MARE': 18.70 } },
-                { id: 9, name: 'Aragosta Viva 250-400g', cat: 'Ittico', sub: 'Crostacei', um: 'pz', prices: { 'OROBICA': 72.00 } },
-                { id: 10, name: 'Astice Blu Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 65.90 } },
-                { id: 11, name: 'Astice Canada vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'LINEA MARE': 29.50 } },
-                { id: 12, name: 'Astice Jumbo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 63.00 } },
-                { id: 13, name: 'Astice Polpa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 91.00 } },
-                { id: 14, name: 'Carabineros 8/10', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 102.00 } },
-                { id: 15, name: 'Gambero Fondale', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 13.00 } },
-                { id: 16, name: 'Gambero Rosa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 16.50 } },
-                { id: 17, name: 'Gambero Rosso 2°', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 59.00 } },
-                { id: 18, name: 'Gambero Viola 2°', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 56.00 } },
-                { id: 19, name: 'King Crab Polpa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 56.50 } },
-                { id: 20, name: 'King Crab Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 93.00 } },
-                { id: 21, name: 'Leg King Crab Cotto', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 79.00 } },
-                { id: 22, name: 'Leg King Crab Crudo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 100.00 } },
-                { id: 23, name: 'Mazzancolla Fresca', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'METRO': 12.49 } },
-                { id: 24, name: 'Mazzancolla Gelo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 7.50 } },
-                { id: 25, name: 'Moleca', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 165.00 } },
-                { id: 26, name: 'Scampo 1/5', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 65.00 } },
-                { id: 27, name: 'Scampo 21/30', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'METRO': 10.62 } },
-                { id: 28, name: 'Scampo 31/40', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'METRO': 14.08 } },
-                { id: 29, name: 'Calamaro Patagonia', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'LINEA MARE': 7.40 } },
-                { id: 30, name: 'Calamaro Spillo', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'OROBICA': 22.80 } },
-                { id: 31, name: 'Lumaca di Mare', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'OROBICA': 17.90 } },
-                { id: 32, name: 'Polpo Gelo Indopacifico', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'LINEA MARE': 16.95 } },
-                { id: 33, name: 'Polpo Gelo Med.', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'METRO': 17.85 } },
-                { id: 34, name: 'Ostriche Gillardeau N3', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'LINEA MARE': 2.44 } },
-                { id: 35, name: 'Ostriche Mignon di Goro', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'OROBICA': 0.69 } },
-                { id: 36, name: 'Ostriche OR N4', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'OYSTER OASIS': 2.25 } },
-                { id: 37, name: 'Akami (-60°)', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'REACH FOOD': 49.50 } },
-                { id: 38, name: 'Branzino Grecia', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 11.71 } },
-                { id: 39, name: 'Chutoro (-60°)', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'REACH FOOD': 53.50 } },
-                { id: 40, name: 'Dentice Gibboso', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 23.50 } },
-                { id: 41, name: 'Gallinella', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 21.15 } },
-                { id: 42, name: 'Orata Grecia', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'METRO': 10.18 } },
-                { id: 43, name: 'Tonno Rosso Fuentes', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 29.00 } },
-                { id: 44, name: 'Caviale Osetra 50g', cat: 'Ittico', sub: 'Specialità', um: 'pz', prices: { 'REACH FOOD': 43.00 } },
-                { id: 45, name: 'Colatura di Alici 100ml', cat: 'Ittico', sub: 'Specialità', um: 'pz', prices: { 'MARR': 6.99 } },
-                // VERDURE
-                { id: 60, name: 'Acetosella', cat: 'Verdure', sub: 'Erbe', um: '100g', prices: { 'ORTOLANO': 6.30 } },
-                { id: 61, name: 'Aneto', cat: 'Verdure', sub: 'Erbe', um: '60g', prices: { 'ABBASCIÀ': 1.18 } },
-                { id: 62, name: 'Basilico', cat: 'Verdure', sub: 'Erbe', um: 'kg', prices: { 'ORTOLANO': 15.50 } },
-                { id: 63, name: 'Coriandolo', cat: 'Verdure', sub: 'Erbe', um: '100g', prices: { 'FAST FRUIT': 1.20 } },
-                { id: 64, name: 'Zenzero', cat: 'Verdure', sub: 'Erbe', um: 'kg', prices: { 'MARR': 4.12 } },
-                { id: 65, name: 'Limoni', cat: 'Verdure', sub: 'Frutta', um: 'kg', prices: { 'MARR': 2.20 } },
-                { id: 66, name: 'Aglio Bianco', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 5.90 } },
-                { id: 67, name: 'Carciofi Mammola', cat: 'Verdure', sub: 'Verdura', um: 'pz', prices: { 'OROBICA': 1.18 } },
-                { id: 68, name: 'Carote', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'OROBICA': 1.29 } },
-                { id: 69, name: 'Patate', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 0.90 } },
-                { id: 70, name: 'Zucchine', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ABBASCIÀ': 2.28 } },
-                // CARNE
-                { id: 80, name: 'Carne Trita 80/20', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 10.00 } },
-                { id: 81, name: 'Controfiletto Angus', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 33.15 } },
-                { id: 82, name: 'Hamburger Manzo', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'MARR': 8.40 } },
-                { id: 83, name: 'Pollo Petto', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'MARR': 6.40 } },
-                // LATTICINI E PASTA
-                { id: 90, name: 'Burro', cat: 'Consumabili', sub: 'Latticini', um: 'kg', prices: { 'MARR': 6.05 } },
-                { id: 91, name: 'Latte Intero UHT', cat: 'Consumabili', sub: 'Latticini', um: 'lt', prices: { 'METRO': 0.86 } },
-                { id: 92, name: 'Parmigiano 24M', cat: 'Consumabili', sub: 'Latticini', um: 'kg', prices: { 'MARR': 18.90 } },
-                { id: 93, name: 'Pasta Staff', cat: 'Consumabili', sub: 'Pasta', um: 'kg', prices: { 'METRO': 1.16 } },
-                // CLEANING
-                { id: 100, name: 'Sapone refill Arancia Capri', cat: 'Cleaning', sub: 'Bagno', um: 'pz', prices: { 'ACQUA DI PARMA': 33.00 } },
-                { id: 101, name: 'Detergente lavastoviglie', cat: 'Cleaning', sub: 'Cucina', um: 'pz', prices: { 'METRO': 10.00 } }
+                // ITTICO - Bivalvi
+                {id:1,name:'Tartufi di Mare',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'METRO':11.12}},{id:2,name:'Cannolicchi Estero',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'METRO':7.50}},{id:3,name:'Cappasanta 1/2 guscio',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'OROBICA':11.90}},{id:4,name:'Cockles',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'METRO':3.67}},{id:5,name:'Cozze',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'METRO':3.50}},{id:6,name:'Vongola Lupino',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'METRO':8.09}},{id:7,name:'Vongola Tellina',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'METRO':10.49}},{id:8,name:'Vongola Verace',cat:'Ittico',sub:'Bivalvi',um:'kg',prices:{'LINEA MARE':18.70}},
+                // ITTICO - Crostacei
+                {id:9,name:'Aragosta Viva',cat:'Ittico',sub:'Crostacei',um:'pz',prices:{'OROBICA':72.00}},{id:10,name:'Astice Blu Vivo',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':65.90}},{id:11,name:'Astice Canada',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'LINEA MARE':29.50}},{id:12,name:'Astice Jumbo',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':63.00}},{id:13,name:'Astice Polpa',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':91.00}},{id:14,name:'Carabineros 8/10',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'REACH FOOD':102.00}},{id:15,name:'Gambero Fondale',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':13.00}},{id:16,name:'Gambero Rosa',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':16.50}},{id:17,name:'Gambero Rosso 2°',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':59.00}},{id:18,name:'Gambero Viola 2°',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':56.00}},{id:19,name:'King Crab Polpa',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'REACH FOOD':56.50}},{id:20,name:'King Crab Vivo',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':93.00}},{id:21,name:'Leg King Crab Cotto',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':79.00}},{id:22,name:'Leg King Crab Crudo',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'REACH FOOD':100.00}},{id:23,name:'Mazzancolla Fresca',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'METRO':12.49}},{id:24,name:'Mazzancolla Gelo',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':7.50}},{id:25,name:'Moleca',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'OROBICA':165.00}},{id:26,name:'Scampo 1/5',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'REACH FOOD':65.00}},{id:27,name:'Scampo 21/30',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'METRO':10.62}},{id:28,name:'Scampo 31/40',cat:'Ittico',sub:'Crostacei',um:'kg',prices:{'METRO':14.08}},
+                // ITTICO - Molluschi e Ostriche
+                {id:29,name:'Calamaro Patagonia',cat:'Ittico',sub:'Molluschi',um:'kg',prices:{'LINEA MARE':7.40}},{id:30,name:'Calamaro Spillo',cat:'Ittico',sub:'Molluschi',um:'kg',prices:{'OROBICA':22.80}},{id:31,name:'Lumaca di Mare',cat:'Ittico',sub:'Molluschi',um:'kg',prices:{'OROBICA':17.90}},{id:32,name:'Polpo Gelo Indo',cat:'Ittico',sub:'Molluschi',um:'kg',prices:{'LINEA MARE':16.95}},{id:33,name:'Polpo Gelo Med.',cat:'Ittico',sub:'Molluschi',um:'kg',prices:{'METRO':17.85}},{id:34,name:'Ostriche Gillardeau',cat:'Ittico',sub:'Ostriche',um:'pz',prices:{'LINEA MARE':2.44}},{id:35,name:'Ostriche Mignon',cat:'Ittico',sub:'Ostriche',um:'pz',prices:{'OROBICA':0.69}},{id:36,name:'Ostriche OR N4',cat:'Ittico',sub:'Ostriche',um:'pz',prices:{'OYSTER OASIS':2.25}},
+                // ITTICO - Pesce
+                {id:37,name:'Akami (-60°)',cat:'Ittico',sub:'Pesce',um:'kg',prices:{'REACH FOOD':49.50}},{id:38,name:'Branzino Grecia',cat:'Ittico',sub:'Pesce',um:'kg',prices:{'METRO':11.71}},{id:39,name:'Chutoro (-60°)',cat:'Ittico',sub:'Pesce',um:'kg',prices:{'REACH FOOD':53.50}},{id:40,name:'Dentice Gibboso',cat:'Ittico',sub:'Pesce',um:'kg',prices:{'OROBICA':23.50}},{id:41,name:'Gallinella',cat:'Ittico',sub:'Pesce',um:'kg',prices:{'METRO':21.15}},{id:42,name:'Orata Grecia',cat:'Ittico',sub:'Pesce',um:'pz',prices:{'METRO':10.18}},{id:43,name:'Tonno Rosso Fuentes',cat:'Ittico',sub:'Pesce',um:'kg',prices:{'OROBICA':29.00}},{id:44,name:'Caviale Osetra 50g',cat:'Ittico',sub:'Specialità',um:'pz',prices:{'REACH FOOD':43.00}},{id:45,name:'Colatura di Alici',cat:'Ittico',sub:'Specialità',um:'pz',prices:{'MARR':6.99}},
+                // VERDURE E FRUTTA
+                {id:60,name:'Acetosella',cat:'Verdure',sub:'Erbe',um:'100g',prices:{'ORTOLANO':6.30}},{id:61,name:'Aneto',cat:'Verdure',sub:'Erbe',um:'60g',prices:{'ABBASCIÀ':1.18}},{id:62,name:'Basilico',cat:'Verdure',sub:'Erbe',um:'kg',prices:{'ORTOLANO':15.50}},{id:63,name:'Coriandolo',cat:'Verdure',sub:'Erbe',um:'100g',prices:{'FAST FRUIT':1.20}},{id:64,name:'Zenzero',cat:'Verdure',sub:'Erbe',um:'kg',prices:{'MARR':4.12}},{id:65,name:'Limoni',cat:'Verdure',sub:'Frutta',um:'kg',prices:{'MARR':2.20}},{id:66,name:'Aglio Bianco',cat:'Verdure',sub:'Verdura',um:'kg',prices:{'ORTOLANO':5.90}},{id:67,name:'Carciofi Mammola',cat:'Verdure',sub:'Verdura',um:'pz',prices:{'OROBICA':1.18}},{id:68,name:'Carote',cat:'Verdure',sub:'Verdura',um:'kg',prices:{'OROBICA':1.29}},{id:69,name:'Patate',cat:'Verdure',sub:'Verdura',um:'kg',prices:{'ORTOLANO':0.90}},{id:70,name:'Zucchine',cat:'Verdure',sub:'Verdura',um:'kg',prices:{'ABBASCIÀ':2.28}},
+                // CONSUMABILI E CLEANING
+                {id:80,name:'Carne Trita 80/20',cat:'Consumabili',sub:'Carne',um:'kg',prices:{'CARNI NOBILI':10.00}},{id:81,name:'Controfiletto Angus',cat:'Consumabili',sub:'Carne',um:'kg',prices:{'CARNI NOBILI':33.15}},{id:82,name:'Hamburger Manzo',cat:'Consumabili',sub:'Carne',um:'kg',prices:{'MARR':8.40}},{id:83,name:'Pollo Petto',cat:'Consumabili',sub:'Carne',um:'kg',prices:{'MARR':6.40}},{id:90,name:'Burro',cat:'Consumabili',sub:'Latticini',um:'kg',prices:{'MARR':6.05}},{id:91,name:'Latte Intero UHT',cat:'Consumabili',sub:'Latticini',um:'lt',prices:{'METRO':0.86}},{id:92,name:'Parmigiano 24M',cat:'Consumabili',sub:'Latticini',um:'kg',prices:{'MARR':18.90}},{id:93,name:'Pasta Staff',cat:'Consumabili',sub:'Pasta',um:'kg',prices:{'METRO':1.16}},{id:100,name:'Sapone refill Arancia',cat:'Cleaning',sub:'Bagno',um:'pz',prices:{'ACQUA DI PARMA':33.00}},{id:101,name:'Detergente lavastoviglie',cat:'Cleaning',sub:'Cucina',um:'pz',prices:{'METRO':10.00}}
             ],
-            suppliers: [
-                { name: 'METRO', min: 150, currentTotal: 0, items: [] }, { name: 'OROBICA', min: 250, currentTotal: 0, items: [] },
-                { name: 'LINEA MARE', min: 200, currentTotal: 0, items: [] }, { name: 'REACH FOOD', min: 300, currentTotal: 0, items: [] },
-                { name: 'MARR', min: 200, currentTotal: 0, items: [] }, { name: 'ORTOLANO', min: 100, currentTotal: 0, items: [] },
-                { name: 'ABBASCIÀ', min: 100, currentTotal: 0, items: [] }, { name: 'CARNI NOBILI', min: 150, currentTotal: 0, items: [] },
-                { name: 'ACQUA DI PARMA', min: 300, currentTotal: 0, items: [] }
-            ],
-            reparti: ['Cucina', 'Sala', 'Bar', 'Wine'],
-            inbox: [], archive: [], charts: {}
+            suppliers: [{ name: 'METRO', min: 150 }, { name: 'OROBICA', min: 250 }, { name: 'LINEA MARE', min: 200 }, { name: 'REACH FOOD', min: 300 }, { name: 'MARR', min: 200 }, { name: 'ORTOLANO', min: 100 }, { name: 'ABBASCIÀ', min: 100 }, { name: 'CARNI NOBILI', min: 150 }, { name: 'ACQUA DI PARMA', min: 300 }, { name: 'OYSTER OASIS', min: 150 }],
+            reparti: ['Cucina', 'Sala', 'Bar', 'Wine'], inbox: [], archive: [], charts: {}
         };
 
         function normalizeStr(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
         // --- FETCH DA RAILWAY SERVER PYTHON ---
-        async function fetchState() {
+        async function syncData() {
             try {
                 const res = await fetch('/api/state');
                 if(res.ok) {
@@ -415,7 +335,6 @@
 
         // --- SISTEMA DI NAVIGAZIONE STAGNO E SICURO ---
         function switchView(viewId) {
-            // Usa .style.display per sovrascrivere Tailwind
             document.querySelectorAll('.view-section').forEach(s => {
                 s.style.display = 'none';
                 s.classList.remove('active', 'active-flex');
@@ -448,7 +367,6 @@
             const sidebar = document.getElementById('sidebar');
             const adminHeader = document.getElementById('admin-header');
             
-            // Kiosk/URL parameters check
             const urlParams = new URLSearchParams(window.location.search);
             const qrReparto = urlParams.get('reparto');
             
@@ -473,8 +391,8 @@
             const w = appState.settings.homeWidgets;
             const cards = [
                 { id: 'pending', i: 'IN', t: 'Pending', v: appState.inbox.length, sub: 'ordini da approvare', act: "switchView('inbox')" },
-                { id: 'saving', i: 'SV', t: 'Saving', v: '€ '+(appState.archive.reduce((s,a)=>s+a.cost,0)*0.12).toFixed(2), sub: 'stimato', act: "switchView('dashboard')" },
-                { id: 'suppliers', i: 'PF', t: 'Logistica', v: appState.suppliers.filter(s=>s.currentTotal>0&&s.currentTotal<s.min).length, sub: 'sotto soglia PF', act: "switchView('dashboard')" },
+                { id: 'saving', i: 'SV', t: 'Saving', v: '€ '+(appState.archive.reduce((s,a)=>s+(a.cost||0),0)*0.12).toFixed(2), sub: 'stimato', act: "switchView('dashboard')" },
+                { id: 'suppliers', i: 'PF', t: 'Logistica', v: appState.suppliers.filter(s=>((s.currentTotal||0)>0&&(s.currentTotal||0)<s.min)).length, sub: 'sotto soglia PF', act: "switchView('dashboard')" },
                 { id: 'inbox', i: 'BX', t: 'Inbox', v: 'Apri', sub: 'gestione ordini', act: "switchView('inbox')" },
                 { id: 'reports', i: 'RP', t: 'Report', v: 'Apri', sub: 'analytics', act: "switchView('reports')" },
                 { id: 'catalog', i: 'CT', t: 'Catalogo', v: 'Apri', sub: 'master data', act: "switchView('catalog')" }
@@ -514,11 +432,9 @@
             appState.inbox.push(newReq);
             
             await pushState();
-            try { await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'new_order', data: newReq }) }); } catch(e){}
-
             document.getElementById('dept-raw-text').value = ""; 
             alert("✓ Ordine inviato all'ufficio acquisti."); 
-            btn.innerText = "🚀 Invia all'Ufficio Acquisti"; btn.disabled = false;
+            btn.innerText = "🚀 Invia Ordine all'Ufficio Acquisti"; btn.disabled = false;
             handleRoleChange();
         }
 
@@ -531,11 +447,10 @@
             cont.innerHTML = appState.inbox.length === 0 ? 
                 '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine in attesa</div>' :
                 appState.inbox.map(req => {
-                    // Match con alias manuale (Fallback se IA fallisce)
                     let manualHtml = '';
                     const reqWords = normalizeStr(req.text);
                     const manualHits = [];
-                    Object.entries(appState.settings.aliases).forEach(([alias, pName]) => {
+                    Object.entries(appState.settings.aliases || {}).forEach(([alias, pName]) => {
                         if(reqWords.includes(normalizeStr(alias))) {
                             const p = appState.products.find(x => normalizeStr(x.name) === normalizeStr(pName));
                             if(p) manualHits.push(p);
@@ -556,7 +471,7 @@
                     return `
                     <div class="glass-card p-8 mb-4">
                         <div class="flex justify-between items-center border-b pb-4 mb-4">
-                            <div><span class="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-[10px] font-black uppercase">${req.dept}</span><span class="ml-2 text-xs font-bold text-slate-500">${req.staff} - ${req.date}</span></div>
+                            <div><span class="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-[9px] font-black uppercase">${req.dept}</span><span class="ml-2 text-xs font-bold text-slate-500">${req.staff} - ${req.date}</span></div>
                             <button onclick="deleteRequest(${req.id})" class="text-rose-500 font-bold text-xs">Rifiuta</button>
                         </div>
                         <p class="text-sm font-medium italic text-slate-700 mb-6">"${req.text}"</p>
@@ -581,7 +496,7 @@
             
             const reqWords = normalizeStr(req.text);
             const manualHits = [];
-            Object.entries(appState.settings.aliases).forEach(([alias, pName]) => {
+            Object.entries(appState.settings.aliases || {}).forEach(([alias, pName]) => {
                 if(reqWords.includes(normalizeStr(alias))) { const p = appState.products.find(x => normalizeStr(x.name) === normalizeStr(pName)); if(p) manualHits.push(p); }
             });
             if(manualHits.length === 0) appState.products.forEach(p => { if(reqWords.includes(normalizeStr(p.name.split(' ')[0]))) manualHits.push(p); });
@@ -592,7 +507,7 @@
             items.forEach(item => {
                 const best = getBestSup(item.p);
                 const supObj = appState.suppliers.find(s => s.name === best.name);
-                if(supObj) { supObj.currentTotal += (best.price * item.q); supObj.items.push(`${item.p.name} x${item.q}`); cost += (best.price * item.q); cats.add(item.p.cat); }
+                if(supObj) { supObj.currentTotal = (supObj.currentTotal || 0) + (best.price * item.q); supObj.items = supObj.items || []; supObj.items.push(`${item.p.name} x${item.q}`); cost += (best.price * item.q); cats.add(item.p.cat); }
             });
 
             appState.archive.unshift({ date: new Date().toLocaleDateString('it-IT'), requester: req.staff, dept: req.dept, text: req.text, cost: cost, cat: Array.from(cats)[0] || 'Varie' });
@@ -605,26 +520,27 @@
         // --- DASHBOARD LOGISTICA ---
         function renderConsolidation() {
             const grid = document.getElementById('consolidation-grid');
-            const activeSuppliers = appState.suppliers.filter(s => s.currentTotal > 0 || ['METRO', 'OROBICA', 'LINEA MARE', 'MARR', 'ORTOLANO'].includes(s.name));
+            const activeSuppliers = appState.suppliers.filter(s => (s.currentTotal || 0) > 0 || ['METRO', 'OROBICA', 'LINEA MARE', 'MARR', 'ORTOLANO'].includes(s.name));
             
             grid.innerHTML = activeSuppliers.map(s => {
-                const isBelow = s.currentTotal < s.min && s.currentTotal > 0;
-                const pct = Math.min((s.currentTotal / s.min) * 100, 100) || 0;
-                const statusColor = isBelow ? 'border-amber-400 bg-amber-50/30' : (s.currentTotal > 0 ? 'border-emerald-400 bg-emerald-50/30' : 'border-slate-100 bg-white');
+                const total = s.currentTotal || 0;
+                const isBelow = total < s.min && total > 0;
+                const pct = Math.min((total / s.min) * 100, 100) || 0;
+                const statusColor = isBelow ? 'border-amber-400 bg-amber-50/30' : (total > 0 ? 'border-emerald-400 bg-emerald-50/30' : 'border-slate-100 bg-white');
                 return `
                 <div class="p-6 rounded-2xl border-2 shadow-sm ${statusColor}">
                     <div class="flex justify-between mb-2">
                         <span class="font-black uppercase text-[10px] tracking-widest">${s.name}</span>
-                        <span class="text-sm font-black">€${s.currentTotal.toFixed(2)}</span>
+                        <span class="text-sm font-black">€${total.toFixed(2)}</span>
                     </div>
                     <div class="text-[9px] font-bold ${isBelow ? 'text-amber-700' : 'text-emerald-700'} mb-2">${isBelow ? 'Sotto soglia' : 'Soglia ok'} (Min: €${s.min})</div>
                     <div class="w-full bg-slate-200 rounded-full h-1.5 mb-4"><div class="h-1.5 rounded-full ${isBelow ? 'bg-amber-500' : 'bg-emerald-500'}" style="width: ${pct}%"></div></div>
-                    <div class="h-16 overflow-y-auto custom-scroll text-[9px] font-bold text-slate-500">${s.items.map(it => `• ${it}`).join('<br>') || 'Nessun prodotto'}</div>
+                    <div class="h-16 overflow-y-auto custom-scroll text-[9px] font-bold text-slate-500">${(s.items || []).map(it => `• ${it}`).join('<br>') || 'Nessun prodotto'}</div>
                 </div>`;
             }).join('');
             
             const pc = document.getElementById('kpi-pending-count'); if(pc) pc.innerText = appState.inbox.length;
-            const saving = appState.archive.reduce((sum, a) => sum + (a.cost * 0.12), 0); 
+            const saving = appState.archive.reduce((sum, a) => sum + ((a.cost||0) * 0.12), 0); 
             const sc = document.getElementById('kpi-saving'); if(sc) sc.innerText = saving.toFixed(2);
         }
 
@@ -641,7 +557,8 @@
         function toggleReportFilters() {
             const level = document.getElementById('filter-level').value;
             ['reparto', 'categoria', 'sottocategoria', 'prodotto'].forEach(id => {
-                document.getElementById(`filter-wrap-${id}`).style.display = level === id ? 'block' : 'none';
+                const el = document.getElementById(`filter-wrap-${id}`);
+                if(el) el.style.display = level === id ? 'block' : 'none';
             });
         }
 
@@ -654,20 +571,22 @@
             const labels = period === 'mensile' ? ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4'] : ['Gen', 'Feb', 'Mar', 'Apr'];
             const trendData = labels.map(() => Math.floor(Math.random() * 500) + 200); 
             
+            const accentColor = appState.settings.accentColor || '#c5a059';
+
             const ctx1 = document.getElementById('analyticsTrendChart').getContext('2d');
-            appState.charts.trend = new Chart(ctx1, { type: 'line', data: { labels: labels, datasets: [{ data: trendData, borderColor: '#09121e', tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: false } } });
+            appState.charts.trend = new Chart(ctx1, { type: 'line', data: { labels: labels, datasets: [{ data: trendData, borderColor: '#09121e', backgroundColor: accentColor, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: false } } });
 
             let pieLabels = appState.reparti;
-            let pieData = appState.reparti.map(r => appState.archive.filter(a => a.dept === r).reduce((s, a) => s + a.cost, 0));
+            let pieData = appState.reparti.map(r => appState.archive.filter(a => a.dept === r).reduce((s, a) => s + (a.cost||0), 0));
             
             if(level === 'categoria') {
                 pieLabels = [...new Set(appState.products.map(p=>p.cat))];
-                pieData = pieLabels.map(c => appState.archive.filter(a => a.cat === c).reduce((s, a) => s + a.cost, 0) || Math.random()*100);
+                pieData = pieLabels.map(c => appState.archive.filter(a => a.cat === c).reduce((s, a) => s + (a.cost||0), 0) || Math.random()*100);
             }
 
             const ctx2 = document.getElementById('analyticsPieChart').getContext('2d');
             const finalPieData = pieData.some(d=>d>0) ? pieData : [100, 200, 300, 150]; 
-            appState.charts.pie = new Chart(ctx2, { type: 'doughnut', data: { labels: pieLabels, datasets: [{ data: finalPieData, backgroundColor: ['#09121e', '#c5a059', '#1e3a5f', '#e2e8f0'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%' } });
+            appState.charts.pie = new Chart(ctx2, { type: 'doughnut', data: { labels: pieLabels, datasets: [{ data: finalPieData, backgroundColor: ['#09121e', accentColor, '#1e3a5f', '#e2e8f0'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%' } });
         }
 
         // --- CATALOGO E ARCHIVIO ---
@@ -678,7 +597,7 @@
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="px-6 py-4">
                         <p class="font-bold text-sm text-slate-900">${p.name}</p>
-                        <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">${p.cat} / ${p.sub || 'VARIE'}</p>
+                        <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">${p.cat} / ${p.sub || 'VARIE'} - ${p.um}</p>
                     </td>
                     <td class="px-6 py-4 text-right flex flex-wrap justify-end gap-1">
                         ${Object.entries(p.prices).map(([sup, pr]) => `<div class="bg-white border rounded-lg px-2 py-1 text-[9px] font-black uppercase shadow-sm">€${pr.toFixed(2)} <span class="text-[7px] text-slate-400 ml-1">${sup}</span></div>`).join('')}
@@ -696,7 +615,7 @@
                         <span class="text-[10px] font-bold text-slate-500">${ord.requester}</span>
                     </td>
                     <td class="px-6 py-4 text-xs font-medium text-slate-700 italic">"${ord.text}"</td>
-                    <td class="px-6 py-4 text-right font-black text-slate-900 text-sm">€ ${ord.cost.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-right font-black text-slate-900 text-sm">€ ${(ord.cost||0).toFixed(2)}</td>
                 </tr>`).join('');
         }
 
@@ -741,7 +660,8 @@
                 }, 100);
             }
 
-            document.getElementById('ui-set-brand').value = appState.settings.brandName;
+            document.getElementById('ui-set-brand').value = appState.settings.brandName || 'Sea Signora';
+            document.getElementById('ui-set-color').value = appState.settings.accentColor || '#c5a059';
             document.getElementById('ui-aliases-area').value = Object.entries(appState.settings.aliases || {}).map(([k,v]) => `${k} => ${v}`).join('\n');
             renderHomeWidgetControls();
         }
@@ -764,22 +684,66 @@
             document.getElementById('excel-area').value = ""; await pushState(); alert(`✓ Importati ${count} articoli nel database Master.`); renderConfigProducts();
         }
 
+        async function processRawCatalogImport() {
+            const text = document.getElementById('raw-catalog-area').value || '';
+            const lines = text.split('\n').map(x => x.trim()).filter(Boolean);
+            let imported = 0;
+            lines.forEach(l => {
+                const m = l.match(/^(.+?)\s*\|\s*U\.M\.\s*:\s*([^|]+)\|\s*Miglior Prezzo\s*:\s*([0-9]+[.,][0-9]+)\s*€?\s*\|\s*Fornitore\s*:\s*([^|]+)$/i);
+                if(m) {
+                    appState.products.push({ id: Date.now()+Math.random(), name: m[1].trim(), cat: 'Varie', sub: 'Varie', um: m[2].trim(), prices: { [m[4].trim().toUpperCase()]: parseFloat(m[3].replace(',','.')) }});
+                    imported++;
+                }
+            });
+            document.getElementById('raw-catalog-area').value = ""; await pushState(); alert(`✓ Elaborato testo libero. Prodotti inseriti: ${imported}`); renderConfigProducts();
+        }
+
         async function addSingleProduct() {
             const n = document.getElementById('ap-name').value;
             const u = document.getElementById('ap-um').value;
-            if(!n || !u) return alert("Inserisci Nome Prodotto e Unità di Misura.");
+            if(!n || !u) return alert("Inserisci Nome e UM.");
             appState.products.push({ id: Date.now(), name: n, um: u, cat: document.getElementById('ap-cat').value, sub: document.getElementById('ap-sub').value, prices: {} });
-            await pushState(); renderConfigProducts(); alert("✓ Prodotto salvato in anagrafica."); document.getElementById('ap-name').value = "";
+            await pushState(); renderConfigProducts(); alert("✓ Prodotto salvato."); document.getElementById('ap-name').value = "";
         }
 
         async function removeProductFromMaster(id) { appState.products = appState.products.filter(p => p.id !== id); await pushState(); renderConfigProducts(); }
 
-        // --- PERSONALIZZAZIONE UI, BACKUP E AI WIDGET ---
+        // --- STAMPA QR ---
+        function printQRCodes() {
+            const printWindow = window.open('', '_blank', 'height=800,width=800');
+            let html = `<html><head><title>Stampa QR Code - Sea Signora</title><style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-align: center; color: #1e293b; padding: 20px; }
+                h1 { margin-top: 20px; text-transform: uppercase; font-weight: 900; letter-spacing: 2px; font-size: 24px; }
+                .grid { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; padding: 30px 0; }
+                .card { border: 2px dashed #cbd5e1; padding: 25px; border-radius: 20px; width: 200px; text-align: center; page-break-inside: avoid; }
+                img { width: 160px; height: 160px; margin: 0 auto; display: block; }
+                h2 { font-size: 20px; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; font-weight: 900; }
+                p { font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; margin: 0; }
+            </style></head><body><h1>Sea Signora Milano<br><span style="font-size: 14px; color: #64748b;">Postazioni Ordini</span></h1><div class="grid">`;
+
+            appState.reparti.forEach(r => {
+                const qrImg = document.querySelector(`#qr-${r} img`);
+                if(qrImg && qrImg.src) {
+                    html += `<div class="card"><img src="${qrImg.src}" alt="QR ${r}" /><h2>${r}</h2><p>Inquadra per ordinare</p></div>`;
+                }
+            });
+
+            html += `</div><script>window.onload=function(){window.print();window.close();}<\/script></body></html>`;
+            printWindow.document.write(html); printWindow.document.close();
+        }
+
+        // --- PERSONALIZZAZIONE UI E BACKUP ---
         function liveUI() {
             const b = document.getElementById('ui-set-brand').value;
             const c = document.getElementById('ui-set-color').value;
             document.getElementById('ui-brand-name').innerText = b;
             document.documentElement.style.setProperty('--brand-accent', c);
+            
+            // Forza aggiornamento gradienti fisici
+            document.querySelectorAll('.brand-gradient').forEach(el => {
+                el.style.background = `linear-gradient(135deg, ${c} 0%, #000 100%)`;
+            });
+
             appState.settings.brandName = b; appState.settings.accentColor = c; pushState();
         }
 
@@ -788,7 +752,7 @@
         function renderHomeWidgetControls() {
             const ctrls = document.getElementById('home-widget-controls');
             if(!ctrls) return;
-            const w = appState.settings.homeWidgets;
+            const w = appState.settings.homeWidgets || DEFAULT_SETTINGS.homeWidgets;
             ctrls.innerHTML = Object.keys(HOME_WIDGET_LABELS).map(id => `<label class="flex items-center justify-between bg-white border rounded-xl px-3 py-2"><span class="text-[10px] font-bold uppercase tracking-wide text-slate-700">${HOME_WIDGET_LABELS[id]}</span><input type="checkbox" ${w[id]?'checked':''} onchange="toggleHomeWidget('${id}')"></label>`).join('');
         }
 
@@ -815,28 +779,41 @@
             reader.readAsText(file);
         }
 
-        function resetAllData() { if(confirm('Confermi il reset completo di dati e personalizzazioni?')) { appState = { ...appState, products: [], archive: [], inbox: [] }; pushState(); window.location.reload(); } }
-
         // --- GEMINI AI CHAT WIDGET ---
         async function sendAiHelp() {
             const q = document.getElementById('ai-help-question').value;
             if(!q) return;
-            document.getElementById('btn-ai-help').innerText = 'Sto pensando...';
+            const btn = document.getElementById('btn-ai-help');
+            btn.innerText = 'Sto pensando...';
+            btn.disabled = true;
+            
             try {
-                const res = await fetch('/api/ai/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: `DOMANDA UTENTE SULL'APP: ${q}. Rispondi in modo utile e conciso come assistente virtuale di Sea Signora. Non usare JSON qui.`, catalog: [] }) });
+                const res = await fetch('/api/ai/help', { 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) 
+                });
                 const data = await res.json();
-                document.getElementById('ai-help-answer').innerText = data.parsed?.items || "Ecco un consiglio utile...";
+                
+                if (data.ok && data.answer) {
+                    document.getElementById('ai-help-answer').innerText = data.answer;
+                } else {
+                    document.getElementById('ai-help-answer').innerText = "Errore: controlla di aver inserito GEMINI_API_KEY in Variables su Railway.";
+                }
             } catch(e) {
-                // Mock locale se il server non è raggiungibile per la chat
-                document.getElementById('ai-help-answer').innerText = "Sono Gemini. Per importare usa Configurazione > Excel. Per gli ordini, falli inviare dai QR dei reparti!";
+                document.getElementById('ai-help-answer').innerText = "Il server non risponde o la connessione è assente.";
             }
+            
             document.getElementById('ai-help-answer-wrap').classList.remove('hidden');
-            document.getElementById('btn-ai-help').innerText = 'Invia a Gemini';
+            btn.innerText = 'Invia a Gemini';
+            btn.disabled = false;
         }
 
-        // --- INIZIALIZZAZIONE ---
         function applyLocalSettings() {
-            if(appState.settings.accentColor) document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor);
+            if(appState.settings.accentColor) {
+                document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor);
+                document.querySelectorAll('.brand-gradient').forEach(el => {
+                    el.style.background = `linear-gradient(135deg, ${appState.settings.accentColor} 0%, #000 100%)`;
+                });
+            }
             if(appState.settings.brandName) document.getElementById('ui-brand-name').innerText = appState.settings.brandName;
             Object.entries(appState.settings.hiddenModules || {}).forEach(([id, val]) => { const el = document.getElementById(id); if(el) el.style.display = val; });
         }
@@ -846,7 +823,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const qrReparto = urlParams.get('reparto');
             
-            await fetchState();
+            await syncData();
             
             if(qrReparto && appState.reparti.includes(qrReparto)) {
                 document.getElementById('role-selector').value = qrReparto;
