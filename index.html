@@ -204,7 +204,20 @@
                         <div class="w-16 h-16 brand-gradient rounded-2xl flex items-center justify-center text-white text-2xl font-black italic">SS</div>
                         <div><h3 class="text-3xl font-black uppercase tracking-tighter">Nuovo Ordine</h3><p id="dept-display" class="text-amber-600 font-bold uppercase text-[10px]">Reparto</p></div>
                     </div>
-                    <textarea id="order-text" placeholder="Scrivi quello che ti serve..." class="w-full h-40 p-6 bg-slate-50 border rounded-2xl text-lg font-medium mb-6 resize-none outline-none focus:ring-2 focus:ring-amber-400"></textarea>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Nome</label>
+                            <input id="staff-nome" type="text" placeholder="Es: Mario" class="w-full p-4 bg-slate-50 border rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-400">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Cognome</label>
+                            <input id="staff-cognome" type="text" placeholder="Es: Rossi" class="w-full p-4 bg-slate-50 border rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-400">
+                        </div>
+                    </div>
+
+                    <label class="text-[10px] font-black uppercase text-slate-400">Cosa ti serve?</label>
+                    <textarea id="order-text" placeholder="Scrivi quello che ti serve..." class="w-full h-40 p-6 bg-slate-50 border rounded-2xl text-lg font-medium mb-6 resize-none outline-none focus:ring-2 focus:ring-amber-400 mt-1"></textarea>
                     <button id="btn-send" onclick="sendOrder()" class="w-full py-6 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all">🚀 Invia Ordine</button>
                 </div>
             </div>
@@ -384,8 +397,8 @@
                 sync();
             }
             
-            // Refresh periodico
-            setInterval(sync, 60000); 
+            // Refresh periodico ogni 30 secondi per real-time
+            setInterval(sync, 30000); 
         };
 
         function renderCatalog() {
@@ -399,6 +412,8 @@
 
         function renderHeatmap() {
             const wrap = document.getElementById('heatmap-wrap');
+            if(!wrap) return;
+            
             const axisX = document.getElementById('heatmap-x').value;
             const axisY = document.getElementById('heatmap-y').value;
             
@@ -425,15 +440,23 @@
                         let matchX = false;
                         let matchY = false;
                         
+                        // Logica di match per asse X
                         if(axisX === 'dept' && a.dept === x) matchX = true;
                         else if(axisX === 'sup' && (a.items || []).some(i => i.supplier === x)) matchX = true;
-                        else if(axisX === 'cat' && (a.items || []).some(i => i.cat === x)) matchX = true;
+                        else if(axisX === 'cat' && (a.items || []).some(i => (appState.products.find(p => p.name === i.name)?.cat || 'Vario') === x)) matchX = true;
                         
-                        if(axisY === 'cat' && (a.items || []).some(i => i.cat === y)) matchY = true;
+                        // Logica di match per asse Y
+                        if(axisY === 'cat' && (a.items || []).some(i => (appState.products.find(p => p.name === i.name)?.cat || 'Vario') === y)) matchY = true;
                         else if(axisY === 'prod' && (a.items || []).some(i => i.name === y)) matchY = true;
                         else if(axisY === 'sup' && (a.items || []).some(i => i.supplier === y)) matchY = true;
                         
-                        if(matchX && matchY) total += a.total;
+                        // Se non ci sono "items" (vecchi ordini), prova match testuale
+                        if(!a.items && a.text) {
+                            if(axisY === 'cat' && a.text.toLowerCase().includes(y.toLowerCase())) matchY = true;
+                            if(axisX === 'dept' && a.dept === x) matchX = true;
+                        }
+
+                        if(matchX && matchY) total += (a.total || 0);
                     });
                     
                     const intensity = total > 500 ? 'bg-amber-600 text-white' : (total > 100 ? 'bg-amber-400 text-white' : (total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
@@ -443,7 +466,7 @@
             });
             
             html += `</tbody></table>`;
-            wrap.innerHTML = html;
+            wrap.innerHTML = html || '<p class="text-center py-10 text-xs text-slate-400 font-bold uppercase">Nessun dato disponibile</p>';
         }
 
         async function askAI() {
@@ -896,11 +919,12 @@
 
         async function sendOrder() {
             const text = document.getElementById('order-text').value;
-            if(!text) return alert("Scrivi qualcosa!");
+            const nome = document.getElementById('staff-nome').value;
+            const cognome = document.getElementById('staff-cognome').value;
             
-            const staff = prompt("Inserisci il tuo Nome e Cognome:");
-            if(!staff) return alert("Nome e cognome sono obbligatori per inviare l'ordine.");
+            if(!text || !nome || !cognome) return alert("Compila tutti i campi (Nome, Cognome e Ordine)!");
             
+            const staff = `${nome} ${cognome}`;
             const dept = document.getElementById('dept-display').innerText;
             const btn = document.getElementById('btn-send');
             
@@ -914,8 +938,10 @@
                 });
                 const d = await res.json();
                 if(d.ok) {
-                    alert("Ordine inviato con successo!");
+                    alert("Ordine inviato con successo! L'amministratore riceverà una mail di notifica.");
                     document.getElementById('order-text').value = "";
+                    document.getElementById('staff-nome').value = "";
+                    document.getElementById('staff-cognome').value = "";
                 } else {
                     alert("Errore nell'invio: " + d.error);
                 }

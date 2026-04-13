@@ -481,9 +481,35 @@ def sanitize_state(state):
     return safe
 
 def send_email(subject, body):
-    # Fallback email simplified
-    print(f"EMAIL MOCK: {subject}")
-    return True, ""
+    """Sends email via SMTP or fallback to Formspree if configured."""
+    print(f"EMAIL ATTEMPT: {subject}")
+    
+    if SMTP_HOST and SMTP_USER and SMTP_PASS:
+        try:
+            msg = MIMEText(body)
+            msg['Subject'] = subject
+            msg['From'] = SMTP_FROM
+            msg['To'] = SMTP_TO
+            
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASS)
+                server.send_message(msg)
+            return True, ""
+        except Exception as e:
+            print(f"SMTP Error: {e}")
+            # Fallback to Formspree below...
+
+    if FORMSPREE_ENDPOINT:
+        try:
+            data = json.dumps({"_subject": subject, "message": body}).encode("utf-8")
+            req = urllib.request.Request(FORMSPREE_ENDPOINT, data=data, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return True, ""
+        except Exception as e:
+            return False, f"Formspree Error: {str(e)}"
+            
+    return False, "No email provider configured"
 
 def log_notification(kind, subject, body, delivered, error_text=""):
     try:
@@ -502,11 +528,12 @@ def get_gemini_response(prompt):
         print("Gemini API Key missing")
         return None
     
-    # Try stable version first, then fallback
+    # Try current recommended models and versions
     endpoints = [
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
         f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
     ]
     
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -555,14 +582,32 @@ def save_state():
 @app.post("/api/order")
 def create_order():
     payload = request.get_json()
+    staff = payload.get("staff", "Staff")
+    dept = payload.get("dept", "N/D")
+    text = payload.get("text", "")
+    
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT state_json FROM app_state WHERE id = 1")
         state = json.loads(cur.fetchone()["state_json"])
-        order = {"id": int(datetime.utcnow().timestamp()*1000), "staff": payload.get("staff"), "dept": payload.get("dept"), "text": payload.get("text"), "date": datetime.utcnow().strftime("%H:%M:%S")}
+        
+        order = {
+            "id": int(datetime.utcnow().timestamp()*1000), 
+            "staff": staff, 
+            "dept": dept, 
+            "text": text, 
+            "date": datetime.utcnow().strftime("%d/%m/%Y %H:%M:%S")
+        }
         state.setdefault("inbox", []).append(order)
+        
         cur.execute("UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1", (json.dumps(state), datetime.utcnow().isoformat()))
         conn.commit()
+    
+    # Send email alert to admin
+    email_body = f"Nuovo ordine ricevuto!\n\nReparto: {dept}\nInviato da: {staff}\nTesto: {text}\nData: {order['date']}"
+    success, err = send_email(f"ORDINE [{dept}] - {staff}", email_body)
+    log_notification("order_alert", f"ORDINE [{dept}]", email_body, success, err)
+    
     return jsonify({"ok": True})
 
 @app.post("/api/ai/order-parse")
