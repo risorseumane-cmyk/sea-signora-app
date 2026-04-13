@@ -24,7 +24,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "noreply@seasignorarest.com")
-SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
+SMTP_TO = os.getenv("SMTP_TO", "amministrazione@seasignorarest.com")
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
 
 app = Flask(__name__)

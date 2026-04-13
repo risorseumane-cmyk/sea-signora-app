@@ -109,22 +109,12 @@
                 
                 <div class="glass-card p-8">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                        <h4 class="font-black uppercase text-xs text-slate-400">Heatmap Dinamica: Analisi Intensità</h4>
+                        <h4 class="font-black uppercase text-xs text-slate-400">Heatmap Comparazione: Prodotti vs Fornitori</h4>
                         <div class="flex flex-wrap gap-2">
+                            <select id="heatmap-cat" onchange="renderHeatmap()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none"></select>
                             <select id="heatmap-data" onchange="renderHeatmap()" class="p-2 bg-amber-50 border-amber-200 border rounded-lg text-[10px] font-black uppercase outline-none">
-                                <option value="orders">Spesa (Archivio)</option>
                                 <option value="catalog">Catalogo (Prezzi)</option>
-                            </select>
-                            <select id="heatmap-y" onchange="renderHeatmap()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
-                                <option value="cat">Categoria</option>
-                                <option value="prod">Prodotto</option>
-                                <option value="sup">Fornitore</option>
-                            </select>
-                            <span class="text-[10px] font-black text-slate-400 py-2">VS</span>
-                            <select id="heatmap-x" onchange="renderHeatmap()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
-                                <option value="dept">Reparto</option>
-                                <option value="sup">Fornitore</option>
-                                <option value="cat">Categoria</option>
+                                <option value="orders">Spesa (Archivio)</option>
                             </select>
                         </div>
                     </div>
@@ -296,6 +286,32 @@
         </main>
     </div>
 
+    <!-- Modal Chiarimento Ordine -->
+    <div id="modal-clarify" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div class="p-6 bg-amber-500 text-white flex justify-between items-center">
+                <h3 class="font-black uppercase text-xs tracking-widest">🤔 Prodotto non riconosciuto</h3>
+                <button onclick="closeClarifyModal()" class="text-xl opacity-50 hover:opacity-100">&times;</button>
+            </div>
+            <div class="p-8 space-y-6">
+                <div>
+                    <p class="text-[10px] font-black uppercase text-slate-400">Testo nell'ordine:</p>
+                    <p id="clarify-text" class="text-xl font-bold text-slate-800 mt-1"></p>
+                </div>
+                
+                <div>
+                    <p class="text-[10px] font-black uppercase text-slate-400 mb-2">Forse intendevi uno di questi?</p>
+                    <div id="clarify-suggestions" class="space-y-2"></div>
+                </div>
+
+                <div class="flex flex-col gap-3 pt-4">
+                    <button onclick="openProductModalFromClarify()" class="w-full py-4 border-2 border-slate-900 text-slate-900 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50 transition-all">➕ Aggiungi come nuovo prodotto</button>
+                    <button onclick="ignoreClarifyItem()" class="w-full py-4 text-slate-400 font-bold text-[10px] uppercase hover:text-slate-600 transition-all">Ignora questa riga</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let appState = {
             settings: { brandName: 'Sea Signora', color: '#c5a059', homeTitle: 'Corporate Home' },
@@ -305,6 +321,7 @@
             inbox: [], archive: []
         };
         let charts = {}; // Spostato fuori da appState per permettere il salvataggio JSON
+        let approvalContext = null;
 
         const API_BASE = window.location.origin.startsWith('file://') ? 'http://localhost:8080' : '';
         let isPushing = false;
@@ -441,6 +458,16 @@
             initCharts();
             populateSupplierSelect();
             populateTrendFilters();
+            populateHeatmapFilters();
+        }
+
+        function populateHeatmapFilters() {
+            const catSel = document.getElementById('heatmap-cat');
+            if(!catSel) return;
+            const current = catSel.value;
+            const cats = [...new Set(appState.products.map(p => p.cat))];
+            catSel.innerHTML = '<option value="">Tutte le Categorie</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            catSel.value = current;
         }
 
         function populateTrendFilters() {
@@ -613,15 +640,42 @@
                 appState.products[idx] = { ...appState.products[idx], name, cat, um, prices };
             } else {
                 // Nuovo
-                appState.products.unshift({
+                const newProd = {
                     id: Date.now(),
                     name, cat, um, prices
-                });
+                };
+                appState.products.unshift(newProd);
+
+                // Se stavamo chiarendo un ordine, aggiungi questo nuovo prodotto ai finalItems
+                if(approvalContext && approvalContext.isAddingNew) {
+                    const priceEntries = Object.entries(prices).sort((a,b) => a[1]-b[1]);
+                    const bestPrice = priceEntries[0];
+                    
+                    const currentLine = approvalContext.linesToClarify[0];
+                    let qty = 1;
+                    const match = currentLine.match(/(\d+([.,]\d+)?)/);
+                    if(match) qty = parseFloat(match[1].replace(',', '.'));
+
+                    approvalContext.finalItems.push({
+                        name: name,
+                        qty: qty,
+                        bestPrice: bestPrice ? bestPrice[1] : 0,
+                        supplier: bestPrice ? bestPrice[0] : 'N/D',
+                        others: priceEntries.slice(1)
+                    });
+                    approvalContext.linesToClarify.shift();
+                    approvalContext.isAddingNew = false;
+                }
             }
             
             await push();
             closeProductModal();
             refresh();
+
+            // Se stavamo chiarendo un ordine, continua con il prossimo item
+            if(approvalContext && !approvalContext.isAddingNew) {
+                clarifyNextItem();
+            }
         }
 
         async function deleteProduct(id) {
@@ -635,80 +689,66 @@
             const wrap = document.getElementById('heatmap-wrap');
             if(!wrap) return;
             
-            const axisX = document.getElementById('heatmap-x').value;
-            const axisY = document.getElementById('heatmap-y').value;
+            const selectedCat = document.getElementById('heatmap-cat').value;
             const dataSource = document.getElementById('heatmap-data').value;
             
-            let xLabels = [];
-            let yLabels = [];
+            // X-axis: Always Suppliers
+            const xLabels = appState.suppliers.map(s => s.name);
             
-            if(axisX === 'dept') xLabels = appState.reparti;
-            else if(axisX === 'sup') xLabels = appState.suppliers.map(s => s.name);
-            else if(axisX === 'cat') xLabels = [...new Set(appState.products.map(p => p.cat))];
-            
-            if(axisY === 'cat') yLabels = [...new Set(appState.products.map(p => p.cat))];
-            else if(axisY === 'prod') yLabels = appState.products.slice(0, 30).map(p => p.name);
-            else if(axisY === 'sup') yLabels = appState.suppliers.map(s => s.name);
+            // Y-axis: Products filtered by Category
+            let filteredProducts = appState.products;
+            if(selectedCat) {
+                filteredProducts = filteredProducts.filter(p => p.cat === selectedCat);
+            }
+            const yLabels = filteredProducts.map(p => p.name);
             
             let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="p-2 border-b"></th>`;
             xLabels.forEach(x => { html += `<th class="p-2 text-[8px] font-black uppercase text-slate-400 text-center border-b border-l">${x}</th>`; });
             html += `</tr></thead><tbody>`;
             
             yLabels.forEach(y => {
-                html += `<tr><td class="p-2 text-[9px] font-bold text-slate-500 border-b uppercase max-w-[120px] truncate">${y}</td>`;
+                const product = appState.products.find(p => p.name === y);
+                html += `<tr><td class="p-2 text-[9px] font-bold text-slate-500 border-b uppercase max-w-[150px] truncate">${y}</td>`;
                 xLabels.forEach(x => {
                     let value = 0;
                     
                     if(dataSource === 'orders') {
-                        // Dati da Archivio (Spesa Totale)
-                        const effectiveArchive = appState.archive.length > 0 ? appState.archive : [
-                            { dept: 'Cucina', total: 450, text: 'Aragosta', items: [{ name: 'Aragosta Viva', supplier: 'METRO', cat: 'Ittico', qty: 2 }] },
-                            { dept: 'Bar', total: 120, text: 'Gin', items: [{ name: 'Gin Tonic', supplier: 'N/D', cat: 'Spirits', qty: 10 }] }
-                        ];
-                        
-                        effectiveArchive.forEach(a => {
-                            let matchX = false; let matchY = false;
-                            let orderTotalFromMaster = 0;
+                        // Dati da Archivio (Spesa Totale per quel prodotto e quel fornitore)
+                        appState.archive.forEach(a => {
                             (a.items || []).forEach(item => {
-                                const masterProduct = appState.products.find(p => p.name === item.name || p.id == item.productId);
-                                if(masterProduct) {
-                                    const bestPrice = Math.min(...Object.values(masterProduct.prices));
-                                    orderTotalFromMaster += bestPrice * (item.qty || 1);
-                                    if(axisX === 'sup' && item.supplier === x) matchX = true;
-                                    if(axisX === 'cat' && masterProduct.cat === x) matchX = true;
-                                    if(axisY === 'cat' && masterProduct.cat === y) matchY = true;
-                                    if(axisY === 'prod' && masterProduct.name === y) matchY = true;
-                                    if(axisY === 'sup' && item.supplier === y) matchY = true;
+                                if((item.name === y || item.productId == product.id) && item.supplier === x) {
+                                    value += (item.bestPrice || 0) * (item.qty || 1);
                                 }
                             });
-                            if(axisX === 'dept' && a.dept === x) matchX = true;
-                            if(matchX && matchY) value += (orderTotalFromMaster || a.total || 0);
                         });
                     } else {
                         // Dati da Catalogo (Prezzi Master)
-                        if(axisY === 'prod') {
-                            const product = appState.products.find(p => p.name === y);
-                            if(product) {
-                                if(axisX === 'sup') value = product.prices[x] || 0;
-                                else if(axisX === 'cat' && product.cat === x) value = Math.min(...Object.values(product.prices));
-                                else if(axisX === 'dept') value = Math.min(...Object.values(product.prices)); // Prezzo per quel reparto (comune)
-                            }
-                        } else if(axisY === 'cat') {
-                            const catProducts = appState.products.filter(p => p.cat === y);
-                            if(axisX === 'sup') value = catProducts.reduce((s, p) => s + (p.prices[x] || 0), 0) / (catProducts.filter(p => p.prices[x]).length || 1); // Media prezzi
-                            else if(axisX === 'cat' && x === y) value = catProducts.reduce((s, p) => s + Math.min(...Object.values(p.prices)), 0);
+                        if(product) {
+                            value = product.prices[x] || 0;
                         }
                     }
                     
-                    const intensity = value > 100 ? 'bg-amber-600 text-white' : (value > 50 ? 'bg-amber-400 text-white' : (value > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
-                    const displayVal = dataSource === 'orders' ? `€${value.toFixed(0)}` : `€${value.toFixed(1)}`;
+                    let intensity = 'bg-slate-50 text-slate-300';
+                    if(value > 0) {
+                        if(dataSource === 'catalog') {
+                            // Per i prezzi, evidenzia il più basso nella riga
+                            const rowPrices = Object.values(product.prices);
+                            const minPrice = Math.min(...rowPrices);
+                            if(value === minPrice) intensity = 'bg-emerald-500 text-white font-black';
+                            else intensity = 'bg-amber-100 text-amber-800';
+                        } else {
+                            intensity = value > 100 ? 'bg-amber-600 text-white' : (value > 50 ? 'bg-amber-400 text-white' : 'bg-amber-100 text-amber-800');
+                        }
+                    }
+                    
+                    const displayVal = value > 0 ? `€${value.toFixed(1)}` : '-';
                     html += `<td class="p-1 border-b border-l"><div class="heatmap-cell ${intensity} transition-all">${displayVal}</div></td>`;
                 });
                 html += `</tr>`;
             });
             
             html += `</tbody></table>`;
-            if(dataSource === 'orders' && appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Dati Demo basati su Catalogo Master</p>`;
+            if(dataSource === 'orders' && appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Nessun ordine in archivio</p>`;
             wrap.innerHTML = html;
         }
 
@@ -788,56 +828,45 @@
                 const data = await res.json();
                 
                 if(data.ok && data.parsed && data.parsed.items) {
-                    let total = 0;
-                    let summary = "";
-                    let products_to_order = [];
-                    
+                    approvalContext = {
+                        req: req,
+                        parsedItems: data.parsed.items,
+                        finalItems: [],
+                        linesToClarify: []
+                    };
+
+                    // Trova le righe originali che non hanno un match
+                    const originalLines = req.text.split('\n').map(l => l.trim()).filter(l => l);
+                    originalLines.forEach(line => {
+                        // Verifica se questa riga è stata mappata a un prodotto
+                        // Usiamo una logica fuzzy semplice: se il nome del prodotto mappato è contenuto nella riga
+                        const isMapped = data.parsed.items.some(item => {
+                            const words = item.name.toLowerCase().split(' ');
+                            return words.some(w => line.toLowerCase().includes(w));
+                        });
+
+                        if(!isMapped) {
+                            approvalContext.linesToClarify.push(line);
+                        }
+                    });
+
+                    // Aggiungi gli articoli già riconosciuti ai finalItems
                     data.parsed.items.forEach(item => {
                         const product = appState.products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name?.toLowerCase());
                         if(product) {
-                            // Trova TUTTI i prezzi per questo prodotto
                             const priceEntries = Object.entries(product.prices).sort((a,b) => a[1]-b[1]);
-                            const bestPrice = priceEntries[0]; // Il più basso
-                            
-                            const subtotal = bestPrice[1] * (item.qty || 1);
-                            total += subtotal;
-                            
-                            products_to_order.push({
+                            const bestPrice = priceEntries[0];
+                            approvalContext.finalItems.push({
                                 name: product.name,
                                 qty: item.qty || 1,
                                 bestPrice: bestPrice[1],
                                 supplier: bestPrice[0],
-                                others: priceEntries.slice(1) // Altri fornitori
+                                others: priceEntries.slice(1)
                             });
                         }
                     });
-                    
-                    // Crea un riepilogo visivo più bello
-                    summary = products_to_order.map(p => {
-                        let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
-                        return `${p.qty}x ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
-                    }).join('\n');
 
-                    if(confirm(`📦 Analisi Miglior Prezzo completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
-                        // Aggiorna porto franco dei fornitori
-                        products_to_order.forEach(p => {
-                            const sup = appState.suppliers.find(s => s.name === p.supplier);
-                            if(sup) sup.current = (sup.current || 0) + (p.bestPrice * p.qty);
-                        });
-
-                        appState.archive.unshift({ 
-                            dept: req.dept, 
-                            total: total, 
-                            date: new Date().toLocaleDateString(), 
-                            text: req.text,
-                            staff: req.staff,
-                            items: products_to_order 
-                        });
-                        
-                        appState.inbox = appState.inbox.filter(r => r.id !== id);
-                        await push();
-                        switchView('dashboard');
-                    }
+                    clarifyNextItem();
                 } else {
                     alert("L'IA non è riuscita a mappare l'ordine. Procedo con il match manuale.");
                     fallbackApprove(req);
@@ -848,6 +877,134 @@
             } finally {
                 btn.innerText = oldText; btn.disabled = false;
             }
+        }
+
+        function clarifyNextItem() {
+            if(approvalContext.linesToClarify.length === 0) {
+                finalizeApproval();
+                return;
+            }
+
+            const currentLine = approvalContext.linesToClarify[0];
+            document.getElementById('clarify-text').innerText = `"${currentLine}"`;
+            
+            // Genera suggerimenti fuzzy dal catalogo
+            const suggestions = appState.products
+                .map(p => ({ 
+                    p, 
+                    score: calculateFuzzyScore(currentLine.toLowerCase(), p.name.toLowerCase()) 
+                }))
+                .filter(s => s.score > 0.1)
+                .sort((a,b) => b.score - a.score)
+                .slice(0, 3);
+
+            const sugDiv = document.getElementById('clarify-suggestions');
+            sugDiv.innerHTML = suggestions.map(s => `
+                <button onclick="selectClarifySuggestion(${s.p.id})" class="w-full p-4 bg-slate-50 border rounded-xl flex justify-between items-center hover:border-amber-400 transition-all text-left">
+                    <div>
+                        <b class="text-sm uppercase">${s.p.name}</b>
+                        <p class="text-[9px] text-slate-400 uppercase">${s.p.cat}</p>
+                    </div>
+                    <span class="text-amber-500 font-black text-[10px]">SELEZIONA</span>
+                </button>
+            `).join('') || '<p class="text-center py-4 text-xs text-slate-400 italic">Nessun suggerimento trovato nel catalogo</p>';
+
+            document.getElementById('modal-clarify').classList.remove('hidden');
+        }
+
+        function calculateFuzzyScore(s1, s2) {
+            const words1 = s1.split(' ');
+            const words2 = s2.split(' ');
+            let matches = 0;
+            words1.forEach(w1 => {
+                if(w1.length < 3) return;
+                if(words2.some(w2 => w2.includes(w1) || w1.includes(w2))) matches++;
+            });
+            return matches / Math.max(words1.length, words2.length);
+        }
+
+        function selectClarifySuggestion(prodId) {
+            const product = appState.products.find(p => p.id === prodId);
+            if(product) {
+                const priceEntries = Object.entries(product.prices).sort((a,b) => a[1]-b[1]);
+                const bestPrice = priceEntries[0];
+                
+                // Estrai quantità dalla riga se possibile
+                const currentLine = approvalContext.linesToClarify[0];
+                let qty = 1;
+                const match = currentLine.match(/(\d+([.,]\d+)?)/);
+                if(match) qty = parseFloat(match[1].replace(',', '.'));
+
+                approvalContext.finalItems.push({
+                    name: product.name,
+                    qty: qty,
+                    bestPrice: bestPrice ? bestPrice[1] : 0,
+                    supplier: bestPrice ? bestPrice[0] : 'N/D',
+                    others: priceEntries.slice(1)
+                });
+            }
+            approvalContext.linesToClarify.shift();
+            closeClarifyModal();
+            clarifyNextItem();
+        }
+
+        function openProductModalFromClarify() {
+            const currentLine = approvalContext.linesToClarify[0];
+            closeClarifyModal();
+            // Prepariamo il modal prodotto con il testo della riga
+            openProductModal();
+            document.getElementById('edit-prod-name').value = currentLine;
+            // Sovrascriviamo la funzione di salvataggio temporaneamente? No, meglio gestire nel saveProductFromModal
+            approvalContext.isAddingNew = true;
+        }
+
+        function ignoreClarifyItem() {
+            approvalContext.linesToClarify.shift();
+            closeClarifyModal();
+            clarifyNextItem();
+        }
+
+        function closeClarifyModal() {
+            document.getElementById('modal-clarify').classList.add('hidden');
+        }
+
+        async function finalizeApproval() {
+            const { req, finalItems } = approvalContext;
+            if(finalItems.length === 0) {
+                alert("Nessun prodotto valido nell'ordine. L'ordine verrà rimosso.");
+                appState.inbox = appState.inbox.filter(r => r.id !== req.id);
+                await push();
+                refresh();
+                return;
+            }
+
+            let total = finalItems.reduce((s, i) => s + (i.bestPrice * i.qty), 0);
+            let summary = finalItems.map(p => {
+                let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
+                return `${p.qty}x ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
+            }).join('\n');
+
+            if(confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
+                // Aggiorna porto franco dei fornitori
+                finalItems.forEach(p => {
+                    const sup = appState.suppliers.find(s => s.name === p.supplier);
+                    if(sup) sup.current = (sup.current || 0) + (p.bestPrice * p.qty);
+                });
+
+                appState.archive.unshift({ 
+                    dept: req.dept, 
+                    total: total, 
+                    date: new Date().toLocaleDateString(), 
+                    text: req.text,
+                    staff: req.staff,
+                    items: finalItems 
+                });
+                
+                appState.inbox = appState.inbox.filter(r => r.id !== req.id);
+                await push();
+                switchView('dashboard');
+            }
+            approvalContext = null;
         }
 
         function fallbackApprove(req) {
