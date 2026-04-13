@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
         :root {
             --brand-blue: #09121e;
@@ -17,22 +17,24 @@
         }
 
         body { font-family: 'Inter', sans-serif; background-color: var(--brand-light); color: #1e293b; }
-        .logo-text { font-family: 'Playfair Display', serif; }
-        .chart-container { position: relative; width: 100%; height: 300px; }
-        
-        /* Navigazione stagna: nasconde fisicamente le sezioni non attive */
+        .chart-container { position: relative; width: 100%; height: 320px; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+
+        /* Protezione Navigazione Stagna */
         .view-section { display: none !important; }
         .view-section.active { display: block !important; }
         .view-section.active-flex { display: flex !important; }
         
-        .tab-btn { transition: all 0.2s ease; border-radius: 10px; cursor: pointer; }
+        .tab-btn { transition: all 0.2s ease; border-radius: 12px; cursor: pointer; }
         .tab-btn.active { background-color: var(--brand-blue); color: white; box-shadow: 0 4px 10px rgba(9, 18, 30, 0.3); }
 
-        .glass-card { background: white; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); border-radius: 20px; }
-        .brand-gradient { background: linear-gradient(135deg, #09121e 0%, #1e3a5f 100%); }
-        .input-style { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; outline: none; transition: border-color 0.2s; width: 100%; font-size: 0.875rem; }
-        .input-style:focus { border-color: var(--brand-accent); }
-        .config-sub-tab { border-bottom: 2px solid transparent; padding: 10px 15px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; cursor: pointer; }
+        .glass-card { background: white; border: 1px solid rgba(226, 232, 240, 0.8); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); border-radius: 20px; }
+        .premium-input { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 16px; outline: none; transition: border-color 0.2s; width: 100%; font-size: 0.875rem; font-weight: 600;}
+        .premium-input:focus { border-color: var(--brand-accent); }
+        .brand-gradient { background: linear-gradient(135deg, var(--brand-blue) 0%, #1e3a5f 100%); }
+        
+        .config-sub-tab { border-bottom: 3px solid transparent; cursor: pointer; padding: 10px 15px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; }
         .config-sub-tab.active { border-color: var(--brand-accent); color: var(--brand-blue); }
     </style>
 </head>
@@ -41,44 +43,40 @@
     <div class="min-h-screen flex flex-col md:flex-row">
         
         <aside id="sidebar" class="w-full md:w-72 bg-white border-r border-slate-200 p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-50">
-            <div class="flex flex-col items-center gap-3 py-2 border-b pb-6">
-                <div class="w-24 h-16 bg-black rounded-xl flex flex-col items-center justify-center text-white shadow-lg border border-slate-800">
-                    <span class="logo-text text-xl leading-none italic">Sea,</span>
-                    <span class="logo-text text-sm font-bold tracking-widest leading-none">SIGNORA</span>
-                </div>
+            <div class="flex flex-col items-center gap-4 py-4 border-b pb-8">
+                <div id="ui-logo-circle" class="w-16 h-16 brand-gradient rounded-full flex items-center justify-center text-white text-2xl shadow-xl border-2 border-white font-black italic">SS</div>
                 <div class="text-center">
                     <h1 id="ui-brand-name" class="text-base font-black tracking-widest uppercase">Sea Signora</h1>
                     <p id="ui-brand-sub" class="text-[9px] font-bold text-amber-600 uppercase tracking-[0.3em]">Milano</p>
                 </div>
             </div>
 
-            <nav class="flex flex-col gap-1">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Intelligence</p>
-                <button onclick="switchView('dashboard')" class="tab-btn active flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📊 KPI Logistica</button>
-                <button onclick="switchView('reports')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📈 Report Analitici</button>
+            <nav id="admin-nav" class="flex flex-col gap-1">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">Monitoraggio</p>
+                <button onclick="switchView('dashboard')" class="tab-btn active flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">📊 KPI Logistica</button>
+                <button onclick="switchView('reports')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">📈 Report & Trend</button>
                 
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 mt-4">Gestione</p>
-                <button onclick="switchView('price-update')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">🧾 Aggiorna Fatture</button>
-                <button onclick="switchView('inbox')" class="tab-btn flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-600">
-                    <div class="flex items-center gap-3">📬 Inbox Ordini</div>
-                    <span id="inbox-badge" class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full hidden">0</span>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 mt-4">Gestione</p>
+                <button onclick="switchView('price-update')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">🧾 Carica Fattura</button>
+                <button onclick="switchView('inbox')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500 relative">
+                    📬 Inbox Ordini <span id="inbox-badge" class="absolute right-4 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden">0</span>
                 </button>
-                <button onclick="switchView('catalog')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📦 Catalogo Master</button>
-                <button onclick="switchView('archive')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📁 Storico</button>
-                <button onclick="switchView('config')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600 mt-2 border-t pt-4">⚙️ Impostazioni</button>
+                <button onclick="switchView('catalog')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">📦 Catalogo Master</button>
+                <button onclick="switchView('archive')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">📁 Storico Ordini</button>
+                <button onclick="switchView('config')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500 mt-4 border-t pt-4">⚙️ Configurazione</button>
             </nav>
         </aside>
 
-        <main class="flex-1 p-4 md:p-10 overflow-y-auto h-screen relative">
+        <main class="flex-1 p-6 md:p-10 overflow-y-auto h-screen relative">
             
-            <header id="admin-header" class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200">
+            <header id="admin-header" class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-200">
                 <div>
-                    <h2 id="ui-page-title" class="text-2xl font-black uppercase tracking-tighter text-slate-900">Dashboard Master</h2>
-                    <p id="ui-page-desc" class="text-xs font-medium text-slate-500">Gestione acquisti sincronizzata in Cloud</p>
+                    <h2 id="ui-page-title" class="text-2xl font-black uppercase tracking-tighter">Dashboard Direzionale</h2>
+                    <p id="ui-page-desc" class="text-xs font-medium text-slate-400 italic">Pannello acquisti in Cloud</p>
                 </div>
-                <div class="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm z-50">
-                    <span class="text-[9px] font-black uppercase text-slate-400 px-2">Ruolo:</span>
-                    <select id="role-selector" onchange="handleRoleChange()" class="bg-slate-50 text-slate-900 text-[10px] font-black uppercase py-2 px-3 rounded-lg outline-none cursor-pointer border">
+                <div id="role-switcher-wrap" class="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm z-50">
+                    <span class="text-[9px] font-black uppercase text-slate-400 px-3 tracking-widest border-r">Ruolo Operativo</span>
+                    <select id="role-selector" onchange="handleRoleChange()" class="bg-transparent text-slate-900 text-[10px] font-black uppercase py-2 px-4 outline-none cursor-pointer">
                         <option value="admin">Amministratore</option>
                         <option value="Cucina">Cucina</option>
                         <option value="Sala">Sala</option>
@@ -89,107 +87,139 @@
             </header>
 
             <div id="view-dashboard" class="view-section active">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="glass-card p-6 border-l-4 border-amber-400">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Richieste Pending</span>
-                        <p id="kpi-pending" class="text-4xl font-black text-slate-900">0</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="ui-kpi-cards">
+                    <div class="glass-card p-8 flex flex-col justify-between border-l-4 border-emerald-500">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Saving Stimato</span>
+                        <p class="text-4xl font-black text-slate-900 tracking-tighter">€ <span id="kpi-saving">0.00</span></p>
                     </div>
-                    <div class="glass-card p-6 border-l-4 border-emerald-500">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Saving Stimato</span>
-                        <p class="text-4xl font-black text-slate-900">€ <span id="kpi-saving">0.00</span></p>
+                    <div class="glass-card p-8 flex flex-col justify-between border-l-4 border-amber-400">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Ordini in Sospeso</span>
+                        <p id="kpi-pending-count" class="text-4xl font-black text-slate-900 tracking-tighter">0</p>
                     </div>
-                    <div class="brand-gradient p-6 rounded-2xl text-white shadow-xl">
-                        <span class="text-[10px] font-black opacity-60 uppercase mb-1 block">Status Cloud</span>
-                        <p id="cloud-status" class="text-xs font-bold text-emerald-300">Connesso a Railway</p>
+                    <div class="brand-gradient p-8 rounded-3xl text-white shadow-xl flex flex-col justify-center">
+                        <span class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-2 block">Stato Server</span>
+                        <p id="cloud-status" class="text-sm font-semibold italic text-amber-300">Connessione in corso...</p>
                     </div>
                 </div>
-                <div class="glass-card p-8">
-                    <h3 class="text-sm font-black uppercase tracking-widest mb-6">📦 Stato Porto Franco Fornitori</h3>
-                    <div id="consolidation-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                <div class="glass-card p-10" id="ui-logistica-card">
+                    <h3 class="text-sm font-black uppercase tracking-widest mb-6">📦 Stato Logistica e Porto Franco</h3>
+                    <div id="consolidation-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
                 </div>
             </div>
 
             <div id="view-reports" class="view-section">
-                <div class="glass-card p-6 mb-8 bg-slate-50 flex flex-wrap gap-4 items-end">
-                    <div class="flex-1 min-w-[140px]">
-                        <label class="text-[9px] font-black text-slate-500 mb-1 block">Periodo</label>
-                        <select id="rep-period" onchange="updateCharts()" class="input-style bg-white"><option value="mensile">Mese</option><option value="trimestrale">Trimestre</option></select>
+                <div class="glass-card p-6 mb-8 flex flex-wrap gap-4 items-end bg-slate-50">
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Periodo</label>
+                        <select id="filter-period" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"><option value="mensile">Ultimi 30 Giorni</option><option value="trimestrale">Ultimo Trimestre</option></select>
                     </div>
-                    <div class="flex-1 min-w-[140px]">
-                        <label class="text-[9px] font-black text-slate-500 mb-1 block">Filtro</label>
-                        <select id="rep-type" onchange="toggleRepFilters(); updateCharts()" class="input-style bg-white">
-                            <option value="all">Generale</option><option value="reparto">Reparto</option><option value="categoria">Categoria</option><option value="prodotto">Prodotto</option>
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Livello di Analisi</label>
+                        <select id="filter-level" onchange="toggleReportFilters(); updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none">
+                            <option value="generale">Generale</option><option value="reparto">Per Reparto</option><option value="categoria">Per Categoria</option>
                         </select>
                     </div>
-                    <div id="rep-wrap-reparto" class="flex-1 min-w-[140px] hidden"><select id="rep-val-reparto" onchange="updateCharts()" class="input-style bg-white"></select></div>
-                    <div id="rep-wrap-categoria" class="flex-1 min-w-[140px] hidden"><select id="rep-val-categoria" onchange="updateCharts()" class="input-style bg-white"></select></div>
-                    <div id="rep-wrap-prodotto" class="flex-1 min-w-[140px] hidden"><select id="rep-val-prodotto" onchange="updateCharts()" class="input-style bg-white"></select></div>
+                    <div id="filter-wrap-reparto" class="flex-1 min-w-[150px] hidden"><label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Reparto</label><select id="filter-reparto" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"></select></div>
+                    <div id="filter-wrap-categoria" class="flex-1 min-w-[150px] hidden"><label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Categoria</label><select id="filter-categoria" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"></select></div>
                 </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="glass-card p-6"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-4">Andamento Spesa</h4><div class="chart-container"><canvas id="chartTrend"></canvas></div></div>
-                    <div class="glass-card p-6"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-4">Incidenza Costi</h4><div class="chart-container"><canvas id="chartPie"></canvas></div></div>
-                </div>
-            </div>
-
-            <div id="view-inbox" class="view-section"><div id="inbox-list" class="max-w-4xl mx-auto space-y-6"></div></div>
-            
-            <div id="view-catalog" class="view-section">
-                <div class="glass-card p-8">
-                    <h3 class="text-xl font-black uppercase mb-6">Anagrafica Sea Signora</h3>
-                    <input id="cat-search" oninput="renderCatalog()" type="text" placeholder="Cerca prodotto..." class="input-style bg-slate-50 mb-6">
-                    <table class="w-full text-left text-sm border rounded-xl overflow-hidden"><tbody id="cat-table-body" class="divide-y"></tbody></table>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="glass-card p-8"><h4 id="trend-title" class="text-[10px] font-black uppercase text-slate-400 mb-6">Andamento Costi</h4><div class="chart-container"><canvas id="analyticsTrendChart"></canvas></div></div>
+                    <div class="glass-card p-8"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-6">Ripartizione Spese</h4><div class="chart-container"><canvas id="analyticsPieChart"></canvas></div></div>
                 </div>
             </div>
 
             <div id="view-price-update" class="view-section">
-                <div class="glass-card p-8">
-                    <h3 class="text-xl font-black uppercase mb-6">Aggiorna da Fattura</h3>
-                    <select id="inv-supplier" onchange="renderInvoiceTable()" class="input-style w-64 mb-6"></select>
-                    <table class="w-full text-left text-sm border divide-y"><tbody id="inv-table-body"></tbody></table>
-                    <div class="mt-6 flex justify-end"><button onclick="saveInvoice()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Listino</button></div>
+                <div class="glass-card p-10">
+                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Aggiorna da Fattura</h3>
+                    <select id="update-supplier-select" onchange="renderPriceUpdateTable()" class="premium-input bg-slate-50 border-none w-64 mb-8"></select>
+                    <div class="overflow-hidden border rounded-xl">
+                        <table class="w-full text-left text-sm"><thead class="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><tr><th class="px-6 py-3">Prodotto</th><th class="px-6 py-3 text-center">Vecchio Prezzo</th><th class="px-6 py-3 text-center">Nuovo Prezzo (€)</th></tr></thead><tbody id="update-table-body" class="divide-y"></tbody></table>
+                    </div>
+                    <div class="mt-6 flex justify-end"><button onclick="saveInvoicePrices()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Modifiche</button></div>
                 </div>
             </div>
 
-            <div id="view-archive" class="view-section"><div class="glass-card p-8"><table class="w-full text-left text-sm"><tbody id="arc-table-body" class="divide-y"></tbody></table></div></div>
+            <div id="view-inbox" class="view-section"><div id="inbox-container" class="max-w-4xl mx-auto space-y-6"></div></div>
+
+            <div id="view-catalog" class="view-section">
+                <div class="glass-card p-10">
+                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Catalogo Master SS</h3>
+                    <input id="catalog-mgmt-search" oninput="renderCatalogMgmt()" type="text" placeholder="Cerca prodotto..." class="w-full p-4 bg-slate-50 border-none rounded-xl text-sm font-bold mb-8 shadow-inner focus:outline-none">
+                    <div class="overflow-x-auto border rounded-xl">
+                        <table class="w-full text-left text-sm"><thead class="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><tr><th class="px-6 py-4">Prodotto / Cat</th><th class="px-6 py-4 text-right">Comparativa Fornitori</th></tr></thead><tbody id="catalog-table-body" class="divide-y"></tbody></table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-archive" class="view-section">
+                <div class="glass-card p-10">
+                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Storico Ordini Approvati</h3>
+                    <div class="overflow-hidden border rounded-xl"><table class="w-full text-left text-sm"><thead class="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><tr><th class="px-6 py-4">Data</th><th class="px-6 py-4">Reparto / Staff</th><th class="px-6 py-4">Dettaglio</th><th class="px-6 py-4 text-right">Costo Approvato</th></tr></thead><tbody id="archive-table-body" class="divide-y"></tbody></table></div>
+                </div>
+            </div>
 
             <div id="view-config" class="view-section">
-                <div class="glass-card p-8">
-                    <div class="flex gap-4 border-b mb-8 overflow-x-auto">
-                        <button onclick="switchCfg('data')" id="cfg-btn-data" class="config-sub-tab active">Prodotti & Excel</button>
-                        <button onclick="switchCfg('reparti')" id="cfg-btn-reparti" class="config-sub-tab">Fornitori & QR</button>
-                        <button onclick="switchCfg('ui')" id="cfg-btn-ui" class="config-sub-tab">Personalizzazione</button>
+                <div class="glass-card p-10">
+                    <div class="flex gap-6 border-b mb-8 overflow-x-auto">
+                        <div onclick="switchConfigTab('prodotti')" id="config-btn-prodotti" class="config-sub-tab active">Prodotti & Excel</div>
+                        <div onclick="switchConfigTab('fornitori')" id="config-btn-fornitori" class="config-sub-tab">Fornitori & Soglie</div>
+                        <div onclick="switchConfigTab('reparti')" id="config-btn-reparti" class="config-sub-tab">QR Reparti</div>
+                        <div onclick="switchConfigTab('ui')" id="config-btn-ui" class="config-sub-tab">Personalizza Layout</div>
                     </div>
-                    <div id="cfg-sec-data" class="cfg-panel space-y-6">
-                        <div class="bg-emerald-50 p-6 rounded-2xl border border-emerald-200">
-                            <h4 class="text-sm font-black text-emerald-900 uppercase mb-2">Importazione Excel</h4>
-                            <textarea id="cfg-excel" class="w-full h-32 input-style mb-4 text-xs font-mono" placeholder="Nome;Categoria;Sottocategoria;UM;Prezzo;Fornitore"></textarea>
-                            <button onclick="importExcel()" class="bg-emerald-600 text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase">Importa</button>
+
+                    <div id="config-sec-prodotti" class="config-inner space-y-8">
+                        <div class="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex justify-between items-center">
+                            <div><h4 class="text-sm font-black text-emerald-900 uppercase">Importazione Rapida Excel</h4><p class="text-[10px] text-emerald-600">Formato: Nome; Categoria; Sottocategoria; UM; Prezzo; Fornitore</p></div>
+                            <button onclick="document.getElementById('excel-box').classList.toggle('hidden')" class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-black text-[10px] uppercase">Apri Import</button>
                         </div>
-                        <div class="border rounded-xl h-64 overflow-y-auto"><table class="w-full text-left text-sm"><tbody id="cfg-prod-list" class="divide-y"></tbody></table></div>
+                        <div id="excel-box" class="hidden"><textarea id="excel-area" class="w-full h-32 p-4 border rounded-xl mb-3 text-sm font-medium" placeholder="Esempio: Tartufi di Mare; Ittico; Bivalvi; kg; 11.12; METRO"></textarea><button onclick="processExcelImport()" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Elabora e Aggiungi</button></div>
+                        
+                        <div class="bg-slate-50 p-6 rounded-2xl border">
+                            <h4 class="text-[10px] font-black uppercase mb-4 text-slate-500">Aggiungi Singolo Prodotto</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                                <input id="ap-name" type="text" placeholder="Nome" class="p-3 border rounded-xl text-xs font-bold">
+                                <select id="ap-cat" class="p-3 border rounded-xl text-xs font-bold"><option value="Ittico">Ittico</option><option value="Verdure">Verdure</option><option value="Consumabili">Consumabili</option><option value="Cleaning">Cleaning</option></select>
+                                <input id="ap-sub" type="text" placeholder="Subcat (es. Pesce)" class="p-3 border rounded-xl text-xs font-bold">
+                                <input id="ap-um" type="text" placeholder="UM (kg, pz)" class="p-3 border rounded-xl text-xs font-bold">
+                            </div>
+                            <button onclick="addSingleProduct()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva</button>
+                        </div>
+                        <div class="overflow-hidden border rounded-xl h-64 overflow-y-auto"><table class="w-full text-left text-sm"><tbody id="config-products-list" class="divide-y bg-white"></tbody></table></div>
                     </div>
-                    <div id="cfg-sec-reparti" class="cfg-panel hidden space-y-6">
-                        <div id="cfg-sup-list" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"></div>
-                        <div id="cfg-qr-list" class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t"></div>
+
+                    <div id="config-sec-fornitori" class="config-inner hidden">
+                        <div id="suppliers-config-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                     </div>
-                    <div id="cfg-sec-ui" class="cfg-panel hidden space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
-                            <input id="ui-brand" type="text" oninput="liveUI()" class="input-style" placeholder="Nome App">
-                            <input id="ui-color" type="color" oninput="liveUI()" class="w-full h-12 p-1 border rounded-xl" value="#c5a059">
+
+                    <div id="config-sec-reparti" class="config-inner hidden">
+                        <p class="text-xs text-slate-500 mb-6">Stampa questi QR. Il cameriere lo inquadra per aprire direttamente il modulo d'ordine del suo reparto.</p>
+                        <div id="config-qr-list" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
+                    </div>
+
+                    <div id="config-sec-ui" class="config-inner hidden space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Nascondi Modulo "Saving"</label><select onchange="toggleModule('ui-kpi-cards', this.value)" class="w-full p-3 border rounded-xl text-sm font-bold"><option value="grid">Mostra</option><option value="none">Nascondi</option></select></div>
+                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Nascondi Modulo "Logistica"</label><select onchange="toggleModule('ui-logistica-card', this.value)" class="w-full p-3 border rounded-xl text-sm font-bold"><option value="block">Mostra</option><option value="none">Nascondi</option></select></div>
+                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Colore Principale App</label><input id="ui-set-color" type="color" oninput="liveUI()" class="w-full h-14 p-1 border rounded-xl" value="#c5a059"></div>
+                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Nome App</label><input id="ui-set-brand" type="text" oninput="liveUI()" class="w-full p-3 border rounded-xl font-bold" value="Sea Signora"></div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div id="view-department" class="view-section h-full">
-                <div class="h-full flex flex-col justify-center max-w-2xl mx-auto w-full">
-                    <div class="glass-card p-10 shadow-2xl bg-white relative">
+                <div class="h-full flex flex-col justify-center w-full max-w-2xl mx-auto">
+                    <div class="glass-card p-10 shadow-2xl border-0 bg-white">
                         <div class="flex items-center gap-5 mb-8">
-                            <div class="w-16 h-16 brand-gradient rounded-xl flex items-center justify-center text-white text-2xl font-black italic">SS</div>
+                            <div class="w-16 h-16 brand-gradient rounded-xl flex items-center justify-center text-white shadow-lg text-2xl font-black italic">SS</div>
                             <div><h3 class="text-3xl font-black uppercase tracking-tighter leading-none">Invia Ordine</h3><p id="dept-name-display" class="text-amber-600 font-bold uppercase text-[10px] mt-1">Reparto</p></div>
                         </div>
-                        <div class="grid grid-cols-2 gap-4 mb-6"><input id="d-nome" type="text" placeholder="Nome" class="input-style bg-slate-50"><input id="d-cognome" type="text" placeholder="Cognome" class="input-style bg-slate-50"></div>
-                        <textarea id="d-text" placeholder="Scrivi la tua lista. L'IA Gemini farà il match automaticamente." class="w-full h-40 input-style bg-slate-50 resize-none mb-6"></textarea>
-                        <button onclick="submitOrder()" id="btn-submit-order" class="w-full py-5 brand-gradient text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-transform">🚀 Invia all'Ufficio Acquisti</button>
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <input id="dept-nome" type="text" placeholder="Nome" class="input-style bg-slate-50">
+                            <input id="dept-cognome" type="text" placeholder="Cognome" class="input-style bg-slate-50">
+                        </div>
+                        <textarea id="dept-raw-text" placeholder="Scrivi la tua lista liberamente. Es: 5kg Astice Blu, 2 casse Gin Mare. L'IA la mapperà automaticamente con il gestionale." class="w-full h-40 input-style bg-slate-50 resize-none mb-6"></textarea>
+                        <button onclick="submitDeptOrder()" id="btn-submit-order" class="w-full py-5 brand-gradient text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-transform">🚀 Invia Ordine all'Ufficio Acquisti</button>
                     </div>
                 </div>
             </div>
@@ -200,160 +230,579 @@
     <script>
         let appState = {
             currentUser: 'admin',
+            settings: { hiddenModules: {}, brandName: 'Sea Signora', accentColor: '#c5a059' },
+            // DATABASE INTEGRALE SEA SIGNORA MILANO MAPPATO
             products: [
+                // ITTICO - Bivalvi
                 { id: 1, name: 'Tartufi di Mare', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 11.12 } },
-                { id: 2, name: 'Astice Blu Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 65.90 } },
-                { id: 3, name: 'Gambero Rosso 2°', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 59.00 } },
-                { id: 4, name: 'Branzino Grecia', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 11.71 } },
-                { id: 5, name: 'Carciofi Mammola', cat: 'Verdure', sub: 'Verdura', um: 'pz', prices: { 'OROBICA': 1.18 } },
-                { id: 6, name: 'Patate', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 0.90 } },
-                { id: 7, name: 'Carne Trita 80/20', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 10.00 } },
-                { id: 8, name: 'Pasta Staff', cat: 'Consumabili', sub: 'Pasta', um: 'kg', prices: { 'METRO': 1.16 } },
-                { id: 9, name: 'Sapone refill Arancia', cat: 'Cleaning', sub: 'Bagno', um: 'pz', prices: { 'ACQUA DI PARMA': 33.00 } },
-                { id: 10, name: 'Detergente lavastoviglie', cat: 'Cleaning', sub: 'Cucina', um: 'pz', prices: { 'METRO': 10.00 } }
+                { id: 2, name: 'Cannolicchi Estero', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 7.50 } },
+                { id: 3, name: 'Cappasanta 1/2 guscio fresca', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'OROBICA': 11.90 } },
+                { id: 4, name: 'Cockles', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 3.67 } },
+                { id: 5, name: 'Cozze', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 3.50 } },
+                { id: 6, name: 'Vongola Lupino', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 8.09 } },
+                { id: 7, name: 'Vongola Tellina', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 10.49 } },
+                { id: 8, name: 'Vongola Verace', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'LINEA MARE': 18.70 } },
+                
+                // ITTICO - Crostacei
+                { id: 9, name: 'Aragosta Viva 250-400g', cat: 'Ittico', sub: 'Crostacei', um: 'pz', prices: { 'OROBICA': 72.00 } },
+                { id: 10, name: 'Astice Blu Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 65.90 } },
+                { id: 11, name: 'Astice Canada vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'LINEA MARE': 29.50 } },
+                { id: 12, name: 'Astice Jumbo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 63.00 } },
+                { id: 13, name: 'Astice Polpa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 91.00 } },
+                { id: 14, name: 'Carabineros 8/10', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 102.00 } },
+                { id: 15, name: 'Gambero Fondale', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 13.00 } },
+                { id: 16, name: 'Gambero Rosa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 16.50 } },
+                { id: 17, name: 'Gambero Rosso 2°', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 59.00 } },
+                { id: 18, name: 'Gambero Viola 2°', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 56.00 } },
+                { id: 19, name: 'King Crab Polpa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 56.50 } },
+                { id: 20, name: 'King Crab Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 93.00 } },
+                { id: 21, name: 'Leg King Crab Cotto', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 79.00 } },
+                { id: 22, name: 'Leg King Crab Crudo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 100.00 } },
+                { id: 23, name: 'Mazzancolla Fresca', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'METRO': 12.49 } },
+                { id: 24, name: 'Mazzancolla Gelo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 7.50 } },
+                { id: 25, name: 'Moleca', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 165.00 } },
+                { id: 26, name: 'Scampo 1/5', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 65.00 } },
+                { id: 27, name: 'Scampo 21/30', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'METRO': 10.62 } },
+                { id: 28, name: 'Scampo 31/40', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'METRO': 14.08 } },
+
+                // ITTICO - Molluschi
+                { id: 29, name: 'Calamaro Patagonia Gelo', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'LINEA MARE': 7.40 } },
+                { id: 30, name: 'Calamaro Spillo Mediterraneo', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'OROBICA': 22.80 } },
+                { id: 31, name: 'Lumaca di Mare', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'OROBICA': 17.90 } },
+                { id: 32, name: 'Polpo Gelo Indopacifico', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'LINEA MARE': 16.95 } },
+                { id: 33, name: 'Polpo Gelo Mediterraneo T4', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'METRO': 17.85 } },
+
+                // ITTICO - Ostriche
+                { id: 34, name: 'Ostriche Gillardeau N3', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'LINEA MARE': 2.44 } },
+                { id: 35, name: 'Ostriche Mignon di Goro N6', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'OROBICA': 0.69 } },
+                { id: 36, name: 'Ostriche OR N4', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'OYSTER OASIS': 2.25 } },
+                { id: 37, name: 'Ostriche Perla del Delta N3', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'OYSTER OASIS': 2.85 } },
+                { id: 38, name: 'Ostriche Perlina del Delta N6', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'OYSTER OASIS': 1.05 } },
+
+                // ITTICO - Pesce
+                { id: 39, name: 'Akami (-60°)', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'REACH FOOD': 49.50 } },
+                { id: 40, name: 'Berice 500-700g', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'METRO': 20.00 } },
+                { id: 41, name: 'Branzino Grecia', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 11.71 } },
+                { id: 42, name: 'Chutoro (-60°)', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'REACH FOOD': 53.50 } },
+                { id: 43, name: 'Dentice Gibboso', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 23.50 } },
+                { id: 44, name: 'Gallinella', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 21.15 } },
+                { id: 45, name: 'Ombrina Boccadoro 4+', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 14.50 } },
+                { id: 46, name: 'Orata Grecia 600-800g', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'METRO': 10.18 } },
+                { id: 47, name: 'Otoro (-60)', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'REACH FOOD': 65.00 } },
+                { id: 48, name: 'Ricciola 3-4 kg', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 20.90 } },
+                { id: 49, name: 'Rombo Fresco Francia', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'METRO': 19.90 } },
+                { id: 50, name: 'Salmone affum. Norvegese', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'OROBICA': 28.50 } },
+                { id: 51, name: 'Scorfano Portogallo', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'LINEA MARE': 26.80 } },
+                { id: 52, name: 'Sogliola Francia', cat: 'Ittico', sub: 'Pesce', um: 'pz', prices: { 'METRO': 27.00 } },
+                { id: 53, name: 'Tonno Rosso Fuentes', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 29.00 } },
+                { id: 54, name: 'Tonno Rosso Mediterraneo', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 37.00 } },
+
+                // VERDURE
+                { id: 60, name: 'Acetosella', cat: 'Verdure', sub: 'Erbe', um: '100g', prices: { 'ORTOLANO': 6.30 } },
+                { id: 61, name: 'Aneto', cat: 'Verdure', sub: 'Erbe', um: '60g', prices: { 'ABBASCIÀ': 1.18 } },
+                { id: 62, name: 'Basilico', cat: 'Verdure', sub: 'Erbe', um: 'kg', prices: { 'ORTOLANO': 15.50 } },
+                { id: 63, name: 'Coriandolo', cat: 'Verdure', sub: 'Erbe', um: '100g', prices: { 'FAST FRUIT': 1.20 } },
+                { id: 64, name: 'Dragoncello FR', cat: 'Verdure', sub: 'Erbe', um: '100g', prices: { 'ORTOLANO': 5.90 } },
+                { id: 68, name: 'Funghi Champignon', cat: 'Verdure', sub: 'Erbe', um: 'kg', prices: { 'ARRIGONI': 3.00 } },
+                { id: 80, name: 'Ananas', cat: 'Verdure', sub: 'Frutta', um: 'kg', prices: { 'ORTOLANO': 2.90 } },
+                { id: 81, name: 'Arance Succo (Navel)', cat: 'Verdure', sub: 'Frutta', um: 'kg', prices: { 'ORTOLANO': 1.80 } },
+                { id: 82, name: 'Arance Tarocco', cat: 'Verdure', sub: 'Frutta', um: 'kg', prices: { 'ORTOLANO': 2.00 } },
+                { id: 89, name: 'Limoni', cat: 'Verdure', sub: 'Frutta', um: 'kg', prices: { 'MARR': 2.20 } },
+                { id: 100, name: 'Aglio Bianco', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 5.90 } },
+                { id: 104, name: 'Carciofi Mammola', cat: 'Verdure', sub: 'Verdura', um: 'pz', prices: { 'OROBICA': 1.18 } },
+                { id: 105, name: 'Carciofi Spina', cat: 'Verdure', sub: 'Verdura', um: 'pz', prices: { 'ABBASCIÀ': 1.38 } },
+                { id: 106, name: 'Carote', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'OROBICA': 1.29 } },
+                { id: 114, name: 'Cipolle Tropea', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ABBASCIÀ': 2.20 } },
+                { id: 127, name: 'Patate', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 0.90 } },
+                { id: 144, name: 'Zucchine', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ABBASCIÀ': 2.28 } },
+
+                // CONSUMABILI - Carne
+                { id: 145, name: 'Carne Trita 80/20', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 10.00 } },
+                { id: 146, name: 'Controfiletto Angus', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 33.15 } },
+                { id: 147, name: 'Coppa Maiale', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 4.80 } },
+                { id: 148, name: 'Cordon Bleu Pollo', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'MARR': 4.86 } },
+                { id: 149, name: 'Cosce Agnello', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'DE AMICIS': 17.01 } },
+                { id: 152, name: 'Hamburger Manzo', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'MARR': 8.40 } },
+                
+                // CONSUMABILI - Latticini & Pasta & Secchi
+                { id: 165, name: 'Albume d\'Uovo', cat: 'Consumabili', sub: 'Latticini', um: 'kg', prices: { 'MARR': 2.60 } },
+                { id: 166, name: 'Burro', cat: 'Consumabili', sub: 'Latticini', um: 'kg', prices: { 'MARR': 6.05 } },
+                { id: 172, name: 'Latte Intero UHT', cat: 'Consumabili', sub: 'Latticini', um: 'lt', prices: { 'METRO': 0.86 } },
+                { id: 177, name: 'Parmigiano 24M', cat: 'Consumabili', sub: 'Latticini', um: 'kg', prices: { 'MARR': 18.90 } },
+                { id: 181, name: 'Uova Intere (90 pz)', cat: 'Consumabili', sub: 'Latticini', um: 'cf', prices: { 'METRO': 16.24 } },
+                { id: 188, name: 'Linguine Felicetti', cat: 'Consumabili', sub: 'Pasta', um: '500g', prices: { 'GRANCHEF': 3.68 } },
+                { id: 191, name: 'Pasta Staff', cat: 'Consumabili', sub: 'Pasta', um: 'kg', prices: { 'METRO': 1.16 } },
+                { id: 193, name: 'Riso Carnaroli', cat: 'Consumabili', sub: 'Pasta', um: 'kg', prices: { 'METRO': 1.41 } },
+                { id: 196, name: 'Brandy', cat: 'Consumabili', sub: 'Secchi', um: 'bt', prices: { 'METRO': 5.00 } },
+                { id: 200, name: 'Colatura di Alici', cat: 'Consumabili', sub: 'Secchi', um: '100ml', prices: { 'MARR': 6.99 } },
+
+                // CLEANING
+                { id: 220, name: 'Sapone refill Arancia di Capri', cat: 'Cleaning', sub: 'Bagno', um: 'pz', prices: { 'ACQUA DI PARMA': 33.00 } },
+                { id: 225, name: 'Carta Igienica Clienti 56PZ', cat: 'Cleaning', sub: 'Bagno', um: 'cf', prices: { 'MARR': 0.27 } },
+                { id: 230, name: 'Detergente lavastoviglie 10L', cat: 'Cleaning', sub: 'Cucina', um: 'pz', prices: { 'METRO': 10.00 } },
+                { id: 232, name: 'Sapone piatti 5L', cat: 'Cleaning', sub: 'Cucina', um: 'pz', prices: { 'MARR': 5.00 } },
+                { id: 238, name: 'Detergente Bicchieri 12KG', cat: 'Cleaning', sub: 'Cucina', um: 'pz', prices: { 'WINTERHALTER': 75.00 } }
             ],
-            suppliers: [{ name: 'METRO', min: 150 }, { name: 'OROBICA', min: 250 }, { name: 'LINEA MARE', min: 200 }, { name: 'CARNI NOBILI', min: 150 }, { name: 'ORTOLANO', min: 100 }],
+            suppliers: [
+                { name: 'METRO', min: 150, currentTotal: 0, items: [] },
+                { name: 'OROBICA', min: 250, currentTotal: 0, items: [] },
+                { name: 'LINEA MARE', min: 200, currentTotal: 0, items: [] },
+                { name: 'REACH FOOD', min: 300, currentTotal: 0, items: [] },
+                { name: 'MARR', min: 200, currentTotal: 0, items: [] },
+                { name: 'ORTOLANO', min: 100, currentTotal: 0, items: [] },
+                { name: 'ABBASCIÀ', min: 100, currentTotal: 0, items: [] },
+                { name: 'FAST FRUIT', min: 100, currentTotal: 0, items: [] },
+                { name: 'ARRIGONI', min: 100, currentTotal: 0, items: [] },
+                { name: 'CARNI NOBILI', min: 150, currentTotal: 0, items: [] },
+                { name: 'DE AMICIS', min: 150, currentTotal: 0, items: [] },
+                { name: 'GRANCHEF', min: 150, currentTotal: 0, items: [] },
+                { name: 'ACQUA DI PARMA', min: 300, currentTotal: 0, items: [] },
+                { name: 'WINTERHALTER', min: 150, currentTotal: 0, items: [] },
+                { name: 'OYSTER OASIS', min: 150, currentTotal: 0, items: [] }
+            ],
             reparti: ['Cucina', 'Sala', 'Bar', 'Wine'],
-            inbox: [], archive: [], charts: {}
+            inbox: [], archive: [], pendingUpdates: {}, charts: {}
         };
 
+        // --- INTEGRAZIONE SERVER CLOUD (PYTHON SU RAILWAY) ---
         async function syncData() {
             try {
+                // Tenta il fetch dalla rotta server Python creata su Railway
                 const res = await fetch('/api/state');
-                const data = await res.json();
-                if(data.ok && data.state) { 
-                    appState = {...appState, ...data.state};
-                    appState.currentUser = document.getElementById('role-selector').value;
-                    refreshUI(); 
+                if (res.ok) {
+                    const data = await res.json();
+                    if(data.ok && data.state) {
+                        appState.products = data.state.products || appState.products;
+                        appState.suppliers = data.state.suppliers || appState.suppliers;
+                        appState.inbox = data.state.inbox || [];
+                        appState.archive = data.state.archive || [];
+                        if(data.state.settings) appState.settings = {...appState.settings, ...data.state.settings};
+                        document.getElementById('cloud-status').innerText = "Connesso e Sincronizzato";
+                        document.getElementById('cloud-status').className = "text-sm font-semibold text-emerald-300";
+                    }
                 }
-            } catch (e) { console.log("Offline mode"); }
+            } catch (e) {
+                console.log("Esecuzione locale offline. Nessun server rilevato.");
+                document.getElementById('cloud-status').innerText = "Modalità Locale (Offline)";
+                document.getElementById('cloud-status').className = "text-sm font-semibold text-amber-300";
+            }
+            applySettings();
         }
 
-        async function pushData() {
+        async function pushDataToServer() {
             try {
-                await fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: appState }) });
-            } catch (e) { }
+                await fetch('/api/state', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ state: { products: appState.products, suppliers: appState.suppliers, inbox: appState.inbox, archive: appState.archive, settings: appState.settings }})
+                });
+            } catch (e) { /* silent fail for offline usage */ }
         }
 
-        function switchView(id) {
-            document.querySelectorAll('.view-section').forEach(s => { s.style.display='none'; s.classList.remove('active','active-flex'); });
-            const target = document.getElementById(`view-${id}`);
-            if(target) { target.style.display = (id === 'department') ? 'flex' : 'block'; target.classList.add(id === 'department' ? 'active-flex' : 'active'); }
+        async function triggerEmailAlert(reqData) {
+            try {
+                await fetch('/api/notify', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'new_order', data: reqData })
+                });
+            } catch (e) { /* Server might not have email configured yet, ignore */ }
+        }
+
+        // --- SISTEMA NAVIGAZIONE STAGNA ---
+        function switchView(viewId) {
+            // Usa display:none !important per forzare l'invisibilità
+            document.querySelectorAll('.view-section').forEach(s => {
+                s.style.display = 'none';
+                s.classList.remove('active', 'active-flex');
+            });
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(id.toLowerCase().split('-')[0]));
-            if(btn) btn.classList.add('active');
-            refreshUI();
-        }
+            
+            const target = document.getElementById(`view-${viewId}`);
+            if (target) {
+                target.style.display = (viewId === 'department') ? 'flex' : 'block';
+                if(viewId === 'department') target.classList.add('active-flex');
+                else target.classList.add('active');
+            }
+            
+            const activeTab = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(viewId));
+            if(activeTab) activeTab.classList.add('active');
 
-        function refreshUI() {
-            renderDashboard(); renderCatalog(); renderArchive(); renderInbox(); renderConfig();
-            if(document.getElementById('view-reports').classList.contains('active')) { populateReportFilters(); initCharts(); }
+            if(viewId === 'dashboard') renderConsolidation();
+            if(viewId === 'reports') { populateReportFilters(); updateCharts(); }
+            if(viewId === 'config') renderConfig();
+            if(viewId === 'catalog') renderCatalogMgmt();
+            if(viewId === 'price-update') populateSupplierSelect();
+            if(viewId === 'archive') renderArchive();
+            if(viewId === 'inbox') renderInbox();
         }
 
         function handleRoleChange() {
             const role = document.getElementById('role-selector').value;
             appState.currentUser = role;
-            const s = document.getElementById('sidebar');
-            const h = document.getElementById('admin-header');
-            if(role === 'admin') { s.style.display='flex'; h.style.display='flex'; switchView('dashboard'); }
-            else { s.style.display='none'; h.style.display='none'; document.getElementById('dept-name-display').innerText=`Reparto: ${role}`; switchView('department'); }
-        }
-
-        async function submitOrder() {
-            const nome = document.getElementById('d-nome').value;
-            const testo = document.getElementById('d-text').value;
-            if(!nome || !testo) return alert("Inserisci dati.");
-            const btn = document.getElementById('btn-submit-order');
-            btn.innerText = "⏳ IA in corso..."; btn.disabled = true;
-            let aiData = null;
-            try {
-                const res = await fetch('/api/ai/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: testo, catalog: appState.products.map(p=>({id: p.id, name: p.name})) }) });
-                const data = await res.json();
-                if(data.ok) aiData = data.parsed;
-            } catch (e) {}
-            appState.inbox.push({ id: Date.now(), dept: appState.currentUser, staff: nome, date: new Date().toLocaleTimeString('it-IT'), text: testo, aiParsed: aiData });
-            await pushData();
-            document.getElementById('d-text').value = ''; alert("✓ Ordine Inviato.");
-            btn.innerText = "🚀 Invia Nuovo Ordine"; btn.disabled = false;
-        }
-
-        function renderInbox() {
-            const cont = document.getElementById('inbox-list');
-            document.getElementById('inbox-badge').innerText = appState.inbox.length;
-            document.getElementById('inbox-badge').style.display = appState.inbox.length ? 'block' : 'none';
-            cont.innerHTML = appState.inbox.map(req => {
-                const aiHtml = req.aiParsed ? req.aiParsed.items.map(i => {
-                    const p = appState.products.find(x => x.id == i.id);
-                    if(!p) return '';
-                    const best = getBest(p);
-                    return `<span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-[10px] font-black border border-emerald-200">${p.name} x${i.qty} (${best.sup}: €${best.price})</span>`;
-                }).join(' ') : '<span class="text-xs text-slate-400 italic">Attesa revisione.</span>';
-                return `<div class="glass-card p-6"><div class="flex justify-between items-start mb-4"><div><span class="bg-slate-100 px-2 py-1 rounded text-[10px] font-black uppercase">${req.dept}</span><p class="text-xs font-bold text-slate-500 mt-2">${req.staff} - ${req.date}</p></div><button onclick="deleteReq(${req.id})" class="text-rose-500 text-xs font-black">Rifiuta</button></div><p class="text-base italic mb-4 border-l-4 border-amber-400 pl-4">"${req.text}"</p><div class="bg-slate-50 p-4 rounded-xl mb-4"><span class="text-[9px] font-black uppercase text-slate-400 block mb-2">Match IA</span><div class="flex flex-wrap gap-2">${aiHtml}</div></div><button onclick="approveReq(${req.id})" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase">Approva</button></div>`;
-            }).join('') || '<p class="text-center py-10 font-bold text-slate-400">Nessun ordine.</p>';
-        }
-
-        function getBest(p) {
-            let best = { sup: 'N/D', price: Infinity };
-            for(const [s, pr] of Object.entries(p.prices)) { if(pr < best.price) { best.price = pr; best.sup = s; } }
-            return best;
-        }
-
-        async function approveReq(id) {
-            const req = appState.inbox.find(r => r.id === id);
-            let total = 0;
-            const items = req.aiParsed ? req.aiParsed.items.map(i => ({p: appState.products.find(x=>x.id == i.id), q: i.qty})) : [];
-            items.forEach(item => {
-                if(!item.p) return;
-                const best = getBest(item.p);
-                const sup = appState.suppliers.find(s => s.name === best.sup);
-                if(sup) { sup.currentTotal = (sup.currentTotal || 0) + (best.price * item.q); total += (best.price * item.q); }
-            });
-            appState.archive.unshift({ date: new Date().toLocaleDateString('it-IT'), requester: req.staff, dept: req.dept, text: req.text, cost: total });
-            appState.inbox = appState.inbox.filter(r => r.id !== id);
-            await pushData(); switchView('dashboard');
-        }
-
-        function deleteReq(id) { appState.inbox = appState.inbox.filter(r => r.id !== id); pushData(); renderInbox(); }
-
-        function renderDashboard() {
-            document.getElementById('kpi-pending').innerText = appState.inbox.length;
-            document.getElementById('kpi-saving').innerText = (appState.archive.reduce((s, a) => s + a.cost, 0) * 0.15).toFixed(2);
-            const grid = document.getElementById('consolidation-grid');
-            grid.innerHTML = appState.suppliers.map(s => {
-                const pct = Math.min(((s.currentTotal || 0) / s.min) * 100, 100);
-                return `<div class="p-6 rounded-2xl border bg-white shadow-sm"><div class="flex justify-between items-center mb-2"><span class="font-black uppercase text-[10px]">${s.name}</span><span class="text-sm font-black">€ ${(s.currentTotal || 0).toFixed(2)}</span></div><div class="w-full bg-slate-100 rounded-full h-1.5 mb-2"><div class="h-1.5 rounded-full ${pct < 100 ? 'bg-amber-400' : 'bg-emerald-500'}" style="width: ${pct}%"></div></div><p class="text-[9px] font-bold text-slate-400">Min: €${s.min}</p></div>`;
-            }).join('');
-        }
-
-        function renderCatalog() {
-            const term = document.getElementById('cat-search').value.toLowerCase();
-            const body = document.getElementById('cat-table-body');
-            body.innerHTML = appState.products.filter(p => p.name.toLowerCase().includes(term)).map(p => `<tr class="hover:bg-slate-50"><td class="px-6 py-4"><p class="font-bold text-sm">${p.name}</p><p class="text-[9px] font-black text-slate-400 uppercase mt-1">${p.cat}</p></td><td class="px-6 py-4 text-right flex flex-wrap justify-end gap-1">${Object.entries(p.prices).map(([s, pr]) => `<div class="bg-white border rounded-lg px-2 py-1 text-[10px] font-black">€${pr.toFixed(2)} <span class="text-slate-400">${s}</span></div>`).join('')}</td></tr>`).join('');
-        }
-
-        function renderArchive() {
-            document.getElementById('arc-table-body').innerHTML = appState.archive.map(a => `<tr class="hover:bg-slate-50"><td class="px-6 py-4 text-xs font-bold text-slate-500">${a.date}</td><td class="px-6 py-4"><span class="bg-slate-100 px-2 py-1 rounded text-[9px] font-black uppercase">${a.dept}</span><p class="text-[10px] font-bold mt-1">${a.requester}</p></td><td class="px-6 py-4 text-xs italic text-slate-600">"${a.text}"</td><td class="px-6 py-4 text-right font-black text-sm">€ ${a.cost.toFixed(2)}</td></tr>`).join('');
-        }
-
-        function switchCfg(id) {
-            document.querySelectorAll('.cfg-panel').forEach(p => p.classList.add('hidden'));
-            document.querySelectorAll('.config-sub-tab').forEach(b => b.classList.remove('active'));
-            document.getElementById(`cfg-sec-${id}`).classList.remove('hidden');
-            document.getElementById(`cfg-btn-${id}`).classList.add('active');
-            if(id === 'reparti') {
-                const ql = document.getElementById('cfg-qr-list');
-                ql.innerHTML = appState.reparti.map(r => `<div class="glass-card p-4 flex flex-col items-center gap-2"><div id="qr-${r}"></div><span class="text-[10px] font-black uppercase">${r}</span></div>`).join('');
-                appState.reparti.forEach(r => { new QRCode(document.getElementById(`qr-${r}`), { text: window.location.origin + "?reparto=" + r, width: 80, height: 80 }); });
+            const sidebar = document.getElementById('sidebar');
+            const adminHeader = document.getElementById('admin-header');
+            
+            if (role === 'admin') { 
+                sidebar.style.display = 'flex'; 
+                adminHeader.style.display = 'flex'; 
+                switchView('dashboard'); 
+            } else { 
+                sidebar.style.display = 'none'; 
+                adminHeader.style.display = 'none'; 
+                document.getElementById('dept-name-display').innerText = `Reparto: ${role}`;
+                switchView('department'); 
             }
         }
 
-        function initCharts() {
-            if(appState.charts.pie) appState.charts.pie.destroy();
-            const repData = appState.reparti.map(r => appState.archive.filter(a => a.dept === r).reduce((s, a) => s + a.cost, 0));
-            appState.charts.pie = new Chart(document.getElementById('chartPie'), { type: 'doughnut', data: { labels: appState.reparti, datasets: [{ data: repData.some(d=>d>0)?repData:[100,200,300,400], backgroundColor: ['#09121e', '#c5a059', '#1e3a5f', '#cbd5e1'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+        // --- INVIO ORDINE (LATO REPARTI) ---
+        async function submitDeptOrder() {
+            const n = document.getElementById('dept-nome').value;
+            const c = document.getElementById('dept-cognome').value;
+            const t = document.getElementById('dept-raw-text').value;
+            if(!n || !t) return alert("Inserisci il tuo Nome e la Lista prodotti.");
+            
+            const btn = document.getElementById('btn-submit-order');
+            btn.innerText = "⏳ IA in elaborazione..."; btn.disabled = true;
+
+            let aiResult = null;
+            try {
+                // Chiama la rotta Gemini sul server Python
+                const res = await fetch('/api/ai/parse', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: t, catalog: appState.products.map(p=>({id: p.id, name: p.name})) })
+                });
+                const data = await res.json();
+                if(data.ok && data.parsed) aiResult = data.parsed;
+            } catch (e) { console.log("AI Fallita o Server Offline."); }
+
+            const newReq = { id: Date.now(), dept: appState.currentUser, staff: `${n} ${c}`, date: new Date().toLocaleTimeString('it-IT'), text: t, aiParsed: aiResult };
+            appState.inbox.push(newReq);
+            
+            await pushDataToServer();
+            await triggerEmailAlert(newReq);
+
+            document.getElementById('dept-raw-text').value = ""; 
+            alert("✓ Ordine inviato all'ufficio acquisti."); 
+            btn.innerText = "🚀 Invia Nuovo Ordine"; btn.disabled = false;
+            handleRoleChange();
         }
 
-        document.addEventListener('DOMContentLoaded', () => { syncData(); handleRoleChange(); });
+        // --- GESTIONE INBOX ADMIN ---
+        function renderInbox() {
+            const container = document.getElementById('inbox-container');
+            document.getElementById('inbox-badge').innerText = appState.inbox.length;
+            document.getElementById('inbox-badge').style.display = appState.inbox.length > 0 ? 'block' : 'none';
+
+            container.innerHTML = appState.inbox.length === 0 ? 
+                '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine in attesa</div>' :
+                appState.inbox.map(req => {
+                    let aiHtml = '<span class="text-xs text-slate-400 italic">Analisi manuale richiesta. L\'IA non ha restituito risultati.</span>';
+                    if (req.aiParsed && req.aiParsed.items) {
+                        aiHtml = req.aiParsed.items.map(i => {
+                            const p = appState.products.find(x => x.id == i.id);
+                            if(!p) return '';
+                            const best = getBestSup(p);
+                            return `<span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-[10px] font-black border border-emerald-100">${p.name} x${i.qty} (${best.name}: €${best.price})</span>`;
+                        }).join(' ');
+                    }
+
+                    return `
+                    <div class="glass-card p-8 mb-4">
+                        <div class="flex justify-between items-center border-b pb-4 mb-4">
+                            <div><span class="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-[9px] font-black uppercase">${req.dept}</span><span class="ml-2 text-xs font-bold text-slate-500">${req.staff} - ${req.date}</span></div>
+                            <button onclick="deleteRequest(${req.id})" class="text-rose-500 font-bold text-xs">Rifiuta</button>
+                        </div>
+                        <p class="text-sm font-medium italic text-slate-700 mb-6">"${req.text}"</p>
+                        <div class="bg-slate-50 p-4 rounded-xl mb-6">
+                            <span class="text-[9px] font-black uppercase text-slate-400 block mb-2">Assegnazione Automatica IA</span>
+                            <div class="flex flex-wrap gap-2">${aiHtml}</div>
+                        </div>
+                        <button onclick="approveRequest(${req.id})" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva e Aggiorna Logistica</button>
+                    </div>`;
+                }).join('');
+        }
+
+        function getBestSup(p) {
+            let bestName = 'N/A'; let bestPrice = Infinity;
+            Object.entries(p.prices).forEach(([s, pr]) => { if(pr < bestPrice) { bestPrice = pr; bestName = s; } });
+            return { name: bestName, price: bestPrice };
+        }
+
+        async function approveRequest(id) {
+            const req = appState.inbox.find(r => r.id === id);
+            let cost = 0; let cats = new Set();
+            
+            const items = (req.aiParsed && req.aiParsed.items) ? req.aiParsed.items.map(i => ({ p: appState.products.find(x=>x.id == i.id), q: i.qty })).filter(x=>x.p)
+                        : appState.products.filter(p => req.text.toLowerCase().includes(p.name.toLowerCase().split(' ')[0])).map(p => ({p: p, q: 1}));
+
+            items.forEach(item => {
+                const best = getBestSup(item.p);
+                const supObj = appState.suppliers.find(s => s.name === best.name);
+                if(supObj) { supObj.currentTotal += (best.price * item.q); supObj.items.push(`${item.p.name} x${item.q}`); cost += (best.price * item.q); cats.add(item.p.cat); }
+            });
+
+            appState.archive.unshift({ date: new Date().toLocaleDateString('it-IT'), requester: req.staff, dept: req.dept, text: req.text, cost: cost, cat: Array.from(cats)[0] || 'Varie' });
+            appState.inbox = appState.inbox.filter(r => r.id !== id);
+            await pushDataToServer();
+            switchView('dashboard');
+        }
+
+        async function deleteRequest(id) { appState.inbox = appState.inbox.filter(r => r.id !== id); await pushDataToServer(); renderInbox(); }
+
+        // --- DASHBOARD ---
+        function renderConsolidation() {
+            const grid = document.getElementById('consolidation-grid');
+            const activeSuppliers = appState.suppliers.filter(s => s.currentTotal > 0 || ['METRO', 'OROBICA', 'LINEA MARE'].includes(s.name));
+            
+            grid.innerHTML = activeSuppliers.map(s => {
+                const isBelow = s.currentTotal < s.min && s.currentTotal > 0;
+                const pct = Math.min((s.currentTotal / s.min) * 100, 100) || 0;
+                const statusColor = isBelow ? 'border-amber-400 bg-amber-50/30' : (s.currentTotal > 0 ? 'border-emerald-400 bg-emerald-50/30' : 'border-slate-100 bg-white');
+                return `
+                <div class="p-6 rounded-2xl border-2 shadow-sm ${statusColor}">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-black uppercase text-[10px] tracking-widest">${s.name}</span>
+                        <span class="text-sm font-black">€${s.currentTotal.toFixed(2)}</span>
+                    </div>
+                    <div class="text-[9px] font-bold ${isBelow ? 'text-amber-700' : 'text-emerald-700'} mb-2">${isBelow ? 'Sotto soglia' : 'Soglia in linea'} (Min: €${s.min})</div>
+                    <div class="w-full bg-slate-200 rounded-full h-1.5 mb-4"><div class="h-1.5 rounded-full ${isBelow ? 'bg-amber-500' : 'bg-emerald-500'}" style="width: ${pct}%"></div></div>
+                    <div class="h-16 overflow-y-auto custom-scroll text-[9px] font-bold text-slate-500">${s.items.map(it => `• ${it}`).join('<br>') || 'Nessun prodotto'}</div>
+                </div>`;
+            }).join('');
+            
+            document.getElementById('kpi-pending-count').innerText = appState.inbox.length;
+            const saving = appState.archive.reduce((sum, a) => sum + (a.cost * 0.12), 0); // Simulazione saving 12%
+            document.getElementById('kpi-saving').innerText = saving.toFixed(2);
+        }
+
+        // --- REPORTISTICA ---
+        function populateReportFilters() {
+            document.getElementById('filter-reparto').innerHTML = '<option value="tutti">Tutti</option>' + appState.reparti.map(r => `<option value="${r}">${r}</option>`).join('');
+            const cats = [...new Set(appState.products.map(p => p.cat))];
+            document.getElementById('filter-categoria').innerHTML = '<option value="tutte">Tutte</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function toggleReportFilters() {
+            const level = document.getElementById('filter-level').value;
+            document.getElementById('filter-wrap-reparto').style.display = level === 'reparto' ? 'block' : 'none';
+            document.getElementById('filter-wrap-categoria').style.display = level === 'categoria' ? 'block' : 'none';
+        }
+
+        function updateCharts() {
+            if(appState.charts.trend) appState.charts.trend.destroy();
+            if(appState.charts.pie) appState.charts.pie.destroy();
+            const period = document.getElementById('filter-period').value;
+            const labels = period === 'mensile' ? ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4'] : ['Gen', 'Feb', 'Mar', 'Apr'];
+            const trendData = labels.map(() => Math.floor(Math.random() * 500) + 200); // Simulazione andamento storico
+            
+            const ctx1 = document.getElementById('analyticsTrendChart').getContext('2d');
+            appState.charts.trend = new Chart(ctx1, { type: 'line', data: { labels: labels, datasets: [{ data: trendData, borderColor: '#0a2540', tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: false } } });
+
+            const ctx2 = document.getElementById('analyticsPieChart').getContext('2d');
+            const repData = appState.reparti.map(r => appState.archive.filter(a => a.dept === r).reduce((s, a) => s + a.cost, 0));
+            const finalPieData = repData.some(d=>d>0) ? repData : [100, 200, 300, 150]; // Dati placeholder se archivio vuoto
+            appState.charts.pie = new Chart(ctx2, { type: 'doughnut', data: { labels: appState.reparti, datasets: [{ data: finalPieData, backgroundColor: ['#0a2540', '#c5a059', '#16406b', '#e2e8f0'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+        }
+
+        // --- CATALOGO E ARCHIVIO ---
+        function renderCatalogMgmt() {
+            const body = document.getElementById('catalog-table-body');
+            const s = (document.getElementById('catalog-mgmt-search')?.value || "").toLowerCase();
+            body.innerHTML = appState.products.filter(p => p.name.toLowerCase().includes(s)).map(p => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <p class="font-bold text-sm text-slate-900">${p.name}</p>
+                        <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-1">${p.cat} / ${p.sub || 'VARIE'}</p>
+                    </td>
+                    <td class="px-6 py-4 text-right flex flex-wrap justify-end gap-1">
+                        ${Object.entries(p.prices).map(([sup, pr]) => `<div class="bg-white border rounded-lg px-2 py-1 text-[9px] font-black uppercase shadow-sm">€${pr.toFixed(2)} <span class="text-[7px] text-slate-400 ml-1">${sup}</span></div>`).join('')}
+                    </td>
+                </tr>`).join('');
+        }
+
+        function renderArchive() {
+            const body = document.getElementById('archive-table-body');
+            body.innerHTML = appState.archive.length === 0 ? '<tr><td colspan="4" class="py-10 text-center opacity-30 font-black uppercase">Storico Vuoto</td></tr>' : appState.archive.map(ord => `
+                <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50">
+                    <td class="px-6 py-4 text-[10px] font-bold text-slate-500">${ord.date}</td>
+                    <td class="px-6 py-4">
+                        <span class="bg-indigo-50 text-indigo-900 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest block w-fit mb-1">${ord.dept}</span>
+                        <span class="text-[10px] font-bold text-slate-500">${ord.requester}</span>
+                    </td>
+                    <td class="px-6 py-4 text-xs font-medium text-slate-700 italic">"${ord.text}"</td>
+                    <td class="px-6 py-4 text-right font-black text-slate-900 text-sm">€ ${ord.cost.toFixed(2)}</td>
+                </tr>`).join('');
+        }
+
+        // --- CONFIGURAZIONE, EXCEL E UI ---
+        function switchConfigTab(tabId) {
+            document.querySelectorAll('.config-inner').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('.config-sub-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`config-sec-${tabId}`).classList.remove('hidden');
+            document.getElementById(`config-btn-${tabId}`).classList.add('active');
+            if(tabId === 'prodotti') renderConfigProducts();
+        }
+
+        function renderConfig() {
+            const supList = document.getElementById('config-sec-fornitori');
+            if(supList) {
+                supList.innerHTML = appState.suppliers.map(s => `
+                    <div class="glass-card p-6 flex justify-between items-center bg-slate-50/30">
+                        <div>
+                            <span class="text-xs font-black uppercase text-slate-800 tracking-widest">${s.name}</span>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Soglia: € ${s.min}</p>
+                        </div>
+                    </div>`).join('');
+            }
+
+            const qrGrid = document.getElementById('config-sec-reparti');
+            if(qrGrid) {
+                qrGrid.innerHTML = appState.reparti.map(r => `
+                    <div class="glass-card p-6 flex flex-col items-center gap-4 hover:border-amber-400 transition-all">
+                        <div id="qr-${r}" class="p-2 bg-white rounded-lg shadow-sm border"></div>
+                        <span class="text-[10px] font-black uppercase text-slate-900">${r}</span>
+                    </div>`).join('');
+                
+                setTimeout(() => {
+                    appState.reparti.forEach(r => {
+                        const el = document.getElementById(`qr-${r}`);
+                        if(el) {
+                            el.innerHTML = '';
+                            new QRCode(el, { text: `${window.location.origin}${window.location.pathname}?reparto=${encodeURIComponent(r)}`, width: 80, height: 80, colorDark : "#0a2540", colorLight : "#ffffff" });
+                        }
+                    });
+                }, 100);
+            }
+
+            document.getElementById('ui-set-brand').value = appState.settings.brandName || 'Sea Signora';
+        }
+
+        function renderConfigProducts() {
+            const body = document.getElementById('config-products-list');
+            if(body) {
+                body.innerHTML = appState.products.map(p => `
+                    <tr>
+                        <td class="px-6 py-3 font-bold text-slate-700 text-sm">${p.name}</td>
+                        <td class="px-6 py-3 text-[10px] uppercase font-black text-slate-400">${p.um}</td>
+                        <td class="px-6 py-3 text-right">
+                            <button onclick="removeProductFromMaster(${p.id})" class="text-rose-500 font-black text-[9px] uppercase tracking-widest">Elimina</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        async function processExcelImport() {
+            const lines = document.getElementById('excel-area').value.split('\n');
+            let count = 0;
+            lines.forEach(l => {
+                const parts = l.split(';').map(x => x.trim());
+                if(parts.length >= 5) {
+                    const [n, c, sub, u, p, s] = parts;
+                    if(n && u && p) {
+                        appState.products.push({ id: Date.now()+Math.random(), name: n, um: u, cat: c, sub: sub, prices: { [(s || 'METRO').toUpperCase()]: parseFloat(p.replace(',','.')) } });
+                        count++;
+                    }
+                }
+            });
+            document.getElementById('excel-area').value = ""; 
+            await pushDataToServer();
+            alert(`✓ Importati ${count} articoli nel database Master.`); 
+            renderConfigProducts();
+        }
+
+        async function addSingleProduct() {
+            const n = document.getElementById('ap-name').value;
+            const u = document.getElementById('ap-um').value;
+            if(!n || !u) return alert("Inserisci Nome Prodotto e Unità di Misura.");
+            appState.products.push({ id: Date.now(), name: n, um: u, cat: document.getElementById('ap-cat').value, sub: document.getElementById('ap-sub').value, prices: {} });
+            await pushDataToServer();
+            renderConfigProducts(); 
+            alert("✓ Prodotto salvato in anagrafica.");
+            document.getElementById('ap-name').value = "";
+        }
+
+        async function removeProductFromMaster(id) { 
+            appState.products = appState.products.filter(p => p.id !== id); 
+            await pushDataToServer();
+            renderConfigProducts(); 
+        }
+
+        function liveUI() {
+            const b = document.getElementById('ui-set-brand').value;
+            const c = document.getElementById('ui-set-color').value;
+            document.getElementById('ui-brand-name').innerText = b;
+            document.documentElement.style.setProperty('--brand-accent', c);
+            appState.settings.brandName = b;
+            appState.settings.accentColor = c;
+            pushDataToServer();
+        }
+
+        function toggleModule(id, val) {
+            const el = document.getElementById(id);
+            if(el) el.style.display = val;
+            appState.settings.hiddenModules[id] = val;
+            pushDataToServer();
+        }
+
+        // --- AGGIORNAMENTO FATTURA ---
+        function populateSupplierSelect() {
+            const sel = document.getElementById('update-supplier-select');
+            if(sel) sel.innerHTML = '<option value="">Fornitore...</option>' + appState.suppliers.map(x => `<option value="${x.name}">${x.name}</option>`).join('');
+        }
+
+        function renderPriceUpdateTable() {
+            const supplier = document.getElementById('update-supplier-select').value;
+            const body = document.getElementById('update-table-body');
+            if(!supplier) { body.innerHTML = ''; return; }
+
+            body.innerHTML = appState.products.filter(p => p.prices[supplier]).map(p => {
+                const old = p.prices[supplier];
+                const current = appState.pendingUpdates[`${p.id}-${supplier}`] || old;
+                return `
+                <tr>
+                    <td class="px-6 py-3 font-bold text-xs">${p.name} <span class="text-[9px] text-slate-400 block">${p.um}</span></td>
+                    <td class="px-6 py-3 text-center text-[10px] text-slate-400">€ ${old.toFixed(2)}</td>
+                    <td class="px-6 py-3 text-center"><input type="number" step="0.01" value="${current}" oninput="appState.pendingUpdates['${p.id}-${supplier}'] = parseFloat(this.value); renderPriceUpdateTable();" class="w-24 p-2 border rounded-lg text-xs font-bold text-center outline-none"></td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function saveInvoicePrices() {
+            let count = 0;
+            Object.entries(appState.pendingUpdates).forEach(([key, val]) => {
+                const [id, sup] = key.split('-');
+                const p = appState.products.find(x => x.id == id);
+                if(p) { p.prices[sup] = val; count++; }
+            });
+            appState.pendingUpdates = {};
+            await pushDataToServer();
+            alert(`✓ ${count} prezzi aggiornati nel Listino Master.`);
+            renderPriceUpdateTable();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => { 
+            // Setup iniziale vista
+            document.querySelectorAll('.view-section').forEach(s => { s.classList.remove('active', 'active-flex'); s.style.display = 'none'; });
+            document.getElementById('view-dashboard').style.display = 'block';
+            
+            // Check parametri URL per QR Code auto-login
+            const urlParams = new URLSearchParams(window.location.search);
+            const qrReparto = urlParams.get('reparto');
+            if(qrReparto && appState.reparti.includes(qrReparto)) {
+                document.getElementById('role-selector').value = qrReparto;
+            }
+
+            await syncData(); 
+            handleRoleChange();
+            
+            // Applica UI Settings salvati
+            if(appState.settings.accentColor) { document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor); }
+            if(appState.settings.brandName) { document.getElementById('ui-brand-name').innerText = appState.settings.brandName; }
+            Object.entries(appState.settings.hiddenModules || {}).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = val;
+            });
+        });
     </script>
 </body>
 </html>
