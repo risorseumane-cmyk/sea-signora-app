@@ -526,37 +526,34 @@ def get_gemini_response(prompt):
     """Urllib fallback direct for stability on Railway."""
     if not GEMINI_API_KEY: 
         print("Gemini API Key missing")
-        return None
+        return "Error: API Key missing"
     
-    # Try current recommended models and versions
-    endpoints = [
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
-    ]
+    # Use exact endpoint and model from user's Google Studio example
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
     
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    last_err = ""
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": GEMINI_API_KEY
+    }
     
-    for url in endpoints:
-        try:
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=30) as response:
-                res = json.loads(response.read().decode("utf-8"))
-                return res['candidates'][0]['content']['parts'][0]['text']
-        except urllib.error.HTTPError as e:
-            err_msg = e.read().decode('utf-8')
-            print(f"Gemini API Error ({url.split('/')[-2]}): {e.code} - {err_msg}")
-            last_err = f"HTTP {e.code}: {err_msg}"
-            continue
-        except Exception as e:
-            print(f"Gemini Error ({url.split('/')[-2]}): {e}")
-            last_err = f"Error: {str(e)}"
-            continue
-            
-    print(f"Gemini Fallback Failed. Last error: {last_err}")
-    return last_err # Return error message instead of None for diagnostics
+    try:
+        req = urllib.request.Request(
+            f"{url}?key={GEMINI_API_KEY}", # Key can be in URL or Header, using both for safety
+            data=json.dumps(payload).encode("utf-8"), 
+            headers=headers, 
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as response:
+            res = json.loads(response.read().decode("utf-8"))
+            return res['candidates'][0]['content']['parts'][0]['text']
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode('utf-8')
+        print(f"Gemini API Error: {e.code} - {err_msg}")
+        return f"HTTP {e.code}: {err_msg}"
+    except Exception as e:
+        print(f"Gemini Error: {e}")
+        return f"Error: {str(e)}"
 
 print("Backend booting... Checking DB and environment...")
 init_db()

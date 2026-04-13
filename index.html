@@ -428,6 +428,12 @@
             else if(axisY === 'prod') yLabels = appState.products.slice(0, 30).map(p => p.name);
             else if(axisY === 'sup') yLabels = appState.suppliers.map(s => s.name);
             
+            // Dati demo se l'archivio è vuoto per mostrare che funziona
+            const effectiveArchive = appState.archive.length > 0 ? appState.archive : [
+                { dept: 'Cucina', total: 450, text: 'Aragosta', items: [{ name: 'Aragosta Viva', supplier: 'METRO', cat: 'Ittico' }] },
+                { dept: 'Bar', total: 120, text: 'Gin', items: [{ name: 'Gin Tonic', supplier: 'N/D', cat: 'Spirits' }] }
+            ];
+
             let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="p-2 border-b"></th>`;
             xLabels.forEach(x => { html += `<th class="p-2 text-[8px] font-black uppercase text-slate-400 text-center border-b border-l">${x}</th>`; });
             html += `</tr></thead><tbody>`;
@@ -436,26 +442,18 @@
                 html += `<tr><td class="p-2 text-[9px] font-bold text-slate-500 border-b uppercase max-w-[120px] truncate">${y}</td>`;
                 xLabels.forEach(x => {
                     let total = 0;
-                    appState.archive.forEach(a => {
+                    effectiveArchive.forEach(a => {
                         let matchX = false;
                         let matchY = false;
                         
-                        // Logica di match per asse X
                         if(axisX === 'dept' && a.dept === x) matchX = true;
                         else if(axisX === 'sup' && (a.items || []).some(i => i.supplier === x)) matchX = true;
-                        else if(axisX === 'cat' && (a.items || []).some(i => (appState.products.find(p => p.name === i.name)?.cat || 'Vario') === x)) matchX = true;
+                        else if(axisX === 'cat' && (a.items || []).some(i => (i.cat === x || (appState.products.find(p => p.name === i.name)?.cat === x)))) matchX = true;
                         
-                        // Logica di match per asse Y
-                        if(axisY === 'cat' && (a.items || []).some(i => (appState.products.find(p => p.name === i.name)?.cat || 'Vario') === y)) matchY = true;
+                        if(axisY === 'cat' && (a.items || []).some(i => (i.cat === y || (appState.products.find(p => p.name === i.name)?.cat === y)))) matchY = true;
                         else if(axisY === 'prod' && (a.items || []).some(i => i.name === y)) matchY = true;
                         else if(axisY === 'sup' && (a.items || []).some(i => i.supplier === y)) matchY = true;
                         
-                        // Se non ci sono "items" (vecchi ordini), prova match testuale
-                        if(!a.items && a.text) {
-                            if(axisY === 'cat' && a.text.toLowerCase().includes(y.toLowerCase())) matchY = true;
-                            if(axisX === 'dept' && a.dept === x) matchX = true;
-                        }
-
                         if(matchX && matchY) total += (a.total || 0);
                     });
                     
@@ -466,7 +464,8 @@
             });
             
             html += `</tbody></table>`;
-            wrap.innerHTML = html || '<p class="text-center py-10 text-xs text-slate-400 font-bold uppercase">Nessun dato disponibile</p>';
+            if(appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Dati Demo (Archivio Reale Vuoto)</p>`;
+            wrap.innerHTML = html;
         }
 
         async function askAI() {
