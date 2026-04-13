@@ -298,22 +298,25 @@
 
     <script>
         let appState = {
-            settings: { brand: 'Sea Signora', color: '#c5a059' },
+            settings: { brandName: 'Sea Signora', color: '#c5a059', homeTitle: 'Corporate Home' },
             products: [],
             suppliers: [],
             reparti: ['Cucina','Sala','Bar','Wine'],
-            inbox: [], archive: [], charts: {}
+            inbox: [], archive: []
         };
+        let charts = {}; // Spostato fuori da appState per permettere il salvataggio JSON
 
+        let isPushing = false;
         async function sync() {
+            if(isPushing) return; // Non sincronizzare se stiamo salvando
             const status = document.getElementById('save-status');
             try {
                 const res = await fetch('/api/state');
                 if(!res.ok) throw new Error("Server non raggiungibile");
                 const d = await res.json();
                 if(d.ok && d.state) { 
-                    // Uniamo lo stato locale con quello del server, dando priorità al server
-                    // ma mantenendo eventuali reparti predefiniti se mancanti
+                    // Se siamo admin e ci sono modifiche locali non salvate, potremmo volerle preservare
+                    // Ma per ora, assumiamo che il server sia la fonte della verità
                     appState = {
                         ...appState,
                         ...d.state,
@@ -333,8 +336,13 @@
         }
 
         async function push() {
+            isPushing = true;
             const status = document.getElementById('save-status');
-            if(status) status.classList.remove('hidden');
+            if(status) {
+                status.innerText = "Sincronizzazione...";
+                status.classList.replace('bg-rose-500', 'bg-emerald-500');
+                status.classList.remove('hidden');
+            }
             
             try {
                 const res = await fetch('/api/state', { 
@@ -344,18 +352,18 @@
                 });
                 if(!res.ok) throw new Error("Salvataggio fallito.");
                 console.log("State pushed successfully.");
+                if(status) {
+                    status.innerText = "SALVATO";
+                    setTimeout(() => status.classList.add('hidden'), 2000);
+                }
             } catch(e) {
                 console.error("Push error:", e);
                 if(status) {
                     status.innerText = "ERRORE SALVATAGGIO";
                     status.classList.replace('bg-emerald-500', 'bg-rose-500');
-                    setTimeout(() => {
-                        status.innerText = "Sincronizzazione...";
-                        status.classList.replace('bg-rose-500', 'bg-emerald-500');
-                    }, 3000);
                 }
             } finally {
-                if(status) setTimeout(() => status.classList.add('hidden'), 1000);
+                isPushing = false;
             }
         }
 
@@ -439,14 +447,17 @@
         function populateTrendFilters() {
             const catSel = document.getElementById('trend-filter-cat');
             const prodSel = document.getElementById('trend-filter-prod');
-            if(!catSel.options.length) {
-                const cats = [...new Set(appState.products.map(p => p.cat))];
-                catSel.innerHTML = '<option value="">Tutte le Categorie</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-            }
-            if(!prodSel.options.length) {
-                const prods = appState.products.slice(0, 50); // Mostriamo solo i primi 50 per ora
-                prodSel.innerHTML = '<option value="">Tutti i Prodotti</option>' + prods.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-            }
+            
+            const currentCat = catSel.value;
+            const currentProd = prodSel.value;
+
+            const cats = [...new Set(appState.products.map(p => p.cat))];
+            catSel.innerHTML = '<option value="">Tutte le Categorie</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            catSel.value = currentCat;
+
+            const prods = appState.products.slice(0, 100); 
+            prodSel.innerHTML = '<option value="">Tutti i Prodotti</option>' + prods.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            prodSel.value = currentProd;
         }
 
         function renderTrends() {
@@ -1003,7 +1014,7 @@
         }
 
         function initCharts() {
-            if(appState.charts.pie) appState.charts.pie.destroy();
+            if(charts.pie) charts.pie.destroy();
             const ctx = document.getElementById('chartPie').getContext('2d');
             const period = document.getElementById('trend-period').value;
             
@@ -1018,12 +1029,12 @@
             const deptTotals = appState.reparti.map(r => {
                 return filteredArchive
                     .filter(a => a.dept === r)
-                    .reduce((s,a) => s + a.total, 0);
+                    .reduce((s,a) => s + (a.total || 0), 0);
             });
             
             const colors = ['#09121e', appState.settings.color || '#c5a059', '#1e3a5f', '#cbd5e1', '#94a3b8'];
 
-            appState.charts.pie = new Chart(ctx, { 
+            charts.pie = new Chart(ctx, { 
                 type: 'doughnut', 
                 data: { 
                     labels: appState.reparti, 
@@ -1053,7 +1064,7 @@
             const period = document.getElementById('trend-period').value;
             const ctx = document.getElementById('chartGaussian').getContext('2d');
             
-            if(appState.charts.gaussian) appState.charts.gaussian.destroy();
+            if(charts.gaussian) charts.gaussian.destroy();
             
             let labels = [];
             let data = [];
@@ -1104,7 +1115,7 @@
                 else data = labels.map(() => Math.floor(Math.random() * 800) + 200);
             }
 
-            appState.charts.gaussian = new Chart(ctx, {
+            charts.gaussian = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -1142,7 +1153,9 @@
 
         function populateSupplierSelect() {
             const s = document.getElementById('update-supplier-select');
+            const current = s.value;
             s.innerHTML = '<option value="">Seleziona Fornitore...</option>' + appState.suppliers.map(x => `<option value="${x.name}">${x.name}</option>`).join('');
+            s.value = current;
         }
 
         function renderPriceUpdateTable() {
