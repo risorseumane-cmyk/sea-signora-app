@@ -77,15 +77,43 @@ def init_db():
             conn.commit()
         else:
             row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
-            if row:
-                state = json.loads(row["state"])
-                state.setdefault("seedVersion", "brand_v1")
-                state.setdefault("seededAt", datetime.now().isoformat())
-                state.setdefault("settings", {})
-                for k, v in default_settings.items():
-                    state["settings"].setdefault(k, v)
-                conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+            if not row:
+                # Tabella popolata ma manca la riga id=1: ricrea in modo sicuro
+                default_state = {
+                    "seedVersion": "brand_v1",
+                    "seededAt": datetime.now().isoformat(),
+                    "settings": default_settings,
+                    "products": [],
+                    "suppliers": [],
+                    "reparti": ["Cucina", "Sala", "Bar", "Wine"],
+                    "inbox": [],
+                    "archive": []
+                }
+                conn.execute("INSERT INTO app_state (id, state) VALUES (1, ?)", (json.dumps(default_state),))
                 conn.commit()
+                return
+
+            state = json.loads(row["state"])
+            state.setdefault("seedVersion", "brand_v1")
+            state.setdefault("seededAt", datetime.now().isoformat())
+
+            settings = state.get("settings") or {}
+            # Migrazione legacy: settings.brand -> settings.brandName
+            if "brandName" not in settings and "brand" in settings and isinstance(settings["brand"], str):
+                settings["brandName"] = settings["brand"]
+
+            # Default non distruttivi (mantiene i valori già impostati)
+            for k, v in default_settings.items():
+                if k == "homeCards":
+                    current_cards = settings.get("homeCards") or {}
+                    merged_cards = {**default_settings["homeCards"], **current_cards}
+                    settings["homeCards"] = merged_cards
+                else:
+                    settings.setdefault(k, v)
+
+            state["settings"] = settings
+            conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+            conn.commit()
 
 init_db()
 
