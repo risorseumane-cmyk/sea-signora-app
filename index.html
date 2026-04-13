@@ -108,6 +108,10 @@
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <h4 class="font-black uppercase text-xs text-slate-400">Heatmap Dinamica: Analisi Intensità</h4>
                         <div class="flex flex-wrap gap-2">
+                            <select id="heatmap-data" onchange="renderHeatmap()" class="p-2 bg-amber-50 border-amber-200 border rounded-lg text-[10px] font-black uppercase outline-none">
+                                <option value="orders">Spesa (Archivio)</option>
+                                <option value="catalog">Catalogo (Prezzi)</option>
+                            </select>
                             <select id="heatmap-y" onchange="renderHeatmap()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
                                 <option value="cat">Categoria</option>
                                 <option value="prod">Prodotto</option>
@@ -224,10 +228,10 @@
 
             <div class="fixed bottom-5 right-5 z-[100]">
                 <div id="ai-panel" class="hidden w-80 bg-white border shadow-2xl rounded-3xl overflow-hidden mb-4 animate-in slide-in-from-bottom-4">
-                    <div class="p-4 bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest flex justify-between"><span>Gemini Assistant</span><button onclick="document.getElementById('ai-panel').classList.add('hidden')">×</button></div>
+                    <div class="p-4 bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest flex justify-between"><span>Sea Signora Assistant</span><button onclick="document.getElementById('ai-panel').classList.add('hidden')">×</button></div>
                     <div class="p-5 space-y-4">
                         <textarea id="chat-q" class="w-full p-3 border rounded-xl text-xs outline-none focus:ring-1 focus:ring-slate-900" placeholder="Chiedimi aiuto..."></textarea>
-                        <button onclick="askAI()" id="chat-btn" class="w-full bg-slate-900 text-white py-2 rounded-xl text-[10px] font-black uppercase">Chiedi a Gemini</button>
+                        <button onclick="askAI()" id="chat-btn" class="w-full bg-slate-900 text-white py-2 rounded-xl text-[10px] font-black uppercase">Chiedi all'Assistente</button>
                         <div id="chat-a" class="p-3 bg-slate-50 rounded-xl text-xs border hidden italic"></div>
                     </div>
                 </div>
@@ -416,6 +420,7 @@
             
             const axisX = document.getElementById('heatmap-x').value;
             const axisY = document.getElementById('heatmap-y').value;
+            const dataSource = document.getElementById('heatmap-data').value;
             
             let xLabels = [];
             let yLabels = [];
@@ -428,12 +433,6 @@
             else if(axisY === 'prod') yLabels = appState.products.slice(0, 30).map(p => p.name);
             else if(axisY === 'sup') yLabels = appState.suppliers.map(s => s.name);
             
-            // Dati demo se l'archivio è vuoto per mostrare che funziona
-            const effectiveArchive = appState.archive.length > 0 ? appState.archive : [
-                { dept: 'Cucina', total: 450, text: 'Aragosta', items: [{ name: 'Aragosta Viva', supplier: 'METRO', cat: 'Ittico', qty: 2 }] },
-                { dept: 'Bar', total: 120, text: 'Gin', items: [{ name: 'Gin Tonic', supplier: 'N/D', cat: 'Spirits', qty: 10 }] }
-            ];
-
             let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="p-2 border-b"></th>`;
             xLabels.forEach(x => { html += `<th class="p-2 text-[8px] font-black uppercase text-slate-400 text-center border-b border-l">${x}</th>`; });
             html += `</tr></thead><tbody>`;
@@ -441,45 +440,58 @@
             yLabels.forEach(y => {
                 html += `<tr><td class="p-2 text-[9px] font-bold text-slate-500 border-b uppercase max-w-[120px] truncate">${y}</td>`;
                 xLabels.forEach(x => {
-                    let total = 0;
-                    effectiveArchive.forEach(a => {
-                        let matchX = false;
-                        let matchY = false;
-                        
-                        // Calcola il totale dell'ordine basato sui prezzi del catalogo master
-                        let orderTotalFromMaster = 0;
-                        (a.items || []).forEach(item => {
-                            const masterProduct = appState.products.find(p => p.name === item.name || p.id == item.productId);
-                            if(masterProduct) {
-                                // Trova il miglior prezzo nel catalogo master
-                                const bestPrice = Math.min(...Object.values(masterProduct.prices));
-                                const itemTotal = bestPrice * (item.qty || 1);
-                                orderTotalFromMaster += itemTotal;
-
-                                // Verifica match per asse X/Y basato sul prodotto master
-                                if(axisX === 'sup' && item.supplier === x) matchX = true;
-                                if(axisX === 'cat' && masterProduct.cat === x) matchX = true;
-                                if(axisY === 'cat' && masterProduct.cat === y) matchY = true;
-                                if(axisY === 'prod' && masterProduct.name === y) matchY = true;
-                                if(axisY === 'sup' && item.supplier === y) matchY = true;
-                            }
-                        });
-
-                        if(axisX === 'dept' && a.dept === x) matchX = true;
-
-                        if(matchX && matchY) {
-                            total += (orderTotalFromMaster || a.total || 0);
-                        }
-                    });
+                    let value = 0;
                     
-                    const intensity = total > 500 ? 'bg-amber-600 text-white' : (total > 100 ? 'bg-amber-400 text-white' : (total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
-                    html += `<td class="p-1 border-b border-l"><div class="heatmap-cell ${intensity} transition-all">€${total.toFixed(0)}</div></td>`;
+                    if(dataSource === 'orders') {
+                        // Dati da Archivio (Spesa Totale)
+                        const effectiveArchive = appState.archive.length > 0 ? appState.archive : [
+                            { dept: 'Cucina', total: 450, text: 'Aragosta', items: [{ name: 'Aragosta Viva', supplier: 'METRO', cat: 'Ittico', qty: 2 }] },
+                            { dept: 'Bar', total: 120, text: 'Gin', items: [{ name: 'Gin Tonic', supplier: 'N/D', cat: 'Spirits', qty: 10 }] }
+                        ];
+                        
+                        effectiveArchive.forEach(a => {
+                            let matchX = false; let matchY = false;
+                            let orderTotalFromMaster = 0;
+                            (a.items || []).forEach(item => {
+                                const masterProduct = appState.products.find(p => p.name === item.name || p.id == item.productId);
+                                if(masterProduct) {
+                                    const bestPrice = Math.min(...Object.values(masterProduct.prices));
+                                    orderTotalFromMaster += bestPrice * (item.qty || 1);
+                                    if(axisX === 'sup' && item.supplier === x) matchX = true;
+                                    if(axisX === 'cat' && masterProduct.cat === x) matchX = true;
+                                    if(axisY === 'cat' && masterProduct.cat === y) matchY = true;
+                                    if(axisY === 'prod' && masterProduct.name === y) matchY = true;
+                                    if(axisY === 'sup' && item.supplier === y) matchY = true;
+                                }
+                            });
+                            if(axisX === 'dept' && a.dept === x) matchX = true;
+                            if(matchX && matchY) value += (orderTotalFromMaster || a.total || 0);
+                        });
+                    } else {
+                        // Dati da Catalogo (Prezzi Master)
+                        if(axisY === 'prod') {
+                            const product = appState.products.find(p => p.name === y);
+                            if(product) {
+                                if(axisX === 'sup') value = product.prices[x] || 0;
+                                else if(axisX === 'cat' && product.cat === x) value = Math.min(...Object.values(product.prices));
+                                else if(axisX === 'dept') value = Math.min(...Object.values(product.prices)); // Prezzo per quel reparto (comune)
+                            }
+                        } else if(axisY === 'cat') {
+                            const catProducts = appState.products.filter(p => p.cat === y);
+                            if(axisX === 'sup') value = catProducts.reduce((s, p) => s + (p.prices[x] || 0), 0) / (catProducts.filter(p => p.prices[x]).length || 1); // Media prezzi
+                            else if(axisX === 'cat' && x === y) value = catProducts.reduce((s, p) => s + Math.min(...Object.values(p.prices)), 0);
+                        }
+                    }
+                    
+                    const intensity = value > 100 ? 'bg-amber-600 text-white' : (value > 50 ? 'bg-amber-400 text-white' : (value > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
+                    const displayVal = dataSource === 'orders' ? `€${value.toFixed(0)}` : `€${value.toFixed(1)}`;
+                    html += `<td class="p-1 border-b border-l"><div class="heatmap-cell ${intensity} transition-all">${displayVal}</div></td>`;
                 });
                 html += `</tr>`;
             });
             
             html += `</tbody></table>`;
-            if(appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Dati Demo basati su Catalogo Master</p>`;
+            if(dataSource === 'orders' && appState.archive.length === 0) html += `<p class="text-[8px] text-center text-amber-600 font-bold mt-2 uppercase">Dati Demo basati su Catalogo Master</p>`;
             wrap.innerHTML = html;
         }
 
@@ -809,54 +821,51 @@
             
             let labels = [];
             let data = [];
+            const now = new Date();
 
             if(period == "7") {
                 labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-                data = labels.map(() => Math.floor(Math.random() * 50) + 10);
+                data = new Array(7).fill(0);
             } else if(period == "30") {
                 labels = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4'];
-                data = labels.map(() => Math.floor(Math.random() * 200) + 50);
+                data = new Array(4).fill(0);
             } else {
                 labels = ['Mese 1', 'Mese 2', 'Mese 3'];
-                data = labels.map(() => Math.floor(Math.random() * 800) + 200);
+                data = new Array(3).fill(0);
             }
             
-            // Se ci sono dati reali nell'archivio, sovrascrivi i placeholder
-            if(appState.archive.length > 0) {
-                const now = new Date();
-                const filtered = appState.archive.filter(a => {
-                    const matchCat = !cat || (a.items || []).some(i => i.cat === cat);
-                    const matchProd = !prodId || (a.items || []).some(i => i.productId == prodId);
-                    const orderDate = new Date(a.date.split('/').reverse().join('-'));
-                    const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
-                    return matchCat && matchProd && diffDays <= parseInt(period);
-                });
+            // Se ci sono dati reali nell'archivio, usali
+            const filtered = appState.archive.filter(a => {
+                const matchCat = !cat || (a.items || []).some(i => i.cat === cat);
+                const matchProd = !prodId || (a.items || []).some(i => i.productId == prodId);
+                const orderDate = new Date(a.date.split('/').reverse().join('-'));
+                const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+                return matchCat && matchProd && diffDays <= parseInt(period);
+            });
 
-                if(filtered.length > 0) {
-                    if(period == "7") {
-                        // Raggruppa per giorno (0-6)
-                        data = new Array(7).fill(0);
-                        filtered.forEach(a => {
-                            const d = new Date(a.date.split('/').reverse().join('-')).getDay();
-                            data[d === 0 ? 6 : d-1] += a.total;
-                        });
-                    } else if(period == "30") {
-                        // Raggruppa per 4 settimane
-                        data = new Array(4).fill(0);
-                        filtered.forEach(a => {
-                            const diff = Math.floor((now - new Date(a.date.split('/').reverse().join('-'))) / (1000*60*60*24*7));
-                            if(diff < 4) data[3-diff] += a.total;
-                        });
-                    } else {
-                        // Raggruppa per 3 mesi
-                        data = new Array(3).fill(0);
-                        filtered.forEach(a => {
-                            const m = new Date(a.date.split('/').reverse().join('-')).getMonth();
-                            const diff = (now.getMonth() - m + 12) % 12;
-                            if(diff < 3) data[2-diff] += a.total;
-                        });
-                    }
+            if(filtered.length > 0) {
+                if(period == "7") {
+                    filtered.forEach(a => {
+                        const d = new Date(a.date.split('/').reverse().join('-')).getDay();
+                        data[d === 0 ? 6 : d-1] += a.total;
+                    });
+                } else if(period == "30") {
+                    filtered.forEach(a => {
+                        const diff = Math.floor((now - new Date(a.date.split('/').reverse().join('-'))) / (1000*60*60*24*7));
+                        if(diff < 4) data[3-diff] += a.total;
+                    });
+                } else {
+                    filtered.forEach(a => {
+                        const m = new Date(a.date.split('/').reverse().join('-')).getMonth();
+                        const diff = (now.getMonth() - m + 12) % 12;
+                        if(diff < 3) data[2-diff] += a.total;
+                    });
                 }
+            } else {
+                // Demo data se archivio vuoto
+                if(period == "7") data = labels.map(() => Math.floor(Math.random() * 50) + 10);
+                else if(period == "30") data = labels.map(() => Math.floor(Math.random() * 200) + 50);
+                else data = labels.map(() => Math.floor(Math.random() * 800) + 200);
             }
 
             appState.charts.gaussian = new Chart(ctx, {
