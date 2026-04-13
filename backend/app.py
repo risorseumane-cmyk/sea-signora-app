@@ -19,6 +19,12 @@ FRONTEND_FILE = BASE_DIR.parent / "index.html"
 # Chiavi e Configurazione
 raw_key = os.getenv("GEMINI_API_KEY", "").replace('"', '').replace("'", "").strip()
 GEMINI_API_KEY = raw_key or "AIzaSyB1onn5YUyBbgAJEd7jxqq5lol3myLpNsg"
+
+print(f"--- SERVER STARTUP ---")
+print(f"BASE_DIR: {BASE_DIR}")
+print(f"DB_PATH: {DB_PATH}")
+print(f"FRONTEND_FILE: {FRONTEND_FILE} (exists: {FRONTEND_FILE.exists()})")
+print(f"GEMINI_API_KEY length: {len(GEMINI_API_KEY) if GEMINI_API_KEY else 0}")
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
