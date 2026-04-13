@@ -8,37 +8,32 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
         
         :root {
-            --brand-blue: #10233f;
-            --brand-accent: #b9954f;
-            --brand-light: #f3f6fb;
-            --brand-slate: #334155;
+            --brand-blue: #09121e;
+            --brand-accent: #c5a059;
+            --brand-light: #f4f7fb;
         }
 
         body { font-family: 'Inter', sans-serif; background-color: var(--brand-light); color: #1e293b; }
+        .logo-text { font-family: 'Playfair Display', serif; }
+        .chart-container { position: relative; width: 100%; height: 300px; }
         
-        .chart-container { position: relative; width: 100%; height: 320px; }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
-
-        /* Gestione visualizzazioni */
-        .view-section { display: none; }
-        .view-section.active { display: block; }
-        .view-section.active-flex { display: flex; }
+        /* Navigazione stagna: nasconde fisicamente le sezioni non attive */
+        .view-section { display: none !important; }
+        .view-section.active { display: block !important; }
+        .view-section.active-flex { display: flex !important; }
         
-        .tab-btn { transition: all 0.2s ease; border-radius: 12px; border: 1px solid transparent; letter-spacing: 0.01em; }
-        .tab-btn:hover { border-color: #dbe3ee; background: #f8fafc; }
-        .tab-btn.active { background-color: var(--brand-blue); color: white; box-shadow: 0 12px 24px -10px rgba(16, 35, 63, 0.45); }
+        .tab-btn { transition: all 0.2s ease; border-radius: 10px; cursor: pointer; }
+        .tab-btn.active { background-color: var(--brand-blue); color: white; box-shadow: 0 4px 10px rgba(9, 18, 30, 0.3); }
 
-        .glass-card { background: white; border: 1px solid rgba(226, 232, 240, 0.95); box-shadow: 0 12px 30px -18px rgba(15, 23, 42, 0.35); border-radius: 20px; }
-        .premium-input { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; outline: none; transition: border-color 0.2s; }
-        .premium-input:focus { border-color: var(--brand-accent); }
-        .brand-gradient { background: linear-gradient(135deg, var(--brand-blue) 0%, #1c3a66 100%); }
-        .config-sub-tab { border-bottom: 3px solid transparent; cursor: pointer; padding: 10px 15px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; }
+        .glass-card { background: white; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); border-radius: 20px; }
+        .brand-gradient { background: linear-gradient(135deg, #09121e 0%, #1e3a5f 100%); }
+        .input-style { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; outline: none; transition: border-color 0.2s; width: 100%; font-size: 0.875rem; }
+        .input-style:focus { border-color: var(--brand-accent); }
+        .config-sub-tab { border-bottom: 2px solid transparent; padding: 10px 15px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; cursor: pointer; }
         .config-sub-tab.active { border-color: var(--brand-accent); color: var(--brand-blue); }
-        .corp-eyebrow { color: #64748b; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; font-size: 10px; }
     </style>
 </head>
 <body class="antialiased">
@@ -46,2857 +41,319 @@
     <div class="min-h-screen flex flex-col md:flex-row">
         
         <aside id="sidebar" class="w-full md:w-72 bg-white border-r border-slate-200 p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-50">
-            <div class="flex flex-col items-center gap-4 py-4 border-b pb-8">
-                <div class="w-40 bg-black rounded-2xl flex items-center justify-center shadow-xl border border-slate-200 overflow-hidden p-2">
-                    <img src="assets/logo-sea-signora.png" alt="Sea Signora Milano" class="w-full h-full object-contain">
+            <div class="flex flex-col items-center gap-3 py-2 border-b pb-6">
+                <div class="w-24 h-16 bg-black rounded-xl flex flex-col items-center justify-center text-white shadow-lg border border-slate-800">
+                    <span class="logo-text text-xl leading-none italic">Sea,</span>
+                    <span class="logo-text text-sm font-bold tracking-widest leading-none">SIGNORA</span>
                 </div>
                 <div class="text-center">
                     <h1 id="ui-brand-name" class="text-base font-black tracking-widest uppercase">Sea Signora</h1>
-                    <p class="text-[9px] font-bold text-amber-600 uppercase tracking-[0.3em]">Milano</p>
+                    <p id="ui-brand-sub" class="text-[9px] font-bold text-amber-600 uppercase tracking-[0.3em]">Milano</p>
                 </div>
             </div>
 
-            <nav id="admin-nav" class="flex flex-col gap-1">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">Monitoraggio</p>
-                <button onclick="switchView('home')" class="tab-btn active flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">Home</button>
-                <button onclick="switchView('dashboard')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">KPI Logistica</button>
-                <button onclick="switchView('reports')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">Report Analitici</button>
+            <nav class="flex flex-col gap-1">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Intelligence</p>
+                <button onclick="switchView('dashboard')" class="tab-btn active flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📊 KPI Logistica</button>
+                <button onclick="switchView('reports')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📈 Report Analitici</button>
                 
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 mt-4">Gestione</p>
-                <button onclick="switchView('price-update')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">Aggiorna Fatture</button>
-                <button onclick="switchView('inbox')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500 relative">
-                    Inbox Ordini <span id="inbox-badge" class="absolute right-4 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden">0</span>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 mt-4">Gestione</p>
+                <button onclick="switchView('price-update')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">🧾 Aggiorna Fatture</button>
+                <button onclick="switchView('inbox')" class="tab-btn flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-600">
+                    <div class="flex items-center gap-3">📬 Inbox Ordini</div>
+                    <span id="inbox-badge" class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full hidden">0</span>
                 </button>
-                <button onclick="switchView('catalog')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500">Catalogo Master</button>
-                <button onclick="switchView('config')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-500 mt-4 border-t pt-4">Impostazioni</button>
+                <button onclick="switchView('catalog')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📦 Catalogo Master</button>
+                <button onclick="switchView('archive')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600">📁 Storico</button>
+                <button onclick="switchView('config')" class="tab-btn flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-600 mt-2 border-t pt-4">⚙️ Impostazioni</button>
             </nav>
         </aside>
 
-        <main class="flex-1 p-6 md:p-10 overflow-y-auto h-screen relative">
+        <main class="flex-1 p-4 md:p-10 overflow-y-auto h-screen relative">
             
-            <header id="admin-header" class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 pb-6 border-b border-slate-200">
-                <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 bg-black rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center p-1.5">
-                        <img src="assets/logo-sea-signora.png" alt="Sea Signora Milano" class="w-full h-full object-contain">
-                    </div>
-                    <div>
-                        <p class="corp-eyebrow">Procurement Control Center</p>
-                        <h2 class="text-2xl font-black uppercase tracking-tighter">Dashboard Direzionale</h2>
-                        <p class="text-xs font-medium text-slate-400">Gestione acquisti, compliance fornitori e controllo costi</p>
-                    </div>
+            <header id="admin-header" class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200">
+                <div>
+                    <h2 id="ui-page-title" class="text-2xl font-black uppercase tracking-tighter text-slate-900">Dashboard Master</h2>
+                    <p id="ui-page-desc" class="text-xs font-medium text-slate-500">Gestione acquisti sincronizzata in Cloud</p>
                 </div>
-                <div id="role-switcher-wrap" class="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm z-50">
-                    <span class="text-[9px] font-black uppercase text-slate-400 px-3 tracking-widest border-r">Visualizza come:</span>
-                    <select id="role-selector" onchange="handleRoleChange()" class="bg-transparent text-slate-900 text-[10px] font-black uppercase py-2 px-4 outline-none cursor-pointer">
+                <div class="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm z-50">
+                    <span class="text-[9px] font-black uppercase text-slate-400 px-2">Ruolo:</span>
+                    <select id="role-selector" onchange="handleRoleChange()" class="bg-slate-50 text-slate-900 text-[10px] font-black uppercase py-2 px-3 rounded-lg outline-none cursor-pointer border">
                         <option value="admin">Amministratore</option>
-                        <option value="Cucina">Reparto: Cucina</option>
-                        <option value="Sala">Reparto: Sala</option>
-                        <option value="Bar">Reparto: Bar</option>
-                        <option value="Wine">Reparto: Wine</option>
+                        <option value="Cucina">Cucina</option>
+                        <option value="Sala">Sala</option>
+                        <option value="Bar">Bar</option>
+                        <option value="Wine">Wine</option>
                     </select>
                 </div>
             </header>
 
-            <div id="view-home" class="view-section active">
-                <div class="max-w-6xl mx-auto">
-                    <div class="rounded-2xl p-6 text-white mb-6 bg-gradient-to-br from-slate-900 to-slate-700 shadow-xl">
-                        <p class="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Sea Signora Milano</p>
-                        <h3 class="text-2xl font-black uppercase mt-1">Corporate Home</h3>
-                        <p class="text-xs opacity-80 mt-1">Panoramica rapida KPI e accessi operativi.</p>
+            <div id="view-dashboard" class="view-section active">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="glass-card p-6 border-l-4 border-amber-400">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Richieste Pending</span>
+                        <p id="kpi-pending" class="text-4xl font-black text-slate-900">0</p>
                     </div>
-                    <div id="home-widget-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-                    <p class="text-[10px] text-slate-500 mt-4">La personalizzazione dei widget e disponibile in Impostazioni > Personalizza Layout.</p>
-                </div>
-            </div>
-
-            <div id="view-dashboard" class="view-section">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="ui-kpi-cards">
-                    <div class="glass-card p-8 flex flex-col justify-between border-l-4 border-amber-400">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Ordini in Sospeso (Da Approvare)</span>
-                        <p id="kpi-pending-count" class="text-4xl font-black text-slate-900 tracking-tighter">0</p>
-                        <button onclick="switchView('inbox')" class="text-indigo-600 text-[10px] font-black uppercase underline mt-4">Vai all'Inbox</button>
+                    <div class="glass-card p-6 border-l-4 border-emerald-500">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Saving Stimato</span>
+                        <p class="text-4xl font-black text-slate-900">€ <span id="kpi-saving">0.00</span></p>
                     </div>
-                    <div class="brand-gradient p-8 rounded-3xl text-white shadow-xl flex flex-col justify-center">
-                        <span class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-2 block">Motore Ottimizzazione</span>
-                        <p class="text-sm font-semibold">Allocazione ordini basata su miglior prezzo, soglie minime fornitore e strategia di consolidamento.</p>
-                    </div>
-                    <div class="glass-card p-8 flex flex-col justify-between border-l-4 border-emerald-400">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Saving Stimato Totale</span>
-                        <p class="text-4xl font-black text-slate-900 tracking-tighter">€ <span id="kpi-saving">0.00</span></p>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase mt-4">vs prezzo medio di mercato</span>
+                    <div class="brand-gradient p-6 rounded-2xl text-white shadow-xl">
+                        <span class="text-[10px] font-black opacity-60 uppercase mb-1 block">Status Cloud</span>
+                        <p id="cloud-status" class="text-xs font-bold text-emerald-300">Connesso a Railway</p>
                     </div>
                 </div>
-                <div class="glass-card p-10" id="ui-logistica-card">
-                    <h3 class="text-sm font-black uppercase tracking-widest mb-6">Stato Logistica e Porto Franco Fornitori</h3>
-                    <div id="consolidation-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <div class="glass-card p-8">
+                    <h3 class="text-sm font-black uppercase tracking-widest mb-6">📦 Stato Porto Franco Fornitori</h3>
+                    <div id="consolidation-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
             <div id="view-reports" class="view-section">
-                <div class="glass-card p-6 mb-8 flex flex-wrap gap-4 items-end bg-slate-50">
-                    <div class="flex-1 min-w-[150px]">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Periodo</label>
-                        <select id="filter-period" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none">
-                            <option value="mensile">Ultimi 30 Giorni</option>
-                            <option value="trimestrale">Ultimo Trimestre</option>
+                <div class="glass-card p-6 mb-8 bg-slate-50 flex flex-wrap gap-4 items-end">
+                    <div class="flex-1 min-w-[140px]">
+                        <label class="text-[9px] font-black text-slate-500 mb-1 block">Periodo</label>
+                        <select id="rep-period" onchange="updateCharts()" class="input-style bg-white"><option value="mensile">Mese</option><option value="trimestrale">Trimestre</option></select>
+                    </div>
+                    <div class="flex-1 min-w-[140px]">
+                        <label class="text-[9px] font-black text-slate-500 mb-1 block">Filtro</label>
+                        <select id="rep-type" onchange="toggleRepFilters(); updateCharts()" class="input-style bg-white">
+                            <option value="all">Generale</option><option value="reparto">Reparto</option><option value="categoria">Categoria</option><option value="prodotto">Prodotto</option>
                         </select>
                     </div>
-                    <div class="flex-1 min-w-[150px]">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Livello di Analisi</label>
-                        <select id="filter-level" onchange="toggleReportFilters(); updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none">
-                            <option value="generale">Generale (Tutto)</option>
-                            <option value="reparto">Per Reparto</option>
-                            <option value="categoria">Per Categoria</option>
-                            <option value="sottocategoria">Per Sottocategoria</option>
-                            <option value="prodotto">Per Prodotto</option>
-                        </select>
-                    </div>
-                    <div id="filter-wrap-reparto" class="flex-1 min-w-[150px] hidden">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Seleziona Reparto</label>
-                        <select id="filter-reparto" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"></select>
-                    </div>
-                    <div id="filter-wrap-categoria" class="flex-1 min-w-[150px] hidden">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Seleziona Categoria</label>
-                        <select id="filter-categoria" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"></select>
-                    </div>
-                    <div id="filter-wrap-sottocategoria" class="flex-1 min-w-[150px] hidden">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Seleziona Sottocategoria</label>
-                        <select id="filter-sottocategoria" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"></select>
-                    </div>
-                    <div id="filter-wrap-prodotto" class="flex-1 min-w-[150px] hidden">
-                        <label class="text-[9px] font-black uppercase text-slate-500 mb-1 block">Seleziona Prodotto</label>
-                        <select id="filter-prodotto" onchange="updateCharts()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white outline-none"></select>
-                    </div>
+                    <div id="rep-wrap-reparto" class="flex-1 min-w-[140px] hidden"><select id="rep-val-reparto" onchange="updateCharts()" class="input-style bg-white"></select></div>
+                    <div id="rep-wrap-categoria" class="flex-1 min-w-[140px] hidden"><select id="rep-val-categoria" onchange="updateCharts()" class="input-style bg-white"></select></div>
+                    <div id="rep-wrap-prodotto" class="flex-1 min-w-[140px] hidden"><select id="rep-val-prodotto" onchange="updateCharts()" class="input-style bg-white"></select></div>
                 </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="glass-card p-8"><h4 id="trend-title" class="text-[10px] font-black uppercase text-slate-400 mb-6">Andamento Costi</h4><div class="chart-container"><canvas id="analyticsTrendChart"></canvas></div></div>
-                    <div class="glass-card p-8"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-6">Ripartizione Spese</h4><div class="chart-container"><canvas id="analyticsPieChart"></canvas></div></div>
-                </div>
-                <div class="glass-card p-8 mt-8">
-                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
-                        <h4 class="text-[10px] font-black uppercase text-slate-400">Heatmap Prezzi (Prodotti x Fornitori)</h4>
-                        <input id="heatmap-search" oninput="renderPriceHeatmap()" type="text" placeholder="Filtra prodotto..." class="p-2 border rounded-lg text-xs font-bold">
-                    </div>
-                    <div class="overflow-auto border rounded-xl">
-                        <table class="w-full text-left text-xs">
-                            <thead id="heatmap-head" class="bg-slate-50 border-b"></thead>
-                            <tbody id="heatmap-body" class="divide-y"></tbody>
-                        </table>
-                    </div>
-                    <p class="text-[10px] text-slate-500 mt-3">Verde: prezzo sotto media storica. Rosso: oltre +10% media storica. Giallo: fascia intermedia.</p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-card p-6"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-4">Andamento Spesa</h4><div class="chart-container"><canvas id="chartTrend"></canvas></div></div>
+                    <div class="glass-card p-6"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-4">Incidenza Costi</h4><div class="chart-container"><canvas id="chartPie"></canvas></div></div>
                 </div>
             </div>
 
-            <div id="view-inbox" class="view-section"><div id="inbox-container" class="max-w-4xl mx-auto space-y-6"></div></div>
-
+            <div id="view-inbox" class="view-section"><div id="inbox-list" class="max-w-4xl mx-auto space-y-6"></div></div>
+            
             <div id="view-catalog" class="view-section">
-                <div class="glass-card p-10">
-                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Catalogo Database</h3>
-                    <input id="catalog-mgmt-search" oninput="renderCatalogMgmt()" type="text" placeholder="Cerca prodotto..." class="w-full p-4 bg-slate-50 border-none rounded-xl text-sm font-bold mb-8 shadow-inner focus:outline-none">
-                    <div class="overflow-x-auto border rounded-xl">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><tr><th class="px-6 py-4">Prodotto / Cat</th><th class="px-6 py-4 text-right">Comparativa Fornitori</th></tr></thead>
-                            <tbody id="catalog-table-body" class="divide-y"></tbody>
-                        </table>
-                    </div>
+                <div class="glass-card p-8">
+                    <h3 class="text-xl font-black uppercase mb-6">Anagrafica Sea Signora</h3>
+                    <input id="cat-search" oninput="renderCatalog()" type="text" placeholder="Cerca prodotto..." class="input-style bg-slate-50 mb-6">
+                    <table class="w-full text-left text-sm border rounded-xl overflow-hidden"><tbody id="cat-table-body" class="divide-y"></tbody></table>
                 </div>
             </div>
 
             <div id="view-price-update" class="view-section">
-                <div class="glass-card p-10">
-                    <h3 class="text-xl font-black uppercase tracking-tighter mb-6">Aggiorna da Fattura</h3>
-                    <select id="update-supplier-select" onchange="renderPriceUpdateTable()" class="p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none w-64 mb-8"></select>
-                    <div class="overflow-hidden border rounded-xl">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400"><tr><th class="px-6 py-3">Prodotto</th><th class="px-6 py-3 text-center">Vecchio Prezzo</th><th class="px-6 py-3 text-center">Nuovo Prezzo (€)</th></tr></thead>
-                            <tbody id="update-table-body" class="divide-y"></tbody>
-                        </table>
-                    </div>
-                    <div class="mt-6 flex justify-end"><button onclick="saveInvoicePrices()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg hover:scale-105">Salva Listino</button></div>
+                <div class="glass-card p-8">
+                    <h3 class="text-xl font-black uppercase mb-6">Aggiorna da Fattura</h3>
+                    <select id="inv-supplier" onchange="renderInvoiceTable()" class="input-style w-64 mb-6"></select>
+                    <table class="w-full text-left text-sm border divide-y"><tbody id="inv-table-body"></tbody></table>
+                    <div class="mt-6 flex justify-end"><button onclick="saveInvoice()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Listino</button></div>
                 </div>
             </div>
 
+            <div id="view-archive" class="view-section"><div class="glass-card p-8"><table class="w-full text-left text-sm"><tbody id="arc-table-body" class="divide-y"></tbody></table></div></div>
+
             <div id="view-config" class="view-section">
-                <div class="glass-card p-10">
-                    <div class="flex gap-6 border-b mb-8 overflow-x-auto">
-                        <div onclick="switchConfigTab('prodotti')" id="config-btn-prodotti" class="config-sub-tab active">Prodotti & Excel</div>
-                        <div onclick="switchConfigTab('fornitori')" id="config-btn-fornitori" class="config-sub-tab">Fornitori & Porto Franco</div>
-                        <div onclick="switchConfigTab('reparti')" id="config-btn-reparti" class="config-sub-tab">Reparti & QR Code</div>
-                        <div onclick="switchConfigTab('versioni')" id="config-btn-versioni" class="config-sub-tab">Versioni Listino</div>
-                        <div onclick="switchConfigTab('ui')" id="config-btn-ui" class="config-sub-tab">Personalizza Layout</div>
+                <div class="glass-card p-8">
+                    <div class="flex gap-4 border-b mb-8 overflow-x-auto">
+                        <button onclick="switchCfg('data')" id="cfg-btn-data" class="config-sub-tab active">Prodotti & Excel</button>
+                        <button onclick="switchCfg('reparti')" id="cfg-btn-reparti" class="config-sub-tab">Fornitori & QR</button>
+                        <button onclick="switchCfg('ui')" id="cfg-btn-ui" class="config-sub-tab">Personalizzazione</button>
                     </div>
-
-                    <div id="config-sec-prodotti" class="config-inner space-y-8">
-                        <div class="bg-slate-50 p-6 rounded-2xl border">
-                            <h4 class="text-[10px] font-black uppercase mb-4 tracking-widest text-slate-500">Aggiungi Prodotto Singolo</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                                <input id="ap-name" type="text" placeholder="Nome Prodotto" class="p-3 border rounded-xl text-xs font-bold">
-                                <input id="ap-cat" type="text" placeholder="Categoria (es. Ittico)" class="p-3 border rounded-xl text-xs font-bold">
-                                <input id="ap-sub" type="text" placeholder="Sottocategoria (es. Pesce)" class="p-3 border rounded-xl text-xs font-bold">
-                                <input id="ap-um" type="text" placeholder="UM (kg, pz...)" class="p-3 border rounded-xl text-xs font-bold">
-                            </div>
-                            <button onclick="addSingleProduct()" class="brand-gradient text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva</button>
-                            <button onclick="loadExtendedCatalog()" class="ml-2 bg-slate-900 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg">Carica Catalogo Esteso</button>
-                            <p id="ap-status-msg" class="mt-3 text-xs font-bold text-emerald-700 hidden"></p>
+                    <div id="cfg-sec-data" class="cfg-panel space-y-6">
+                        <div class="bg-emerald-50 p-6 rounded-2xl border border-emerald-200">
+                            <h4 class="text-sm font-black text-emerald-900 uppercase mb-2">Importazione Excel</h4>
+                            <textarea id="cfg-excel" class="w-full h-32 input-style mb-4 text-xs font-mono" placeholder="Nome;Categoria;Sottocategoria;UM;Prezzo;Fornitore"></textarea>
+                            <button onclick="importExcel()" class="bg-emerald-600 text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase">Importa</button>
                         </div>
-                        <div class="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
-                            <h4 class="text-sm font-black text-emerald-900 uppercase mb-2">Importazione Massiva Excel</h4>
-                            <p class="text-[10px] text-emerald-700 mb-4">Incolla le righe da Excel. Formato esatto: Nome; Categoria; Sottocat; UM; Prezzo; Fornitore</p>
-                            <textarea id="excel-area" class="w-full h-32 p-4 border rounded-xl mb-3 text-xs" placeholder="Aragosta; Ittico; Crostacei; kg; 72.00; OROBICA"></textarea>
-                            <button onclick="processExcelImport()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg">Importa Dati</button>
-                        </div>
-                        <div class="bg-slate-50 p-6 rounded-2xl border">
-                            <h4 class="text-sm font-black text-slate-900 uppercase mb-2">Importa Listino Completo (Testo Libero)</h4>
-                            <p class="text-[10px] text-slate-600 mb-4">Incolla anche il listino in formato descrittivo (bullet, due punti, trattini). Il parser prova a estrarre prodotto, UM, prezzo e fornitore automaticamente.</p>
-                            <textarea id="raw-catalog-area" class="w-full h-40 p-4 border rounded-xl mb-3 text-xs" placeholder="- Branzino Grecia kg METRO 11.71"></textarea>
-                            <button onclick="processRawCatalogImport()" class="bg-slate-900 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg">Importa da Testo</button>
-                        </div>
-                        <div class="bg-amber-50 p-6 rounded-2xl border border-amber-100">
-                            <h4 class="text-sm font-black text-amber-900 uppercase mb-2">Elenco Puntato Prodotti (formato Sea Signora)</h4>
-                            <p class="text-[10px] text-amber-700 mb-4">Incolla qui il formato tipo: <span class="font-black">Nome | U.M.: ... | Miglior Prezzo: ... | Fornitore: ...</span>. Supporta anche titoli categoria con emoji.</p>
-                            <textarea id="bullet-catalog-area" class="w-full h-52 p-4 border rounded-xl mb-3 text-xs" placeholder="🐟 ITTICO&#10;Aragosta Viva | U.M.: 500-700g | Miglior Prezzo: 73.80 € | Fornitore: METRO"></textarea>
-                            <div class="flex flex-wrap gap-2">
-                                <button onclick="importBulletCatalog()" class="bg-amber-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg">Importa Elenco Puntato</button>
-                                <button onclick="copyBulletToRawArea()" class="bg-white border border-amber-200 text-amber-700 px-6 py-2 rounded-xl font-black text-[10px] uppercase">Copia nel box testo libero</button>
-                            </div>
-                        </div>
+                        <div class="border rounded-xl h-64 overflow-y-auto"><table class="w-full text-left text-sm"><tbody id="cfg-prod-list" class="divide-y"></tbody></table></div>
                     </div>
-
-                    <div id="config-sec-fornitori" class="config-inner hidden">
-                        <div class="flex justify-between items-center mb-6">
-                            <h4 class="text-sm font-black uppercase">Parametri Fornitori</h4>
-                            <button onclick="addSupplier()" class="text-[10px] bg-slate-200 px-4 py-2 rounded-lg font-bold uppercase">+ Aggiungi</button>
-                        </div>
-                        <div id="config-suppliers-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                    <div id="cfg-sec-reparti" class="cfg-panel hidden space-y-6">
+                        <div id="cfg-sup-list" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"></div>
+                        <div id="cfg-qr-list" class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t"></div>
                     </div>
-
-                    <div id="config-sec-reparti" class="config-inner hidden">
-                        <div class="flex justify-between items-center mb-6">
-                            <h4 class="text-sm font-black uppercase">Generatore QR Reparti</h4>
-                            <button onclick="addDepartment()" class="text-[10px] bg-slate-200 px-4 py-2 rounded-lg font-bold uppercase">+ Aggiungi Reparto</button>
-                        </div>
-                        <p class="text-xs text-slate-500 mb-6">Inquadra il QR con il telefono per aprire direttamente il modulo d'ordine del reparto corrispondente.</p>
-                        <div id="config-qr-list" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
-                    </div>
-
-                    <div id="config-sec-versioni" class="config-inner hidden space-y-6">
-                        <div class="bg-slate-50 p-6 rounded-2xl border">
-                            <h4 class="text-sm font-black uppercase mb-4">Storico Versioni Prezzi</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                                <div>
-                                    <label class="text-[10px] font-black uppercase text-slate-400 block mb-1">Fornitore</label>
-                                    <select id="version-filter-supplier" onchange="renderPriceVersions()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white">
-                                        <option value="all">Tutti</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black uppercase text-slate-400 block mb-1">Prodotto</label>
-                                    <input id="version-filter-product" oninput="renderPriceVersions()" type="text" placeholder="Cerca prodotto..." class="w-full p-3 border rounded-xl text-xs font-bold bg-white">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black uppercase text-slate-400 block mb-1">Sorgente</label>
-                                    <select id="version-filter-source" onchange="renderPriceVersions()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white">
-                                        <option value="all">Tutte</option>
-                                        <option value="invoice-update">Fattura</option>
-                                        <option value="excel">Excel</option>
-                                        <option value="raw-import">Import Testo</option>
-                                        <option value="extended-catalog">Catalogo Esteso</option>
-                                    </select>
-                                </div>
-                                <div class="flex items-end gap-2">
-                                    <button onclick="exportPriceHistoryCsv()" class="bg-slate-900 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase w-full">Export CSV Storico</button>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <label class="text-[10px] font-black uppercase text-slate-400 block mb-1">Trend Prodotto</label>
-                                    <select id="version-trend-product" onchange="renderPriceHistoryTrend()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white">
-                                        <option value="">Seleziona prodotto</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black uppercase text-slate-400 block mb-1">Trend Fornitore</label>
-                                    <select id="version-trend-supplier" onchange="renderPriceHistoryTrend()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white">
-                                        <option value="all">Tutti</option>
-                                    </select>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2 items-end">
-                                    <div>
-                                        <label class="text-[10px] font-black uppercase text-slate-400 block mb-1">Media Mobile</label>
-                                        <select id="version-trend-ma" onchange="renderPriceHistoryTrend()" class="w-full p-3 border rounded-xl text-xs font-bold bg-white">
-                                            <option value="0">Off</option>
-                                            <option value="3">3 punti</option>
-                                            <option value="5">5 punti</option>
-                                            <option value="7">7 punti</option>
-                                        </select>
-                                    </div>
-                                    <div class="pb-2">
-                                        <label class="inline-flex items-center gap-2 text-[10px] font-black uppercase text-slate-500">
-                                            <input id="version-trend-multi" type="checkbox" onchange="renderPriceHistoryTrend()" class="accent-slate-900">
-                                            Multi-fornitore
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="bg-white border rounded-xl p-4 mb-4">
-                                <div class="chart-container" style="height:260px;"><canvas id="priceHistoryTrendChart"></canvas></div>
-                            </div>
-                            <div class="overflow-auto border rounded-xl">
-                                <table class="w-full text-left text-xs">
-                                    <thead class="bg-white border-b text-[10px] font-black uppercase text-slate-400">
-                                        <tr>
-                                            <th class="px-4 py-3">Data</th>
-                                            <th class="px-4 py-3">Prodotto</th>
-                                            <th class="px-4 py-3">Fornitore</th>
-                                            <th class="px-4 py-3 text-right">Da</th>
-                                            <th class="px-4 py-3 text-right">A</th>
-                                            <th class="px-4 py-3">Fonte</th>
-                                            <th class="px-4 py-3 text-right">Azione</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="price-history-table-body" class="divide-y"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="config-sec-ui" class="config-inner hidden space-y-6">
-                        <h4 class="text-sm font-black uppercase mb-4">Personalizza Pagine</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Nascondi Modulo "Saving"</label>
-                                <select onchange="toggleModule('ui-kpi-cards', this.value)" class="w-full p-3 border rounded-xl text-sm font-bold"><option value="block">Mostra</option><option value="none">Nascondi</option></select>
-                            </div>
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Nascondi Modulo "Logistica"</label>
-                                <select onchange="toggleModule('ui-logistica-card', this.value)" class="w-full p-3 border rounded-xl text-sm font-bold"><option value="block">Mostra</option><option value="none">Nascondi</option></select>
-                            </div>
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Colore Principale App</label>
-                                <input id="ui-accent-input" type="color" oninput="setAccentColor(this.value)" class="w-full h-12 p-1 border rounded-xl" value="#c5a059">
-                            </div>
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Nome Brand</label>
-                                <input id="ui-brand-input" type="text" placeholder="Sea Signora" class="w-full p-3 border rounded-xl text-sm font-bold" oninput="setBrandName(this.value)">
-                            </div>
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Strategia Acquisto</label>
-                                <select id="ui-allocation-mode" onchange="setAllocationMode(this.value)" class="w-full p-3 border rounded-xl text-sm font-bold">
-                                    <option value="hybrid">Ibrida (prezzo + porto franco)</option>
-                                    <option value="best_price">Solo miglior prezzo</option>
-                                    <option value="porto_franco">Priorita porto franco</option>
-                                </select>
-                            </div>
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Coeff. Penalita Porto Franco</label>
-                                <input id="ui-penalty-rate" type="number" min="0" step="0.01" class="w-full p-3 border rounded-xl text-sm font-bold" onchange="setPenaltyRate(this.value)">
-                            </div>
-                            <div><label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Finestra Porto Franco</label>
-                                <select id="ui-porto-window" onchange="setPortoFrancoWindow(this.value)" class="w-full p-3 border rounded-xl text-sm font-bold">
-                                    <option value="daily">Giornaliera</option>
-                                    <option value="weekly">Settimanale</option>
-                                    <option value="monthly">Mensile</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="border rounded-2xl p-4 bg-slate-50">
-                            <div class="flex items-center justify-between mb-3">
-                                <p class="text-[10px] font-black uppercase text-slate-500">Widget Home Iniziale</p>
-                                <button onclick="resetHomeWidgets()" class="text-[10px] bg-white border px-3 py-2 rounded-lg font-black uppercase">Reset Layout</button>
-                            </div>
-                            <p class="text-[10px] text-slate-500 mb-3">Scegli i widget visibili nella Home principale dell'amministrazione.</p>
-                            <div id="home-widget-controls" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-                        </div>
-                        <div class="border rounded-2xl p-4 bg-slate-50">
-                            <p class="text-[10px] font-black uppercase text-slate-500 mb-3">Backup e Ripristino</p>
-                            <div class="flex flex-wrap gap-2">
-                                <button onclick="exportDataBackup()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Esporta Backup</button>
-                                <button onclick="triggerImportBackup()" class="bg-white border px-4 py-2 rounded-lg text-[10px] font-black uppercase">Importa Backup</button>
-                                <button onclick="exportOrdersCsv()" class="bg-white border px-4 py-2 rounded-lg text-[10px] font-black uppercase">Export CSV Ordini</button>
-                                <button onclick="resetAllData()" class="bg-rose-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Reset Totale</button>
-                            </div>
-                            <input id="backup-import-input" type="file" accept="application/json" class="hidden" onchange="importDataBackup(event)">
-                        </div>
-                        <div class="border rounded-2xl p-4 bg-slate-50">
-                            <p class="text-[10px] font-black uppercase text-slate-500 mb-3">Sinonimi AI (uno per riga)</p>
-                            <p class="text-[10px] text-slate-500 mb-2">Formato: sinonimo => nome prodotto catalogo</p>
-                            <textarea id="ui-aliases-area" class="w-full h-28 p-3 border rounded-xl text-xs" placeholder="astice blu => Astice Blu Vivo"></textarea>
-                            <div class="mt-2">
-                                <button onclick="saveAliases()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Salva Sinonimi</button>
-                            </div>
-                        </div>
-                        <div class="border rounded-2xl p-4 bg-slate-50">
-                            <p class="text-[10px] font-black uppercase text-slate-500 mb-3">AI Gemini Sempre Attiva</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Provider Bloccato</label>
-                                    <input type="text" value="Gemini (fisso)" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" disabled>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Modello</label>
-                                    <input type="text" value="gemini-2.0-flash" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" disabled>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label class="text-[10px] font-black text-slate-400 uppercase block mb-1">Gemini API Key</label>
-                                    <input type="text" class="w-full p-3 border rounded-xl text-sm font-bold bg-slate-100" value="Gestita dal server (non richiesta qui)" disabled>
-                                </div>
-                            </div>
-                            <p class="text-[10px] text-slate-500 mt-2">Gemini è gestita dal server: non inserire la chiave nel browser.</p>
+                    <div id="cfg-sec-ui" class="cfg-panel hidden space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input id="ui-brand" type="text" oninput="liveUI()" class="input-style" placeholder="Nome App">
+                            <input id="ui-color" type="color" oninput="liveUI()" class="w-full h-12 p-1 border rounded-xl" value="#c5a059">
                         </div>
                     </div>
                 </div>
             </div>
 
             <div id="view-department" class="view-section h-full">
-                <div class="h-full flex flex-col justify-center w-full">
-                    <div class="max-w-2xl mx-auto w-full glass-card p-10 shadow-2xl border-0">
-                        <div class="flex items-center gap-6 mb-8">
-                            <div class="w-16 h-16 bg-black rounded-2xl flex items-center justify-center shadow-xl border border-slate-200 overflow-hidden p-1.5">
-                                <img src="assets/logo-sea-signora.png" alt="Sea Signora Milano" class="w-full h-full object-contain">
-                            </div>
-                            <div>
-                                <h3 class="text-3xl font-black uppercase tracking-tighter leading-none text-slate-900">Nuovo Ordine</h3>
-                                <p id="dept-name-display" class="text-amber-600 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Sea Signora</p>
-                            </div>
+                <div class="h-full flex flex-col justify-center max-w-2xl mx-auto w-full">
+                    <div class="glass-card p-10 shadow-2xl bg-white relative">
+                        <div class="flex items-center gap-5 mb-8">
+                            <div class="w-16 h-16 brand-gradient rounded-xl flex items-center justify-center text-white text-2xl font-black italic">SS</div>
+                            <div><h3 class="text-3xl font-black uppercase tracking-tighter leading-none">Invia Ordine</h3><p id="dept-name-display" class="text-amber-600 font-bold uppercase text-[10px] mt-1">Reparto</p></div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <input id="dept-nome" type="text" placeholder="Nome" class="p-4 bg-slate-50 border rounded-xl text-sm font-bold outline-none">
-                            <input id="dept-cognome" type="text" placeholder="Cognome" class="p-4 bg-slate-50 border rounded-xl text-sm font-bold outline-none">
-                        </div>
-                        <textarea id="dept-raw-text" placeholder="Elenca i prodotti e le quantità. Es: 5kg Astice Blu, 2 casse Gin Mare, 3kg Patate..." class="w-full h-40 p-6 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium mb-6 resize-none outline-none focus:border-amber-400"></textarea>
-                        <p id="dept-submit-status" class="hidden mb-4 text-xs font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">Ordine inviato</p>
-                        <button onclick="submitDeptOrder()" class="w-full py-5 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-transform">
-                            Invia all'Ufficio Acquisti
-                        </button>
+                        <div class="grid grid-cols-2 gap-4 mb-6"><input id="d-nome" type="text" placeholder="Nome" class="input-style bg-slate-50"><input id="d-cognome" type="text" placeholder="Cognome" class="input-style bg-slate-50"></div>
+                        <textarea id="d-text" placeholder="Scrivi la tua lista. L'IA Gemini farà il match automaticamente." class="w-full h-40 input-style bg-slate-50 resize-none mb-6"></textarea>
+                        <button onclick="submitOrder()" id="btn-submit-order" class="w-full py-5 brand-gradient text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-transform">🚀 Invia all'Ufficio Acquisti</button>
                     </div>
                 </div>
-            </div>
-
-            <!-- AI Help Widget (Gemini via server) -->
-            <div class="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-3">
-                <div id="ai-help-panel" class="hidden w-[92vw] max-w-md bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
-                    <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-widest opacity-70">Assistente</p>
-                            <p id="ai-help-title" class="text-sm font-black">Chiedi aiuto a Gemini</p>
-                        </div>
-                        <button onclick="closeAiHelp()" class="text-xs font-black uppercase bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl">Chiudi</button>
-                    </div>
-                    <div class="p-4 space-y-3">
-                        <p id="ai-help-subtitle" class="text-[11px] text-slate-500">Suggerimenti e azioni relative alla pagina attuale.</p>
-                        <textarea id="ai-help-question" class="w-full h-24 p-3 border rounded-xl text-sm" placeholder="Es: Come importo il catalogo? Come correggo un ordine? Come leggo questo report?"></textarea>
-                        <div class="flex items-center gap-2">
-                            <button id="ai-help-send" onclick="sendAiHelp()" class="flex-1 bg-slate-900 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Invia a Gemini</button>
-                            <button onclick="fillAiHelpExample()" class="bg-white border px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Esempio</button>
-                        </div>
-                        <div id="ai-help-status" class="hidden text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-xl"></div>
-                        <div id="ai-help-answer-wrap" class="hidden">
-                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Risposta</p>
-                            <div id="ai-help-answer" class="whitespace-pre-wrap text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl p-3"></div>
-                        </div>
-                    </div>
-                </div>
-                <button id="ai-help-fab" onclick="toggleAiHelp()" class="brand-gradient text-white shadow-2xl rounded-2xl px-5 py-4 text-[10px] font-black uppercase tracking-widest">
-                    Chiedi aiuto a Gemini
-                </button>
             </div>
 
         </main>
     </div>
 
     <script>
-        const STORAGE_KEY = 'seasignora-v2';
-        const CONNECTION_KEY = 'seasignora-connection-v1';
-        const DEFAULT_SETTINGS = {
-            brandName: 'Sea Signora',
-            accentColor: '#c5a059',
-            hiddenModules: {},
-            allocationMode: 'hybrid',
-            penaltyRate: 0.06,
-            portoFrancoWindow: 'weekly',
-            aliases: {},
-            aiEnabled: true,
-            aiProvider: 'gemini',
-            aiModel: 'gemini-2.0-flash',
-            homeWidgets: {
-                pending: true,
-                saving: true,
-                suppliers: true,
-                inbox: true,
-                reports: true,
-                catalog: true
-            },
-            aiApiKey: ''
-        };
-        const BASE_PRODUCTS = [
-            { id: 1, name: 'Tartufi di Mare', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 11.12 } },
-            { id: 2, name: 'Cannolicchi Estero', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 7.5 } },
-            { id: 3, name: 'Cappasanta 1/2 guscio fresca', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'OROBICA': 11.9 } },
-            { id: 4, name: 'Aragosta Viva 250-400g', cat: 'Ittico', sub: 'Crostacei', um: 'pz', prices: { 'OROBICA': 72 } },
-            { id: 5, name: 'Astice Blu Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 65.9 } },
-            { id: 6, name: 'Carabineros 8/10', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'REACH FOOD': 102 } },
-            { id: 7, name: 'Calamaro Patagonia Gelo', cat: 'Ittico', sub: 'Molluschi', um: 'kg', prices: { 'LINEA MARE': 7.4 } },
-            { id: 8, name: 'Ostriche Gillardeau N3', cat: 'Ittico', sub: 'Ostriche', um: 'pz', prices: { 'LINEA MARE': 2.44 } },
-            { id: 9, name: 'Branzino Grecia', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 11.71 } },
-            { id: 10, name: 'Tonno Rosso Fuentes Fresco', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'OROBICA': 29 } },
-            { id: 11, name: 'Caviale Osetra 50g', cat: 'Ittico', sub: 'Specialita', um: 'pz', prices: { 'REACH FOOD': 43 } },
-            { id: 12, name: 'Basilico', cat: 'Verdure', sub: 'Erbe', um: 'kg', prices: { 'ORTOLANO': 15.5 } },
-            { id: 13, name: 'Carciofi Mammola', cat: 'Verdure', sub: 'Verdura', um: 'pz', prices: { 'OROBICA': 1.18 } },
-            { id: 14, name: 'Patate', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 0.9 } },
-            { id: 15, name: 'Carne Trita 80/20', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 10 } },
-            { id: 16, name: 'Pasta Staff', cat: 'Consumabili', sub: 'Pasta', um: 'kg', prices: { 'METRO': 1.16 } },
-            { id: 17, name: 'Colatura di Alici 100ml', cat: 'Consumabili', sub: 'Secchi', um: 'pz', prices: { 'MARR': 6.99 } },
-            { id: 18, name: 'Sapone refill Arancia di Capri', cat: 'Cleaning', sub: 'Bagno clienti', um: 'pz', prices: { 'ACQUA DI PARMA': 33 } },
-            { id: 19, name: 'Detergente lavastoviglie 10L', cat: 'Cleaning', sub: 'Pulizia cucina', um: 'pz', prices: { 'METRO': 10 } },
-            { id: 20, name: 'Brillantante Bicchieri 10KG', cat: 'Cleaning', sub: 'Pulizia cucina', um: 'pz', prices: { 'WINTERHALTER': 83.5 } }
-        ];
-        const EXTENDED_CATALOG = [
-            { name: 'Cozze', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', supplier: 'METRO', price: 3.50 },
-            { name: 'Vongola Lupino', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', supplier: 'METRO', price: 8.09 },
-            { name: 'Vongola Tellina', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', supplier: 'METRO', price: 10.49 },
-            { name: 'Vongola Verace', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', supplier: 'LINEA MARE', price: 18.70 },
-            { name: 'Astice Canada Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'LINEA MARE', price: 29.50 },
-            { name: 'Astice Jumbo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'OROBICA', price: 63.00 },
-            { name: 'Astice Polpa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'OROBICA', price: 91.00 },
-            { name: 'Gambero Fondale', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'OROBICA', price: 13.00 },
-            { name: 'Gambero Rosa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'OROBICA', price: 16.50 },
-            { name: 'Gambero Rosso 2', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'OROBICA', price: 59.00 },
-            { name: 'King Crab Polpa', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'REACH FOOD', price: 56.50 },
-            { name: 'Scampo 1/5', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'REACH FOOD', price: 65.00 },
-            { name: 'Scampo 31/40', cat: 'Ittico', sub: 'Crostacei', um: 'kg', supplier: 'METRO', price: 14.08 },
-            { name: 'Calamaro Spillo Mediterraneo Gelo', cat: 'Ittico', sub: 'Molluschi', um: 'kg', supplier: 'OROBICA', price: 22.80 },
-            { name: 'Polpo Gelo Indopacifico T3', cat: 'Ittico', sub: 'Molluschi', um: 'kg', supplier: 'LINEA MARE', price: 16.95 },
-            { name: 'Polpo Gelo Mediterraneo T4', cat: 'Ittico', sub: 'Molluschi', um: 'kg', supplier: 'METRO', price: 17.85 },
-            { name: 'Ostriche Mignon di Goro N6', cat: 'Ittico', sub: 'Ostriche', um: 'pz', supplier: 'OROBICA', price: 0.69 },
-            { name: 'Ostriche OR N4', cat: 'Ittico', sub: 'Ostriche', um: 'pz', supplier: 'OYSTER OASIS', price: 2.25 },
-            { name: 'Akami -60', cat: 'Ittico', sub: 'Pesce', um: 'kg', supplier: 'REACH FOOD', price: 49.50 },
-            { name: 'Orata Grecia 600-800g', cat: 'Ittico', sub: 'Pesce', um: 'kg', supplier: 'METRO', price: 10.18 },
-            { name: 'Salmone Affumicato Norvegese', cat: 'Ittico', sub: 'Pesce', um: 'kg', supplier: 'OROBICA', price: 28.50 },
-            { name: 'Tonno Rosso Mediterraneo Ikejime', cat: 'Ittico', sub: 'Pesce', um: 'kg', supplier: 'OROBICA', price: 37.00 },
-            { name: 'Riccio Fresco Galizia', cat: 'Ittico', sub: 'Specialita', um: 'kg', supplier: 'OROBICA', price: 27.90 },
-            { name: 'Riccio Polpa Gelo', cat: 'Ittico', sub: 'Specialita', um: 'kg', supplier: 'REACH FOOD', price: 21.00 },
-            { name: 'Aneto', cat: 'Verdure', sub: 'Erbe', um: '60g', supplier: 'ABBASCIA', price: 1.18 },
-            { name: 'Menta Ananas', cat: 'Verdure', sub: 'Erbe', um: '60g', supplier: 'ORTOLANO', price: 5.90 },
-            { name: 'Prezzemolo', cat: 'Verdure', sub: 'Erbe', um: 'kg', supplier: 'ORTOLANO', price: 4.90 },
-            { name: 'Ananas', cat: 'Verdure', sub: 'Frutta', um: 'kg', supplier: 'ORTOLANO', price: 2.90 },
-            { name: 'Avocado', cat: 'Verdure', sub: 'Frutta', um: 'pz', supplier: 'ORTOLANO', price: 1.50 },
-            { name: 'Lime', cat: 'Verdure', sub: 'Frutta', um: 'kg', supplier: 'ORTOLANO', price: 3.98 },
-            { name: 'Mirtilli', cat: 'Verdure', sub: 'Frutta', um: '125g', supplier: 'ORTOLANO', price: 3.25 },
-            { name: 'Aglio Bianco', cat: 'Verdure', sub: 'Verdura', um: 'kg', supplier: 'ORTOLANO', price: 5.90 },
-            { name: 'Asparagi', cat: 'Verdure', sub: 'Verdura', um: 'kg', supplier: 'ORTOLANO', price: 10.50 },
-            { name: 'Cipolle Tropea', cat: 'Verdure', sub: 'Verdura', um: 'kg', supplier: 'ABBASCIA', price: 2.20 },
-            { name: 'Pomodoro Datterino', cat: 'Verdure', sub: 'Verdura', um: 'kg', supplier: 'FAST FRUIT', price: 3.50 },
-            { name: 'Pomodoro Marinda', cat: 'Verdure', sub: 'Verdura', um: 'kg', supplier: 'ORTOLANO', price: 5.90 },
-            { name: 'Zucchine', cat: 'Verdure', sub: 'Verdura', um: 'kg', supplier: 'ABBASCIA', price: 2.28 },
-            { name: 'Controfiletto Angus', cat: 'Consumabili', sub: 'Carne', um: 'kg', supplier: 'CARNI NOBILI', price: 33.15 },
-            { name: 'Pollo Petto', cat: 'Consumabili', sub: 'Carne', um: 'kg', supplier: 'MARR', price: 6.40 },
-            { name: 'Salsiccia', cat: 'Consumabili', sub: 'Carne', um: 'kg', supplier: 'MARR', price: 5.85 },
-            { name: 'Parmigiano 24M', cat: 'Consumabili', sub: 'Latticini', um: 'kg', supplier: 'MARR', price: 18.90 },
-            { name: 'Uova Intere 90 pz', cat: 'Consumabili', sub: 'Latticini', um: 'pz', supplier: 'METRO', price: 16.24 },
-            { name: 'Linguine Felicetti', cat: 'Consumabili', sub: 'Pasta', um: 'kg', supplier: 'GRANCHEF', price: 3.68 },
-            { name: 'Riso Carnaroli', cat: 'Consumabili', sub: 'Pasta', um: 'kg', supplier: 'METRO', price: 1.41 },
-            { name: 'Passata Pomodoro', cat: 'Consumabili', sub: 'Secchi', um: 'pz', supplier: 'MARR', price: 1.28 },
-            { name: 'Farina 00', cat: 'Consumabili', sub: 'Secchi', um: 'kg', supplier: 'MARR', price: 0.69 },
-            { name: 'Vodka Cucina', cat: 'Consumabili', sub: 'Secchi', um: 'pz', supplier: 'METRO', price: 9.90 },
-            { name: 'Zucchero Bianco', cat: 'Consumabili', sub: 'Secchi', um: 'kg', supplier: 'METRO', price: 1.05 },
-            { name: 'Crema refill Arancia di Capri', cat: 'Cleaning', sub: 'Bagno clienti', um: 'pz', supplier: 'ACQUA DI PARMA', price: 33.00 },
-            { name: 'Diffusore 180ml Arancia di Capri', cat: 'Cleaning', sub: 'Bagno clienti', um: 'pz', supplier: 'ACQUA DI PARMA', price: 67.00 },
-            { name: 'Carta Igienica Clienti 56PZ', cat: 'Cleaning', sub: 'Bagno clienti', um: 'pz', supplier: 'MARR', price: 0.27 },
-            { name: 'Detergente Bicchieri 12KG', cat: 'Cleaning', sub: 'Pulizia cucina', um: 'pz', supplier: 'WINTERHALTER', price: 75.00 },
-            { name: 'Sgrassante Cucina 5L', cat: 'Cleaning', sub: 'Pulizia cucina', um: 'pz', supplier: 'METRO', price: 8.90 },
-            { name: 'Sgorgante L', cat: 'Cleaning', sub: 'Pulizia cucina', um: 'pz', supplier: 'ICA SYSTEM', price: 3.35 }
-        ];
-        const BASE_SUPPLIERS = [
-            { name: 'METRO', min: 150 }, { name: 'OROBICA', min: 250 }, { name: 'LINEA MARE', min: 200 }, { name: 'REACH FOOD', min: 300 },
-            { name: 'ORTOLANO', min: 100 }, { name: 'CARNI NOBILI', min: 150 }, { name: 'ACQUA DI PARMA', min: 300 }, { name: 'MARR', min: 200 },
-            { name: 'OYSTER OASIS', min: 150 }, { name: 'DE AMICIS', min: 180 }, { name: 'GRANCHEF', min: 120 }, { name: 'JFC', min: 150 },
-            { name: 'WINTERHALTER', min: 200 }, { name: 'ICA SYSTEM', min: 120 }, { name: 'DYPTIQUE', min: 100 }
-        ];
-
-        const appState = loadState();
-        applyLocalConnectionSettings();
-        hydrateDerivedState();
-        let lastAddedProductId = null;
-        let autoSyncTimer = null;
-        let autoSyncInFlight = false;
-        let autoSyncQueued = false;
-        let adminPullTimer = null;
-        let adminPullInFlight = false;
-        let globalPullTimer = null;
-        const HOME_WIDGET_LABELS = {
-            pending: 'Ordini Pending',
-            saving: 'Saving Stimato',
-            suppliers: 'Porto Franco',
-            inbox: 'Vai Inbox',
-            reports: 'Apri Report',
-            catalog: 'Catalogo'
+        let appState = {
+            currentUser: 'admin',
+            products: [
+                { id: 1, name: 'Tartufi di Mare', cat: 'Ittico', sub: 'Bivalvi', um: 'kg', prices: { 'METRO': 11.12 } },
+                { id: 2, name: 'Astice Blu Vivo', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 65.90 } },
+                { id: 3, name: 'Gambero Rosso 2°', cat: 'Ittico', sub: 'Crostacei', um: 'kg', prices: { 'OROBICA': 59.00 } },
+                { id: 4, name: 'Branzino Grecia', cat: 'Ittico', sub: 'Pesce', um: 'kg', prices: { 'METRO': 11.71 } },
+                { id: 5, name: 'Carciofi Mammola', cat: 'Verdure', sub: 'Verdura', um: 'pz', prices: { 'OROBICA': 1.18 } },
+                { id: 6, name: 'Patate', cat: 'Verdure', sub: 'Verdura', um: 'kg', prices: { 'ORTOLANO': 0.90 } },
+                { id: 7, name: 'Carne Trita 80/20', cat: 'Consumabili', sub: 'Carne', um: 'kg', prices: { 'CARNI NOBILI': 10.00 } },
+                { id: 8, name: 'Pasta Staff', cat: 'Consumabili', sub: 'Pasta', um: 'kg', prices: { 'METRO': 1.16 } },
+                { id: 9, name: 'Sapone refill Arancia', cat: 'Cleaning', sub: 'Bagno', um: 'pz', prices: { 'ACQUA DI PARMA': 33.00 } },
+                { id: 10, name: 'Detergente lavastoviglie', cat: 'Cleaning', sub: 'Cucina', um: 'pz', prices: { 'METRO': 10.00 } }
+            ],
+            suppliers: [{ name: 'METRO', min: 150 }, { name: 'OROBICA', min: 250 }, { name: 'LINEA MARE', min: 200 }, { name: 'CARNI NOBILI', min: 150 }, { name: 'ORTOLANO', min: 100 }],
+            reparti: ['Cucina', 'Sala', 'Bar', 'Wine'],
+            inbox: [], archive: [], charts: {}
         };
 
-        function normalizeText(v) {
-            return (v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-
-        function parseNumber(v) {
-            if (typeof v === 'number') return v;
-            return parseFloat(String(v || '0').replace(',', '.')) || 0;
-        }
-
-        function loadState() {
+        async function syncData() {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) {
-                    return {
-                        currentUser: 'admin',
-                        currentDept: '',
-                        products: BASE_PRODUCTS,
-                        suppliers: BASE_SUPPLIERS.map(s => ({ ...s })),
-                        reparti: ['Cucina', 'Sala', 'Bar', 'Wine'],
-                        inbox: [],
-                        orderHistory: [],
-                        archive: [],
-                        priceHistory: [],
-                        pendingUpdates: {},
-                        charts: {},
-                        settings: { ...DEFAULT_SETTINGS }
-                    };
+                const res = await fetch('/api/state');
+                const data = await res.json();
+                if(data.ok && data.state) { 
+                    appState = {...appState, ...data.state};
+                    appState.currentUser = document.getElementById('role-selector').value;
+                    refreshUI(); 
                 }
-                const parsed = JSON.parse(raw);
-                return {
-                    currentUser: 'admin',
-                    currentDept: '',
-                    products: parsed.products || BASE_PRODUCTS,
-                    suppliers: parsed.suppliers || BASE_SUPPLIERS.map(s => ({ ...s })),
-                    reparti: parsed.reparti || ['Cucina', 'Sala', 'Bar', 'Wine'],
-                    inbox: parsed.inbox || [],
-                    orderHistory: parsed.orderHistory || [],
-                    archive: parsed.archive || [],
-                    priceHistory: parsed.priceHistory || [],
-                    pendingUpdates: {},
-                    charts: {},
-                    settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) }
-                };
-            } catch {
-                localStorage.removeItem(STORAGE_KEY);
-                return loadState();
-            }
+            } catch (e) { console.log("Offline mode"); }
         }
 
-        function readConnectionSettings() {
+        async function pushData() {
             try {
-                const raw = localStorage.getItem(CONNECTION_KEY);
-                if (!raw) return { serverUrl: '', serverApiKey: '', aiApiKey: '' };
-                const parsed = JSON.parse(raw);
-                return {
-                    serverUrl: (parsed.serverUrl || '').trim(),
-                    serverApiKey: (parsed.serverApiKey || '').trim(),
-                    aiApiKey: (parsed.aiApiKey || '').trim()
-                };
-            } catch {
-                return { serverUrl: '', serverApiKey: '', aiApiKey: '' };
-            }
+                await fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: appState }) });
+            } catch (e) { }
         }
 
-        function writeConnectionSettings() {
-            const payload = {
-                serverUrl: appState.settings.serverUrl || '',
-                serverApiKey: appState.settings.serverApiKey || '',
-                aiApiKey: appState.settings.aiApiKey || ''
-            };
-            localStorage.setItem(CONNECTION_KEY, JSON.stringify(payload));
-        }
-
-        function applyLocalConnectionSettings() {
-            const localConn = readConnectionSettings();
-            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-            appState.settings.serverUrl = localConn.serverUrl || appState.settings.serverUrl || fallbackOrigin;
-            appState.settings.serverApiKey = localConn.serverApiKey || '';
-            appState.settings.aiApiKey = localConn.aiApiKey || '';
-            writeConnectionSettings();
-        }
-
-        function saveState() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                products: appState.products,
-                suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
-                reparti: appState.reparti,
-                inbox: appState.inbox,
-                orderHistory: appState.orderHistory || [],
-                archive: appState.archive,
-                priceHistory: appState.priceHistory || [],
-                settings: {
-                    ...appState.settings,
-                    aiApiKey: '',
-                    serverUrl: '',
-                    serverApiKey: ''
-                }
-            }));
-            writeConnectionSettings();
-            queueAutoSync();
-        }
-
-        function queueAutoSync() {
-            const url = (appState.settings.serverUrl || '').trim().replace(/\/+$/, '');
-            if (!url) return;
-            clearTimeout(autoSyncTimer);
-            autoSyncTimer = setTimeout(async () => {
-                if (autoSyncInFlight) {
-                    autoSyncQueued = true;
-                    return;
-                }
-                autoSyncInFlight = true;
-                try {
-                    await saveStateToServer({ silent: true });
-                } finally {
-                    autoSyncInFlight = false;
-                    if (autoSyncQueued) {
-                        autoSyncQueued = false;
-                        queueAutoSync();
-                    }
-                }
-            }, 1200);
-        }
-
-        function hydrateDerivedState() {
-            appState.suppliers = appState.suppliers.map(s => ({ ...s, currentTotal: 0, items: [], belowWindow: false }));
-            const windowDays = getPortoFrancoWindowDays();
-            appState.archive.filter(order => withinDays(order, windowDays)).forEach(order => {
-                (order.allocations || []).forEach(a => {
-                    const sup = appState.suppliers.find(s => s.name === a.supplier);
-                    if (!sup) return;
-                    sup.currentTotal += a.total;
-                    a.items.forEach(i => sup.items.push(`${i.productName} x${i.qty}`));
-                });
-            });
-            appState.suppliers.forEach(s => {
-                s.belowWindow = s.currentTotal > 0 && s.currentTotal < s.min;
-            });
-        }
-
-        function getPortoFrancoWindowDays() {
-            const w = appState.settings.portoFrancoWindow || 'weekly';
-            if (w === 'daily') return 1;
-            if (w === 'monthly') return 30;
-            return 7;
-        }
-
-        // --- SISTEMA DI NAVIGAZIONE BLINDATO ---
-        function switchView(viewId) {
-            appState.activeView = viewId;
-            document.querySelectorAll('.view-section').forEach(s => {
-                s.style.display = 'none';
-                s.classList.remove('active', 'active-flex');
-            });
+        function switchView(id) {
+            document.querySelectorAll('.view-section').forEach(s => { s.style.display='none'; s.classList.remove('active','active-flex'); });
+            const target = document.getElementById(`view-${id}`);
+            if(target) { target.style.display = (id === 'department') ? 'flex' : 'block'; target.classList.add(id === 'department' ? 'active-flex' : 'active'); }
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            
-            const target = document.getElementById(`view-${viewId}`);
-            if (target) {
-                target.style.display = (viewId === 'department') ? 'flex' : 'block';
-                if(viewId === 'department') target.classList.add('active-flex');
-                else target.classList.add('active');
-            }
-            
-            const activeTab = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(viewId.toLowerCase().split('-')[0]));
-            if(activeTab) activeTab.classList.add('active');
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(id.toLowerCase().split('-')[0]));
+            if(btn) btn.classList.add('active');
+            refreshUI();
+        }
 
-            if (viewId === 'home') renderHomeView();
-            if(viewId === 'dashboard') renderConsolidation();
-            if(viewId === 'reports') { populateReportFilters(); updateCharts(); }
-            if(viewId === 'config') renderConfig();
-            if(viewId === 'inbox') renderInbox();
-            if(viewId === 'catalog') renderCatalogMgmt();
-            if(viewId === 'price-update') populateSupplierSelect();
-            updateAiHelpCopy();
+        function refreshUI() {
+            renderDashboard(); renderCatalog(); renderArchive(); renderInbox(); renderConfig();
+            if(document.getElementById('view-reports').classList.contains('active')) { populateReportFilters(); initCharts(); }
         }
 
         function handleRoleChange() {
             const role = document.getElementById('role-selector').value;
             appState.currentUser = role;
-            const sidebar = document.getElementById('sidebar');
-            const adminHeader = document.getElementById('admin-header');
-            const roleWrap = document.getElementById('role-switcher-wrap');
-
-            if (appState.kioskMode) {
-                appState.currentUser = appState.forcedDept;
-                appState.currentDept = appState.forcedDept;
-                sidebar.style.display = 'none';
-                adminHeader.style.display = 'none';
-                if (roleWrap) roleWrap.style.display = 'none';
-                document.getElementById('dept-name-display').innerText = `Reparto: ${appState.forcedDept}`;
-                switchView('department');
-                updateAiHelpCopy();
-                return;
-            }
-            
-            if (role === 'admin') { 
-                sidebar.style.display = 'flex'; 
-                adminHeader.style.display = 'flex'; 
-                if (roleWrap) roleWrap.style.display = 'flex';
-                switchView('home');
-                startAdminInboxPolling();
-                pullStateFromServerSilently();
-                updateAiHelpCopy();
-            } else { 
-                sidebar.style.display = 'none'; 
-                adminHeader.style.display = 'none'; 
-                if (roleWrap) roleWrap.style.display = 'none';
-                appState.currentDept = role;
-                document.getElementById('dept-name-display').innerText = `Reparto: ${role}`;
-                switchView('department');
-                if (adminPullTimer) clearInterval(adminPullTimer);
-                updateAiHelpCopy();
-            }
+            const s = document.getElementById('sidebar');
+            const h = document.getElementById('admin-header');
+            if(role === 'admin') { s.style.display='flex'; h.style.display='flex'; switchView('dashboard'); }
+            else { s.style.display='none'; h.style.display='none'; document.getElementById('dept-name-display').innerText=`Reparto: ${role}`; switchView('department'); }
         }
 
-        // --- AI HELP (Gemini via server) ---
-        const AI_HELP_EXAMPLES = {
-            home: "Riassumimi i KPI principali e cosa devo controllare oggi.",
-            dashboard: "Perché vedo 'Ordini in sospeso'? Cosa devo fare per chiuderli?",
-            reports: "Come interpreto questi grafici? Quali azioni consigli?",
-            inbox: "Come approvo e assegno correttamente un ordine ai fornitori?",
-            catalog: "Come importo un nuovo catalogo e come evito duplicati?",
-            "price-update": "Come aggiorno le fatture e verifico aumenti prezzi?",
-            config: "Come aggiungo un nuovo reparto e genero il QR?",
-            department: "Come scrivo un ordine chiaro? Fai un esempio in 3 righe."
-        };
-
-        function getActiveViewId() {
-            if (appState && appState.activeView) return appState.activeView;
-            const el = Array.from(document.querySelectorAll('.view-section')).find(s => s.style.display !== 'none');
-            if (!el || !el.id) return 'home';
-            return el.id.replace(/^view-/, '') || 'home';
-        }
-
-        function updateAiHelpCopy() {
-            const viewId = getActiveViewId();
-            const titleEl = document.getElementById('ai-help-title');
-            const subEl = document.getElementById('ai-help-subtitle');
-            if (titleEl) titleEl.innerText = "Chiedi aiuto a Gemini";
-            if (subEl) subEl.innerText = `Contesto: ${viewId}`;
-        }
-
-        function toggleAiHelp() {
-            const panel = document.getElementById('ai-help-panel');
-            if (!panel) return;
-            const isOpen = !panel.classList.contains('hidden');
-            if (isOpen) closeAiHelp();
-            else openAiHelp();
-        }
-
-        function openAiHelp() {
-            const panel = document.getElementById('ai-help-panel');
-            if (!panel) return;
-            panel.classList.remove('hidden');
-            updateAiHelpCopy();
-            setTimeout(() => {
-                const q = document.getElementById('ai-help-question');
-                if (q) q.focus();
-            }, 50);
-        }
-
-        function closeAiHelp() {
-            const panel = document.getElementById('ai-help-panel');
-            if (!panel) return;
-            panel.classList.add('hidden');
-        }
-
-        function fillAiHelpExample() {
-            const viewId = getActiveViewId();
-            const q = document.getElementById('ai-help-question');
-            if (!q) return;
-            q.value = AI_HELP_EXAMPLES[viewId] || "Aiutami con questa pagina: cosa devo fare e quali errori evitare?";
-        }
-
-        function setAiHelpStatus(kind, text) {
-            const el = document.getElementById('ai-help-status');
-            if (!el) return;
-            el.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'bg-amber-50', 'text-amber-700', 'border-amber-200', 'bg-rose-50', 'text-rose-700', 'border-rose-200');
-            el.classList.add('border');
-            if (kind === 'ok') el.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
-            else if (kind === 'warn') el.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
-            else el.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
-            el.innerText = text || '';
-        }
-
-        function buildAiHelpContext() {
-            const viewId = getActiveViewId();
-            return {
-                view: viewId,
-                currentUser: appState.currentUser || '',
-                currentDept: appState.currentDept || '',
-                counts: {
-                    products: Array.isArray(appState.products) ? appState.products.length : 0,
-                    suppliers: Array.isArray(appState.suppliers) ? appState.suppliers.length : 0,
-                    inbox: Array.isArray(appState.inbox) ? appState.inbox.length : 0,
-                    archive: Array.isArray(appState.archive) ? appState.archive.length : 0
-                },
-                settings: {
-                    portoFrancoWindow: (appState.settings || {}).portoFrancoWindow,
-                    allocationMode: (appState.settings || {}).allocationMode
-                }
-            };
-        }
-
-        async function sendAiHelp() {
-            const btn = document.getElementById('ai-help-send');
-            const qEl = document.getElementById('ai-help-question');
-            const ansWrap = document.getElementById('ai-help-answer-wrap');
-            const ansEl = document.getElementById('ai-help-answer');
-            const viewId = getActiveViewId();
-            const question = (qEl?.value || '').trim();
-            if (!question) {
-                setAiHelpStatus('warn', 'Scrivi una domanda.');
-                return;
-            }
-            if (ansWrap) ansWrap.classList.add('hidden');
-            if (btn) btn.disabled = true;
-            setAiHelpStatus('ok', 'Gemini sta rispondendo...');
-
+        async function submitOrder() {
+            const nome = document.getElementById('d-nome').value;
+            const testo = document.getElementById('d-text').value;
+            if(!nome || !testo) return alert("Inserisci dati.");
+            const btn = document.getElementById('btn-submit-order');
+            btn.innerText = "⏳ IA in corso..."; btn.disabled = true;
+            let aiData = null;
             try {
-                const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-                const base = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
-                if (!base) throw new Error('Server non configurato');
-                const headers = { 'Content-Type': 'application/json' };
-                const key = (appState.settings.serverApiKey || '').trim();
-                if (key) headers['X-API-Key'] = key;
-
-                const res = await fetch(`${base}/api/ai/help`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                        page: viewId,
-                        question,
-                        context: buildAiHelpContext(),
-                        model: 'gemini-2.0-flash'
-                    })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data?.ok) {
-                    throw new Error(data?.error || `AI error ${res.status}`);
-                }
-                if (ansEl) ansEl.innerText = (data.answer || '').trim();
-                if (ansWrap) ansWrap.classList.remove('hidden');
-                setAiHelpStatus('ok', 'Risposta pronta.');
-            } catch (e) {
-                setAiHelpStatus('error', (e && e.message) ? e.message : 'Errore AI');
-            } finally {
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        // --- CONFIGURAZIONE E QR CODES ---
-        function switchConfigTab(id) {
-            document.querySelectorAll('.config-inner').forEach(s => s.classList.add('hidden'));
-            document.querySelectorAll('.config-sub-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(`config-sec-${id}`).classList.remove('hidden');
-            document.getElementById(`config-btn-${id}`).classList.add('active');
-        }
-
-        function renderConfig() {
-            // Fornitori
-            const sList = document.getElementById('config-suppliers-list');
-            if(sList) sList.innerHTML = appState.suppliers.map(s => `<div class="glass-card p-4 flex justify-between items-center"><span class="text-xs font-black">${s.name}</span><div class="flex items-center gap-2"><span class="text-[9px] text-slate-400">Min. Ordine:</span><input type="number" value="${s.min}" onchange="updateMin('${s.name}', this.value)" class="w-20 p-1 border rounded text-xs text-center font-bold outline-none"></div></div>`).join('');
-            
-            // Reparti e QR Codes
-            const qList = document.getElementById('config-qr-list');
-            if(qList) {
-                qList.innerHTML = appState.reparti.map(r => `
-                    <div class="glass-card p-4 flex flex-col items-center gap-3">
-                        <div id="qr-${r}" class="p-2 bg-white rounded-lg shadow-sm border"></div>
-                        <span class="text-[10px] font-black uppercase text-slate-900">${r}</span>
-                    </div>`).join('');
-                
-                // Genera i QR fisici usando la libreria qrcode.js
-                setTimeout(() => {
-                    appState.reparti.forEach(r => {
-                        const el = document.getElementById(`qr-${r}`);
-                        if(el) {
-                            el.innerHTML = '';
-                            new QRCode(el, { text: `${window.location.origin}${window.location.pathname}?reparto=${encodeURIComponent(r)}`, width: 80, height: 80, colorDark : "#0a2540", colorLight : "#ffffff" });
-                        }
-                    });
-                }, 100);
-            }
-            document.getElementById('ui-brand-input').value = appState.settings.brandName || 'Sea Signora';
-            renderPriceVersionFilters();
-            renderPriceVersions();
-            renderHomeWidgetControls();
-        }
-
-        function renderPriceVersionFilters() {
-            const supplierSel = document.getElementById('version-filter-supplier');
-            if (supplierSel) {
-                const current = supplierSel.value || 'all';
-                supplierSel.innerHTML = '<option value="all">Tutti</option>' + appState.suppliers.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-                supplierSel.value = Array.from(supplierSel.options).some(o => o.value === current) ? current : 'all';
-            }
-            const trendSupplierSel = document.getElementById('version-trend-supplier');
-            if (trendSupplierSel) {
-                const current = trendSupplierSel.value || 'all';
-                trendSupplierSel.innerHTML = '<option value="all">Tutti</option>' + appState.suppliers.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-                trendSupplierSel.value = Array.from(trendSupplierSel.options).some(o => o.value === current) ? current : 'all';
-            }
-            const trendProductSel = document.getElementById('version-trend-product');
-            if (trendProductSel) {
-                const current = trendProductSel.value || '';
-                trendProductSel.innerHTML = '<option value="">Seleziona prodotto</option>' + appState.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-                trendProductSel.value = Array.from(trendProductSel.options).some(o => o.value === current) ? current : '';
-            }
-        }
-
-        function getSourceLabel(source) {
-            const map = {
-                'invoice-update': 'Fattura',
-                'excel': 'Excel',
-                'raw-import': 'Import Testo',
-                'extended-catalog': 'Catalogo Esteso',
-                'rollback': 'Rollback',
-                'import': 'Import',
-                'manual': 'Manuale'
-            };
-            return map[source] || source || '-';
-        }
-
-        function renderPriceVersions() {
-            const body = document.getElementById('price-history-table-body');
-            if (!body) return;
-            const sup = document.getElementById('version-filter-supplier')?.value || 'all';
-            const source = document.getElementById('version-filter-source')?.value || 'all';
-            const q = normalizeText(document.getElementById('version-filter-product')?.value || '');
-
-            const rows = (appState.priceHistory || []).filter(h => {
-                if (sup !== 'all' && h.supplier !== sup) return false;
-                if (source !== 'all' && h.source !== source) return false;
-                const p = appState.products.find(x => x.id === h.productId);
-                const name = normalizeText(p?.name || '');
-                if (q && !name.includes(q)) return false;
-                return true;
-            }).slice(0, 200);
-
-            body.innerHTML = rows.length === 0
-                ? '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400 font-bold uppercase">Nessun evento storico</td></tr>'
-                : rows.map(h => {
-                    const p = appState.products.find(x => x.id === h.productId);
-                    const volatility = getProductVolatility(h.productId);
-                    const badge = volatility >= 15
-                        ? '<span class="ml-2 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-black uppercase">Volatilita alta</span>'
-                        : volatility >= 8
-                            ? '<span class="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-black uppercase">Volatilita media</span>'
-                            : '<span class="ml-2 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">Volatilita bassa</span>';
-                    return `<tr class="hover:bg-slate-50">
-                        <td class="px-4 py-3">${new Date(h.dateISO).toLocaleString('it-IT')}</td>
-                        <td class="px-4 py-3 font-bold">${p?.name || 'Prodotto non trovato'}${badge}</td>
-                        <td class="px-4 py-3">${h.supplier}</td>
-                        <td class="px-4 py-3 text-right">€ ${parseNumber(h.oldPrice).toFixed(2)}</td>
-                        <td class="px-4 py-3 text-right">€ ${parseNumber(h.newPrice).toFixed(2)}</td>
-                        <td class="px-4 py-3">${getSourceLabel(h.source)}</td>
-                        <td class="px-4 py-3 text-right"><button onclick="rollbackPriceVersion('${h.id}')" class="px-2 py-1 border rounded text-[10px] font-black uppercase">Rollback</button></td>
-                    </tr>`;
-                }).join('');
-            renderPriceHistoryTrend();
-        }
-
-        function renderPriceHistoryTrend() {
-            const canvas = document.getElementById('priceHistoryTrendChart');
-            if (!canvas) return;
-            if (appState.charts.priceHistoryTrend) appState.charts.priceHistoryTrend.destroy();
-            const productId = document.getElementById('version-trend-product')?.value || '';
-            const supplier = document.getElementById('version-trend-supplier')?.value || 'all';
-            const maWindow = parseInt(document.getElementById('version-trend-ma')?.value || '0', 10);
-            const multiSupplier = !!document.getElementById('version-trend-multi')?.checked;
-            if (!productId) {
-                const ctxEmpty = canvas.getContext('2d');
-                appState.charts.priceHistoryTrend = new Chart(ctxEmpty, {
-                    type: 'line',
-                    data: { labels: [], datasets: [{ data: [] }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Seleziona un prodotto per vedere il trend prezzi' } }, scales: { x: { display: false }, y: { display: false } } }
-                });
-                return;
-            }
-
-            const events = (appState.priceHistory || [])
-                .filter(h => String(h.productId) === String(productId))
-                .filter(h => supplier === 'all' ? true : h.supplier === supplier)
-                .sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO));
-
-            if (!events.length) {
-                const ctxNone = canvas.getContext('2d');
-                appState.charts.priceHistoryTrend = new Chart(ctxNone, {
-                    type: 'line',
-                    data: { labels: [], datasets: [{ data: [] }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Nessun dato storico per i filtri selezionati' } }, scales: { x: { display: false }, y: { display: false } } }
-                });
-                return;
-            }
-
-            const labels = Array.from(new Set(events.map(e => new Date(e.dateISO).toLocaleDateString('it-IT'))));
-            const palette = ['#10233f', '#1f4e79', '#3b82f6', '#0f766e', '#7c3aed', '#be123c'];
-            let datasets = [];
-
-            const suppliers = multiSupplier
-                ? Array.from(new Set(events.map(e => e.supplier)))
-                : [supplier === 'all' ? (events[events.length - 1]?.supplier || 'N/A') : supplier];
-
-            suppliers.forEach((supName, idx) => {
-                const supEvents = events.filter(e => e.supplier === supName);
-                if (!supEvents.length) return;
-                const points = labels.map(lbl => {
-                    let hit = null;
-                    for (let i = supEvents.length - 1; i >= 0; i--) {
-                        if (new Date(supEvents[i].dateISO).toLocaleDateString('it-IT') === lbl) { hit = supEvents[i]; break; }
-                    }
-                    return hit ? parseNumber(hit.newPrice) : null;
-                });
-                datasets.push({
-                    label: supName,
-                    data: points,
-                    borderColor: palette[idx % palette.length],
-                    backgroundColor: 'transparent',
-                    tension: 0.25,
-                    fill: false,
-                    pointRadius: 3
-                });
-
-                if (maWindow > 1) {
-                    datasets.push({
-                        label: `${supName} MA(${maWindow})`,
-                        data: movingAverage(points, maWindow),
-                        borderColor: palette[idx % palette.length],
-                        borderDash: [6, 4],
-                        backgroundColor: 'transparent',
-                        tension: 0.25,
-                        fill: false,
-                        pointRadius: 0
-                    });
-                }
-            });
-
-            const ctx = canvas.getContext('2d');
-            appState.charts.priceHistoryTrend = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: 'bottom' } },
-                    scales: {
-                        y: { ticks: { callback: (v) => `€ ${Number(v).toFixed(2)}` } }
-                    }
-                }
-            });
-        }
-
-        function movingAverage(arr, windowSize) {
-            if (!windowSize || windowSize <= 1) return arr;
-            return arr.map((_, i) => {
-                const slice = arr.slice(Math.max(0, i - windowSize + 1), i + 1).filter(v => v !== null && Number.isFinite(v));
-                if (!slice.length) return null;
-                return slice.reduce((s, v) => s + v, 0) / slice.length;
-            });
-        }
-
-        function getProductVolatility(productId) {
-            const series = (appState.priceHistory || [])
-                .filter(h => String(h.productId) === String(productId))
-                .map(h => parseNumber(h.newPrice))
-                .filter(v => Number.isFinite(v) && v > 0)
-                .slice(0, 30);
-            if (series.length < 3) return 0;
-            const avg = series.reduce((s, v) => s + v, 0) / series.length;
-            const max = Math.max(...series);
-            const min = Math.min(...series);
-            return avg ? ((max - min) / avg) * 100 : 0;
-        }
-
-        function updateMin(name, val) {
-            const s = appState.suppliers.find(x => x.name === name);
-            if (s) s.min = parseNumber(val);
-            saveState();
-            renderConsolidation();
-        }
-
-        function setBrandName(val) {
-            appState.settings.brandName = val || 'Sea Signora';
-            document.getElementById('ui-brand-name').innerText = appState.settings.brandName;
-            saveState();
-        }
-
-        function setAccentColor(val) {
-            appState.settings.accentColor = val || '#c5a059';
-            document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor);
-            saveState();
-        }
-
-        function setAllocationMode(val) {
-            appState.settings.allocationMode = val || 'hybrid';
-            saveState();
-        }
-
-        function setPenaltyRate(val) {
-            appState.settings.penaltyRate = Math.max(0, parseNumber(val));
-            saveState();
-        }
-
-        function setPortoFrancoWindow(val) {
-            appState.settings.portoFrancoWindow = val || 'weekly';
-            saveState();
-            hydrateDerivedState();
-            renderConsolidation();
-        }
-
-        function setAiEnabled(val) {
-            appState.settings.aiEnabled = true;
-            saveState();
-        }
-
-        function setAiProvider(val) {
-            appState.settings.aiProvider = 'gemini';
-            saveState();
-        }
-
-        function setAiModel(val) {
-            appState.settings.aiModel = 'gemini-2.0-flash';
-            saveState();
-        }
-
-        function setAiApiKey(val) {
-            appState.settings.aiApiKey = (val || '').trim();
-            saveState();
-        }
-
-        function saveAliases() {
-            const lines = (document.getElementById('ui-aliases-area').value || '').split('\n');
-            const aliases = {};
-            lines.forEach(line => {
-                const [k, v] = line.split('=>').map(x => (x || '').trim());
-                if (!k || !v) return;
-                aliases[normalizeText(k)] = v;
-            });
-            appState.settings.aliases = aliases;
-            saveState();
-            alert('✓ Sinonimi AI salvati.');
-        }
-
-        async function callOpenAiForOrder(text) {
-            const key = appState.settings.aiApiKey || '';
-            if (!key) throw new Error('API key mancante');
-            const catalog = appState.products.slice(0, 200).map(p => ({
-                id: p.id,
-                name: p.name,
-                um: p.um,
-                cat: p.cat,
-                sub: p.sub
-            }));
-
-            const prompt = {
-                role: 'user',
-                content:
-                    `Analizza questa lista spesa e fai il match con il catalogo.\n` +
-                    `Restituisci SOLO JSON valido nel formato {"items":[{"productId":number,"qty":number}]}\n` +
-                    `Regole: qty default 1, usa il prodotto catalogo piu vicino semanticamente.\n\n` +
-                    `Catalogo:\n${JSON.stringify(catalog)}\n\n` +
-                    `Testo ordine:\n${text}`
-            };
-
-            const res = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model: appState.settings.aiModel || 'gpt-4o-mini',
-                    temperature: 0.1,
-                    messages: [
-                        { role: 'system', content: 'Sei un parser ordini. Rispondi solo con JSON.' },
-                        prompt
-                    ]
-                })
-            });
-            if (!res.ok) throw new Error(`AI error ${res.status}`);
-            const data = await res.json();
-            const content = data?.choices?.[0]?.message?.content || '{}';
-            const parsed = JSON.parse(content);
-            return parsed;
-        }
-
-        async function callGeminiForOrder(text) {
-            const catalog = appState.products.slice(0, 200).map(p => ({
-                id: p.id,
-                name: p.name,
-                um: p.um,
-                cat: p.cat,
-                sub: p.sub
-            }));
-            const model = appState.settings.aiModel || 'gemini-2.0-flash';
-            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-            const base = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
-            const key = (appState.settings.serverApiKey || '').trim();
-            if (!base) throw new Error('Server non configurato');
-            const headers = { 'Content-Type': 'application/json' };
-            if (key) headers['X-API-Key'] = key;
-            const res = await fetch(`${base}/api/ai/order-parse`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ text, catalog, model })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data?.ok && data?.parsed) return data.parsed;
-            throw new Error(data?.error || `Gemini server error ${res.status}`);
-        }
-
-        async function analyzeOrderAI(id) {
-            const req = appState.inbox.find(r => r.id === id);
-            if (!req) return;
-            req.aiStatus = 'loading';
-            renderInbox();
-            try {
-                let aiItems = [];
-                const parsed = await callGeminiForOrder(req.text);
-                aiItems = (parsed.items || []).map(row => {
-                    const product = appState.products.find(p => String(p.id) === String(row.productId));
-                    if (!product) return null;
-                    return { product, qty: parseNumber(row.qty || 1) || 1 };
-                }).filter(Boolean);
-                if (aiItems.length === 0) aiItems = parseOrderText(req.text);
-                req.aiAnalysis = aiItems.map(x => ({ productId: x.product.id, qty: x.qty }));
-                req.aiStatus = 'done';
-                saveState();
-                renderInbox();
-            } catch (e) {
-                req.aiStatus = 'error';
-                req.aiError = String(e?.message || e);
-                renderInbox();
-            }
-        }
-
-        function exportDataBackup() {
-            const payload = {
-                products: appState.products,
-                suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
-                reparti: appState.reparti,
-                inbox: appState.inbox,
-                archive: appState.archive,
-                priceHistory: appState.priceHistory || [],
-                settings: appState.settings
-            };
-            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `seasignora-backup-${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function triggerImportBackup() {
-            document.getElementById('backup-import-input').click();
-        }
-
-        function importDataBackup(event) {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                try {
-                    const data = JSON.parse(String(reader.result || '{}'));
-                    if (!Array.isArray(data.products) || !Array.isArray(data.suppliers)) throw new Error('Formato non valido');
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                    alert('✓ Backup importato. La pagina verra ricaricata.');
-                    window.location.reload();
-                } catch {
-                    alert('Backup non valido.');
-                } finally {
-                    event.target.value = '';
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        function resetAllData() {
-            if (!confirm('Confermi il reset completo di dati e personalizzazioni?')) return;
-            localStorage.removeItem(STORAGE_KEY);
-            window.location.reload();
-        }
-
-        function setServerUrl(val) {
-            appState.settings.serverUrl = (val || '').trim().replace(/\/+$/, '');
-            saveState();
-        }
-
-        function setServerApiKey(val) {
-            appState.settings.serverApiKey = (val || '').trim();
-            saveState();
-        }
-
-        function getSerializableState() {
-            const safeSettings = {
-                ...appState.settings,
-                aiApiKey: '',
-                serverUrl: '',
-                serverApiKey: ''
-            };
-            return {
-                products: appState.products,
-                suppliers: appState.suppliers.map(s => ({ name: s.name, min: s.min })),
-                reparti: appState.reparti,
-                inbox: appState.inbox,
-                orderHistory: appState.orderHistory || [],
-                archive: appState.archive,
-                priceHistory: appState.priceHistory || [],
-                settings: safeSettings
-            };
-        }
-
-        async function loadStateFromServer() {
-            const url = appState.settings.serverUrl;
-            if (!url) return alert('Inserisci URL Server nelle impostazioni.');
-            try {
-                const res = await fetch(`${url}/api/state`);
+                const res = await fetch('/api/ai/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: testo, catalog: appState.products.map(p=>({id: p.id, name: p.name})) }) });
                 const data = await res.json();
-                if (!res.ok || !data.ok) throw new Error(data.error || 'Errore lettura server');
-                const merged = {
-                    ...data.state,
-                    settings: {
-                        ...DEFAULT_SETTINGS,
-                        ...(data.state?.settings || {}),
-                        aiApiKey: appState.settings.aiApiKey || '',
-                        serverUrl: appState.settings.serverUrl || '',
-                        serverApiKey: appState.settings.serverApiKey || ''
-                    }
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-                alert('✓ Dati caricati dal server. La pagina verra ricaricata.');
-                window.location.reload();
-            } catch (e) {
-                alert(`Errore caricamento server: ${String(e.message || e)}`);
-            }
+                if(data.ok) aiData = data.parsed;
+            } catch (e) {}
+            appState.inbox.push({ id: Date.now(), dept: appState.currentUser, staff: nome, date: new Date().toLocaleTimeString('it-IT'), text: testo, aiParsed: aiData });
+            await pushData();
+            document.getElementById('d-text').value = ''; alert("✓ Ordine Inviato.");
+            btn.innerText = "🚀 Invia Nuovo Ordine"; btn.disabled = false;
         }
 
-        function applyRemoteState(remote) {
-            if (!remote || typeof remote !== 'object') return;
-            if (Array.isArray(remote.products)) appState.products = remote.products;
-            if (Array.isArray(remote.suppliers)) appState.suppliers = remote.suppliers;
-            if (Array.isArray(remote.reparti)) appState.reparti = remote.reparti;
-            if (Array.isArray(remote.inbox)) appState.inbox = remote.inbox;
-            if (Array.isArray(remote.orderHistory)) appState.orderHistory = remote.orderHistory;
-            if (Array.isArray(remote.archive)) appState.archive = remote.archive;
-            if (Array.isArray(remote.priceHistory)) appState.priceHistory = remote.priceHistory;
-            if (remote.settings && typeof remote.settings === 'object') {
-                appState.settings = {
-                    ...appState.settings,
-                    ...remote.settings,
-                    aiApiKey: appState.settings.aiApiKey || '',
-                    serverUrl: appState.settings.serverUrl || '',
-                    serverApiKey: appState.settings.serverApiKey || ''
-                };
-            }
-        }
-
-        async function pullStateFromServerSilently() {
-            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-            const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
-            if (!url || adminPullInFlight) return;
-            adminPullInFlight = true;
-            try {
-                const res = await fetch(`${url}/api/state`);
-                const data = await res.json();
-                if (!res.ok || !data.ok || !data.state) return;
-                applyRemoteState(data.state);
-                const inboxVisible = document.getElementById('view-inbox')?.style.display !== 'none';
-                if (inboxVisible) renderInbox();
-                const catVisible = document.getElementById('view-catalog')?.style.display !== 'none';
-                if (catVisible) renderCatalogMgmt();
-                const dashboardVisible = document.getElementById('view-dashboard')?.style.display !== 'none';
-                if (dashboardVisible) renderConsolidation();
-            } catch {
-                // do nothing, non-blocking background sync
-            } finally {
-                adminPullInFlight = false;
-            }
-        }
-
-        function startAdminInboxPolling() {
-            if (adminPullTimer) clearInterval(adminPullTimer);
-            adminPullTimer = setInterval(() => {
-                pullStateFromServerSilently();
-            }, 8000);
-        }
-
-        function startGlobalStatePolling() {
-            if (globalPullTimer) clearInterval(globalPullTimer);
-            globalPullTimer = setInterval(() => {
-                pullStateFromServerSilently();
-            }, 10000);
-        }
-
-        async function saveStateToServer(opts = {}) {
-            const silent = !!opts.silent;
-            const url = appState.settings.serverUrl;
-            const key = (appState.settings.serverApiKey || '').trim();
-            if (!url) {
-                if (!silent) alert('Inserisci URL Server nelle impostazioni.');
-                return;
-            }
-            try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (key) headers['X-API-Key'] = key;
-                const res = await fetch(`${url}/api/state`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ state: getSerializableState() })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.ok) throw new Error(data.error || 'Errore salvataggio server');
-                if (!silent) alert('✓ Dati inviati al server con successo.');
-            } catch (e) {
-                if (!silent) alert(`Errore salvataggio server: ${String(e.message || e)}`);
-            }
-        }
-
-        async function notifyAdminEmail(type, data) {
-            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-            const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
-            const key = (appState.settings.serverApiKey || '').trim();
-            if (!url) return;
-            try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (key) headers['X-API-Key'] = key;
-                await fetch(`${url}/api/notify`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ type, data })
-                });
-            } catch {
-                // silently ignore, main flow must continue
-            }
-        }
-
-        async function submitOrderDirectlyToServer(orderPayload) {
-            const fallbackOrigin = (window.location && window.location.origin) ? window.location.origin : '';
-            const url = (appState.settings.serverUrl || fallbackOrigin).trim().replace(/\/+$/, '');
-            const key = (appState.settings.serverApiKey || '').trim();
-            if (!url) return { ok: false, emailDelivered: false, error: 'Server URL mancante' };
-            try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (key) headers['X-API-Key'] = key;
-                const res = await fetch(`${url}/api/order`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(orderPayload)
-                });
-                const data = await res.json().catch(() => ({}));
-                return {
-                    ok: !!(res.ok && data && data.ok),
-                    emailDelivered: !!(data && data.emailDelivered),
-                    error: (data && data.emailError) ? data.emailError : ''
-                };
-            } catch {
-                return { ok: false, emailDelivered: false, error: 'Errore rete invio ordine' };
-            }
-        }
-
-        function ensureSeedCatalogInCurrentState() {
-            if (!Array.isArray(appState.products)) appState.products = [];
-            if (!Array.isArray(appState.suppliers)) appState.suppliers = [];
-            if (!Array.isArray(appState.reparti) || appState.reparti.length === 0) appState.reparti = ['Cucina', 'Sala', 'Bar', 'Wine'];
-
-            BASE_PRODUCTS.forEach(p => {
-                upsertProductWithPrice({
-                    name: p.name,
-                    cat: p.cat,
-                    sub: p.sub,
-                    um: p.um,
-                    supplier: Object.keys(p.prices || {})[0] || 'METRO',
-                    price: Object.values(p.prices || {})[0] || 0,
-                    source: 'seed-base'
-                });
-            });
-
-            EXTENDED_CATALOG.forEach(row => {
-                upsertProductWithPrice({
-                    name: row.name,
-                    cat: row.cat,
-                    sub: row.sub,
-                    um: row.um,
-                    supplier: row.supplier,
-                    price: parseNumber(row.price),
-                    source: 'seed-extended'
-                });
-            });
-
-            BASE_SUPPLIERS.forEach(s => {
-                if (!appState.suppliers.some(x => x.name === s.name)) appState.suppliers.push({ name: s.name, min: s.min, currentTotal: 0, items: [] });
-            });
-        }
-
-        async function initializeFullCatalogOnServer() {
-            const proceed = confirm('Vuoi inizializzare il catalogo completo sul server? Non elimina ordini esistenti.');
-            if (!proceed) return;
-            const before = appState.products.length;
-            ensureSeedCatalogInCurrentState();
-            const added = Math.max(0, appState.products.length - before);
-            saveState();
-            renderCatalogMgmt();
-            renderConfig();
-            await saveStateToServer();
-            alert(`✓ Catalogo completo inizializzato. Nuovi prodotti inseriti: ${added}.`);
-        }
-
-        function addSupplier() {
-            const name = prompt('Nome fornitore (es: FAST FRUIT)');
-            if (!name) return;
-            const normalized = name.trim().toUpperCase();
-            if (appState.suppliers.some(s => s.name === normalized)) return alert('Fornitore gia presente.');
-            appState.suppliers.push({ name: normalized, min: 100, currentTotal: 0, items: [] });
-            saveState();
-            renderConfig();
-        }
-
-        function addDepartment() {
-            const name = prompt('Nome reparto (es: Pasticceria)');
-            if (!name) return;
-            const dep = name.trim();
-            if (appState.reparti.includes(dep)) return alert('Reparto gia presente.');
-            appState.reparti.push(dep);
-            const roleSel = document.getElementById('role-selector');
-            if (roleSel) {
-                roleSel.innerHTML = '<option value="admin">Amministratore</option>' + appState.reparti.map(r => `<option value="${r}">Reparto: ${r}</option>`).join('');
-            }
-            saveState();
-            renderConfig();
-        }
-
-        function processExcelImport() {
-            const lines = document.getElementById('excel-area').value.split('\n');
-            let count = 0;
-            lines.forEach(l => {
-                const parts = l.split(';').map(x => x.trim());
-                if(parts.length >= 5) {
-                    const [n, c, sub, u, p, s] = parts;
-                    if(n && u && p) {
-                        const supplierName = (s || 'METRO').toUpperCase();
-                        if (upsertProductWithPrice({ name: n, cat: c || 'Varie', sub: sub || 'Varie', um: u, supplier: supplierName, price: parseNumber(p), source: 'excel' })) count++;
-                    }
-                }
-            });
-            document.getElementById('excel-area').value = "";
-            saveState();
-            alert(`✓ Importati ${count} prodotti.`);
-            renderCatalogMgmt();
-            renderConfig();
-        }
-
-        function tokenizeName(v) {
-            return normalizeText(v).split(' ').filter(Boolean);
-        }
-
-        function similarityScore(a, b) {
-            const A = new Set(tokenizeName(a));
-            const B = new Set(tokenizeName(b));
-            if (!A.size || !B.size) return 0;
-            let inter = 0;
-            A.forEach(t => { if (B.has(t)) inter++; });
-            return inter / new Set([...A, ...B]).size;
-        }
-
-        function resolveAliasProductName(name) {
-            const n = normalizeText(name);
-            const aliases = appState.settings.aliases || {};
-            if (aliases[n]) return aliases[n];
-            return name;
-        }
-
-        function findProductMatch(name, cat, um) {
-            const target = resolveAliasProductName(name);
-            const key = normalizeText(target);
-            const byExact = appState.products.find(p => normalizeText(p.name) === key);
-            if (byExact) return byExact;
-
-            const byComposite = appState.products.find(p =>
-                normalizeText(p.name) === key &&
-                normalizeText(p.cat || '') === normalizeText(cat || '') &&
-                normalizeText(p.um || '') === normalizeText(um || '')
-            );
-            if (byComposite) return byComposite;
-
-            const candidates = appState.products
-                .map(p => ({ p, score: similarityScore(target, p.name) }))
-                .filter(x => x.score >= 0.82)
-                .sort((a, b) => b.score - a.score);
-            return candidates[0]?.p || null;
-        }
-
-        function pushPriceHistory(productId, supplier, oldPrice, newPrice, source) {
-            appState.priceHistory = appState.priceHistory || [];
-            appState.priceHistory.unshift({
-                id: Date.now() + Math.random(),
-                dateISO: new Date().toISOString(),
-                productId,
-                supplier,
-                oldPrice: parseNumber(oldPrice),
-                newPrice: parseNumber(newPrice),
-                source: source || 'manual'
-            });
-            if (appState.priceHistory.length > 5000) appState.priceHistory = appState.priceHistory.slice(0, 5000);
-        }
-
-        function upsertProductWithPrice({ name, cat, sub, um, supplier, price, source }) {
-            if (!name || !supplier || !Number.isFinite(price)) return false;
-            const resolvedName = resolveAliasProductName(name);
-            let existing = findProductMatch(resolvedName, cat, um);
-            if (!existing) {
-                existing = {
-                    id: Date.now() + Math.random(),
-                    name: resolvedName.trim(),
-                    cat: cat || 'Varie',
-                    sub: sub || 'Varie',
-                    um: um || 'pz',
-                    prices: {}
-                };
-                appState.products.push(existing);
-            }
-            existing.cat = cat || existing.cat || 'Varie';
-            existing.sub = sub || existing.sub || 'Varie';
-            existing.um = um || existing.um || 'pz';
-            const supUpper = supplier.toUpperCase();
-            const old = parseNumber(existing.prices[supUpper] ?? 0);
-            const next = parseNumber(price);
-            existing.prices[supUpper] = next;
-            if (old !== next) pushPriceHistory(existing.id, supUpper, old, next, source || 'import');
-            if (!appState.suppliers.some(s => s.name === supUpper)) {
-                appState.suppliers.push({ name: supUpper, min: 120, currentTotal: 0, items: [] });
-            }
-            return true;
-        }
-
-        function inferCategoryAndSub(line, currentCat, currentSub) {
-            const clean = normalizeText(line);
-            const cat = currentCat || 'Varie';
-            let sub = currentSub || 'Varie';
-            if (clean.includes('bivalvi')) sub = 'Bivalvi';
-            if (clean.includes('crostacei')) sub = 'Crostacei';
-            if (clean.includes('molluschi')) sub = 'Molluschi';
-            if (clean.includes('ostriche')) sub = 'Ostriche';
-            if (clean.includes('pesce')) sub = 'Pesce';
-            if (clean.includes('specialita')) sub = 'Specialita';
-            if (clean.includes('erbe') || clean.includes('altro')) sub = 'Erbe';
-            if (clean.includes('frutta')) sub = 'Frutta';
-            if (clean.includes('verdura')) sub = 'Verdura';
-            if (clean.includes('carne')) sub = 'Carne';
-            if (clean.includes('latticini')) sub = 'Latticini';
-            if (clean.includes('pasta')) sub = 'Pasta';
-            if (clean.includes('secchi')) sub = 'Secchi';
-            if (clean.includes('bagno')) sub = 'Bagno clienti';
-            if (clean.includes('pulizia')) sub = 'Pulizia cucina';
-            if (clean.includes('spirits') || clean.includes('spirit') || clean.includes('whisky') || clean.includes('rum') || clean.includes('vodka') || clean.includes('tequila')) sub = 'Distillati';
-            return { cat, sub };
-        }
-
-        function parseRawCatalogLine(line, currentCat, currentSub) {
-            const l = (line || '').replace(/^[-*•]\s*/, '').trim();
-            if (!l) return null;
-            const { cat, sub } = inferCategoryAndSub(l, currentCat, currentSub);
-
-            const pipeStyle = l.match(/^(.+?)\s*\|\s*U\.M\.\s*:\s*([^|]+)\|\s*Miglior Prezzo\s*:\s*([0-9]+[.,][0-9]+)\s*€?\s*\|\s*Fornitore\s*:\s*([^|]+)$/i);
-            if (pipeStyle) {
-                const name = pipeStyle[1].trim();
-                const um = pipeStyle[2].trim().toLowerCase();
-                const price = parseNumber(pipeStyle[3]);
-                const supplier = pipeStyle[4].trim().toUpperCase();
-                if (name && Number.isFinite(price)) {
-                    return {
-                        name,
-                        cat,
-                        sub,
-                        um: um || 'pz',
-                        supplier: supplier || 'N/D',
-                        price
-                    };
-                }
-            }
-
-            const supplierPriceTail = l.match(/(.+?)\s*[-:]\s*(?:miglior prezzo|prezzo|fornitore)?[^0-9]*([0-9]+[.,][0-9]+)\s*[-–]\s*fornitore[:\s]+([A-Za-z0-9 .'&/-]+)$/i)
-                || l.match(/(.+?)\s+([A-Za-z][A-Za-z0-9 &'./-]{1,})\s+([0-9]+[.,][0-9]+)$/);
-
-            if (supplierPriceTail) {
-                let name = supplierPriceTail[1].replace(/U\.M\.:.*$/i, '').replace(/\s+/g, ' ').trim();
-                const maybeSupplier = supplierPriceTail[2].trim().toUpperCase();
-                const maybePrice = parseNumber(supplierPriceTail[3]);
-                const umMatch = l.match(/\b(kg|pz|ml|l|lt|g|100g|125g|60g|40g|10l|5l|12kg|10kg)\b/i);
-                const um = umMatch ? umMatch[1].toLowerCase() : 'pz';
-                return { name, cat, sub, um, supplier: maybeSupplier, price: maybePrice };
-            }
-
-            const colonStyle = l.match(/^([^:]+):\s*€?\s*([0-9]+[.,][0-9]+)\s*-\s*FORNITORE:\s*(.+)$/i);
-            if (colonStyle) {
-                return {
-                    name: colonStyle[1].trim(),
-                    cat,
-                    sub,
-                    um: 'pz',
-                    supplier: colonStyle[3].trim().toUpperCase(),
-                    price: parseNumber(colonStyle[2])
-                };
-            }
-            return null;
-        }
-
-        function processRawCatalogImport() {
-            const text = document.getElementById('raw-catalog-area').value || '';
-            const lines = text.split('\n').map(x => x.trim()).filter(Boolean);
-            let currentCat = 'Varie';
-            let currentSub = 'Varie';
-            let imported = 0;
-            let skipped = 0;
-            const skippedLines = [];
-
-            lines.forEach(line => {
-                const norm = normalizeText(line);
-                if (norm === 'ittico' || norm.startsWith('ittico')) currentCat = 'Ittico';
-                else if (norm === 'verdure' || norm.startsWith('verdure')) currentCat = 'Verdure';
-                else if (norm === 'consumabili' || norm.startsWith('consumabili')) currentCat = 'Consumabili';
-                else if (norm === 'cleaning' || norm.startsWith('cleaning')) currentCat = 'Cleaning';
-                else if (norm === 'spirits' || norm.startsWith('spirits')) currentCat = 'Spirits';
-
-                const inf = inferCategoryAndSub(line, currentCat, currentSub);
-                currentSub = inf.sub;
-
-                const parsed = parseRawCatalogLine(line, currentCat, currentSub);
-                if (parsed && upsertProductWithPrice({ ...parsed, source: 'raw-import' })) imported++;
-                else {
-                    if (!/^(ittico|verdure|consumabili|cleaning|spirits|bivalvi|crostacei|molluschi|ostriche|pesce|specialita|categoria)/i.test(norm)) {
-                        skipped++;
-                        if (skippedLines.length < 20) skippedLines.push(line);
-                    }
-                }
-            });
-
-            saveState();
-            renderCatalogMgmt();
-            renderConfig();
-            const report = skipped
-                ? `\n\nRighe non parse: ${skipped}\nPrime da verificare:\n- ${skippedLines.join('\n- ')}`
-                : '';
-            alert(`✓ Importazione completata. Righe valide importate: ${imported}.${report}`);
-        }
-
-        function copyBulletToRawArea() {
-            const bullet = document.getElementById('bullet-catalog-area');
-            const raw = document.getElementById('raw-catalog-area');
-            if (!bullet || !raw) return;
-            raw.value = bullet.value || '';
-        }
-
-        function importBulletCatalog() {
-            const bullet = document.getElementById('bullet-catalog-area');
-            const raw = document.getElementById('raw-catalog-area');
-            if (!bullet || !raw) return;
-            if (!String(bullet.value || '').trim()) return alert('Incolla prima l\'elenco puntato dei prodotti.');
-            raw.value = bullet.value;
-            processRawCatalogImport();
-        }
-
-        function loadExtendedCatalog() {
-            let added = 0;
-            EXTENDED_CATALOG.forEach(row => {
-                const key = normalizeText(row.name);
-                let existing = appState.products.find(p => normalizeText(p.name) === key);
-                if (!existing) {
-                    existing = { id: Date.now() + Math.random(), name: row.name, cat: row.cat, sub: row.sub, um: row.um, prices: {} };
-                    appState.products.push(existing);
-                    added++;
-                }
-                existing.cat = existing.cat || row.cat;
-                existing.sub = existing.sub || row.sub;
-                existing.um = existing.um || row.um;
-                const old = parseNumber(existing.prices[row.supplier] ?? 0);
-                const next = parseNumber(row.price);
-                existing.prices[row.supplier] = next;
-                if (old !== next) pushPriceHistory(existing.id, row.supplier, old, next, 'extended-catalog');
-                if (!appState.suppliers.some(s => s.name === row.supplier)) appState.suppliers.push({ name: row.supplier, min: 120, currentTotal: 0, items: [] });
-            });
-            saveState();
-            renderCatalogMgmt();
-            renderConfig();
-            alert(`✓ Catalogo esteso caricato. Nuovi prodotti aggiunti: ${added}.`);
-        }
-
-        function addSingleProduct() {
-            const n = document.getElementById('ap-name').value;
-            const c = document.getElementById('ap-cat').value;
-            const s = document.getElementById('ap-sub').value;
-            const u = document.getElementById('ap-um').value;
-            if(!n || !u) return alert("Inserisci Nome e UM.");
-            const id = Date.now();
-            appState.products.push({ id, name: n, um: u, cat: c, sub: s, prices: {} });
-            lastAddedProductId = id;
-            saveState();
-            const status = document.getElementById('ap-status-msg');
-            if (status) {
-                status.classList.remove('hidden');
-                status.textContent = `✓ Prodotto salvato: ${n}. Lo trovi ora in Catalogo Master.`;
-            }
-            document.getElementById('ap-name').value = "";
-            document.getElementById('ap-cat').value = "";
-            document.getElementById('ap-sub').value = "";
-            document.getElementById('ap-um').value = "";
-            switchView('catalog');
-            const search = document.getElementById('catalog-mgmt-search');
-            if (search) search.value = n;
-            renderCatalogMgmt();
-        }
-
-        function toggleModule(id, val) {
-            const el = document.getElementById(id);
-            if(el) el.style.display = val;
-            appState.settings.hiddenModules[id] = val;
-            saveState();
-        }
-
-        // --- INVIO ORDINE DAI REPARTI ---
-        async function submitDeptOrder() {
-            const n = document.getElementById('dept-nome').value;
-            const c = document.getElementById('dept-cognome').value;
-            const t = document.getElementById('dept-raw-text').value;
-            if(!n || !t) return alert("Compila Nome Operatore e inserisci i prodotti.");
-            
-            // Simula elaborazione AI dell'ordine (ricerca stringhe nei prodotti e calcolo best price)
-            const reqId = Date.now();
-            const staff = `${n} ${c}`.trim();
-            const newReq = { id: reqId, staff, dept: appState.currentDept, createdAt: new Date().toISOString(), date: new Date().toLocaleTimeString(), text: t };
-            appState.inbox.push(newReq);
-            appState.orderHistory = appState.orderHistory || [];
-            appState.orderHistory.unshift({ ...newReq, status: 'in_attesa', updatedAt: new Date().toISOString() });
-            document.getElementById('dept-raw-text').value = ""; 
-            document.getElementById('dept-nome').value = "";
-            document.getElementById('dept-cognome').value = "";
-            const status = document.getElementById('dept-submit-status');
-            if (status) {
-                status.classList.remove('hidden');
-                status.textContent = 'Ordine inviato';
-                setTimeout(() => status.classList.add('hidden'), 3000);
-            }
-            saveState();
-            const orderApi = await submitOrderDirectlyToServer({
-                dept: newReq.dept,
-                staff: newReq.staff,
-                text: newReq.text,
-                date: new Date().toLocaleString('it-IT')
-            });
-            if (!orderApi.ok) {
-                await saveStateToServer({ silent: true });
-                await notifyAdminEmail('order', {
-                    dept: newReq.dept,
-                    staff: newReq.staff,
-                    text: newReq.text,
-                    date: new Date().toLocaleString('it-IT')
-                });
-            } else if (!orderApi.emailDelivered) {
-                // Second attempt only for email when order is saved but delivery failed.
-                await notifyAdminEmail('order', {
-                    dept: newReq.dept,
-                    staff: newReq.staff,
-                    text: newReq.text,
-                    date: new Date().toLocaleString('it-IT')
-                });
-            }
-            alert("✓ Ordine Inviato");
-            if (!appState.kioskMode) handleRoleChange();
-        }
-
-        function parseOrderText(text) {
-            const normalized = normalizeText(text);
-            const aliasHits = Object.entries(appState.settings.aliases || {}).map(([alias, productName]) => {
-                if (!normalized.includes(alias)) return null;
-                const product = appState.products.find(p => normalizeText(p.name) === normalizeText(productName));
-                return product ? { product, qty: 1 } : null;
-            }).filter(Boolean);
-            return appState.products.map(p => {
-                const productNorm = normalizeText(p.name);
-                const shortKey = productNorm.split(' ').slice(0, 2).join(' ');
-                const exact = normalized.includes(productNorm);
-                const partial = shortKey && normalized.includes(shortKey);
-                if (!exact && !partial) return null;
-                const qtyRegex = new RegExp(`(\\d+[\\.,]?\\d*)\\s*(kg|pz|casse|cassa|l|lt)?\\s*${shortKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
-                const m = normalized.match(qtyRegex);
-                const qty = parseNumber(m?.[1] || 1);
-                return { product: p, qty: qty > 0 ? qty : 1 };
-            }).filter(Boolean).concat(aliasHits);
-        }
-
-        function splitOrderFragments(text) {
-            return String(text || '')
-                .split(/\n|,|;|\+/)
-                .map(x => x.trim())
-                .filter(Boolean)
-                .slice(0, 20);
-        }
-
-        function parseQtyFromFragment(fragment) {
-            const m = String(fragment || '').match(/(\d+[.,]?\d*)\s*(kg|pz|casse|cassa|l|lt|g|ml)?/i);
-            return parseNumber(m?.[1] || 1) || 1;
-        }
-
-        function getProductCandidates(fragment, limit = 6) {
-            const f = normalizeText(fragment);
-            if (!f) return [];
-            const rows = appState.products
-                .map(p => {
-                    const nameNorm = normalizeText(p.name);
-                    const score = similarityScore(f, p.name) + (nameNorm.includes(f) || f.includes(nameNorm) ? 0.2 : 0);
-                    return { product: p, score };
-                })
-                .filter(x => x.score >= 0.2)
-                .sort((a, b) => b.score - a.score)
-                .slice(0, limit);
-            return rows.map(r => r.product);
-        }
-
-        function getUnknownFragmentsForRequest(req) {
-            const fragments = splitOrderFragments(req.text);
-            const covered = new Set(((req.aiAnalysis || []).map(a => String(a.productId))).concat((req.manualAnalysis || []).map(a => String(a.productId))));
-            return fragments.filter(f => {
-                const matched = parseOrderText(f);
-                if (matched.length) return false;
-                const candidates = getProductCandidates(f, 1);
-                if (!candidates.length) return false;
-                if (candidates[0] && covered.has(String(candidates[0].id))) return false;
-                return true;
-            });
-        }
-
-        function applyAlternativeForRequest(reqId, idx) {
-            const req = appState.inbox.find(r => r.id === reqId);
-            if (!req) return;
-            const select = document.getElementById(`alt-${reqId}-${idx}`);
-            if (!select) return;
-            const productId = Number(select.value);
-            if (!productId) return alert('Seleziona un prodotto.');
-            const fragments = getUnknownFragmentsForRequest(req);
-            const fragment = fragments[idx];
-            if (!fragment) return;
-            const qty = parseQtyFromFragment(fragment);
-            req.manualAnalysis = req.manualAnalysis || [];
-            const existing = req.manualAnalysis.find(x => Number(x.productId) === productId);
-            if (existing) existing.qty += qty;
-            else req.manualAnalysis.push({ productId, qty, sourceText: fragment });
-            saveState();
-            renderInbox();
-        }
-
-        function getMatchesForRequest(req) {
-            const aiMatches = (req.aiAnalysis || []).map(a => {
-                const product = appState.products.find(p => p.id === a.productId);
-                return product ? { product, qty: a.qty || 1 } : null;
-            }).filter(Boolean);
-            const manualMatches = (req.manualAnalysis || []).map(a => {
-                const product = appState.products.find(p => p.id === a.productId);
-                return product ? { product, qty: a.qty || 1 } : null;
-            }).filter(Boolean);
-            const fallback = parseOrderText(req.text);
-            const all = aiMatches.concat(manualMatches, fallback);
-            const merged = new Map();
-            all.forEach(({ product, qty }) => {
-                const k = String(product.id);
-                const curr = merged.get(k) || { product, qty: 0 };
-                curr.qty += qty || 1;
-                merged.set(k, curr);
-            });
-            return Array.from(merged.values());
-        }
-
-        // --- GESTIONE INBOX E "IA" DI ASSEGNAZIONE ---
         function renderInbox() {
-            const container = document.getElementById('inbox-container');
-            const badge = document.getElementById('inbox-badge');
-            badge.innerText = appState.inbox.length;
-            badge.style.display = appState.inbox.length > 0 ? 'block' : 'none';
-            document.getElementById('kpi-pending-count').innerText = appState.inbox.length;
-
-            const consolidatedPlan = buildConsolidatedPlan();
-            const consolidatedHtml = consolidatedPlan.linesCount > 0 ? `
-                <div class="glass-card p-8 mb-6 border-2 border-indigo-100 bg-indigo-50/40">
-                    <div class="flex justify-between items-center mb-4">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-widest text-indigo-500">AI Ordine Accorpato</p>
-                            <h4 class="text-lg font-black text-slate-900">Accorpamento automatico ordini reparti</h4>
-                        </div>
-                        <span class="text-xs font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">${consolidatedPlan.requestIds.length} ordini</span>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                        ${consolidatedPlan.allocations.map(a => {
-                            const sup = appState.suppliers.find(s => s.name === a.supplier);
-                            const min = sup?.min || 0;
-                            const below = a.total < min;
-                            return `<div class="bg-white border rounded-xl p-3">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs font-black uppercase">${a.supplier}</span>
-                                    <span class="text-xs font-black">€ ${a.total.toFixed(2)}</span>
-                                </div>
-                                <p class="text-[10px] ${below ? 'text-amber-700' : 'text-emerald-700'} font-bold mt-1">${below ? `Sotto porto franco (€ ${min.toFixed(2)})` : 'Porto franco ok'}</p>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                    <div class="flex flex-wrap justify-between items-center gap-3 border-t pt-4">
-                        <div>
-                            <p class="text-[10px] uppercase font-black text-slate-400">Totale stimato</p>
-                            <p class="text-lg font-black">€ ${consolidatedPlan.effectiveCost.toFixed(2)} <span class="text-xs text-slate-400">(raw € ${consolidatedPlan.rawCost.toFixed(2)})</span></p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="analyzeAllPendingOrdersAI()" class="bg-white border border-indigo-200 text-indigo-700 px-4 py-3 rounded-xl font-black text-[10px] uppercase">Analizza Tutti con AI</button>
-                            <button onclick="approveConsolidatedOrder()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva Ordine Accorpato</button>
-                        </div>
-                    </div>
-                </div>` : '';
-
-            const pendingHtml = appState.inbox.length === 0 ? 
-                '<div class="py-20 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine da approvare</div>' :
-                appState.inbox.map(req => {
-                    const effectiveMatches = getMatchesForRequest(req);
-                    let matchesHtml = '';
-                    effectiveMatches.forEach(({ product, qty }) => {
-                        const best = getBestSup(product);
-                        matchesHtml += `<span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-[9px] font-bold border border-emerald-100">${product.name} x${qty} (${best.name}: €${best.price.toFixed(2)})</span> `;
-                    });
-                    const unknownFragments = getUnknownFragmentsForRequest(req);
-                    const alternativesHtml = unknownFragments.length ? `
-                        <div class="mt-4 border-t pt-3">
-                            <span class="text-[10px] font-black uppercase text-amber-700 block mb-2">Prodotti non riconosciuti: scegli alternativa</span>
-                            <div class="space-y-2">
-                                ${unknownFragments.map((fragment, idx) => {
-                                    const options = getProductCandidates(fragment).map(p => `<option value="${p.id}">${p.name} (${p.cat})</option>`).join('');
-                                    return `<div class="grid md:grid-cols-[1fr,1fr,auto] gap-2 items-center">
-                                        <span class="text-xs text-slate-600 italic">"${fragment}"</span>
-                                        <select id="alt-${req.id}-${idx}" class="border rounded-lg px-2 py-1 text-xs">
-                                            <option value="">Seleziona prodotto</option>
-                                            ${options}
-                                        </select>
-                                        <button onclick="applyAlternativeForRequest(${req.id}, ${idx})" class="bg-amber-500 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase">Applica</button>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                        </div>` : '';
-
-                    return `
-                    <div class="glass-card p-8 mb-4">
-                        <div class="flex justify-between items-center border-b pb-4 mb-4">
-                            <div><span class="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-[9px] font-black uppercase">${req.dept}</span><span class="ml-2 text-xs font-bold text-slate-500">${req.staff} - ${req.date}</span></div>
-                            <button onclick="rejectRequest(${req.id})" class="text-rose-500 font-bold text-xs">Rifiuta</button>
-                        </div>
-                        <p class="text-sm font-medium italic text-slate-700 mb-6">"${req.text}"</p>
-                        <div class="bg-slate-50 p-4 rounded-xl mb-6">
-                            <span class="text-[9px] font-black uppercase text-slate-400 block mb-2">IA Match & Best Price</span>
-                            <div class="flex flex-wrap gap-2">${matchesHtml || '<span class="text-xs italic text-slate-400">Nessun match esatto. Inserimento manuale richiesto.</span>'}</div>
-                            ${alternativesHtml}
-                            <div class="mt-3 flex items-center gap-2">
-                                <button onclick="analyzeOrderAI(${req.id})" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase">Analizza con AI</button>
-                                <span class="text-[10px] font-bold text-slate-500">${req.aiStatus === 'loading' ? 'Analisi in corso...' : (req.aiStatus === 'done' ? 'Analisi completata' : (req.aiStatus === 'error' ? `Errore AI: ${req.aiError || ''}` : ''))}</span>
-                            </div>
-                        </div>
-                        <button onclick="approveRequest(${req.id})" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approva e Aggiorna Logistica</button>
-                    </div>`;
-                }).join('');
-
-            const hist = (appState.orderHistory || []).slice(0, 20);
-            const historyHtml = `
-                <div class="glass-card p-6">
-                    <h4 class="text-[11px] font-black uppercase tracking-widest mb-4 text-slate-500">Storico Ordini</h4>
-                    ${hist.length === 0
-                        ? '<p class="text-xs text-slate-400 font-bold uppercase">Nessuno storico disponibile</p>'
-                        : `<div class="space-y-2">${hist.map(h => {
-                            const clr = h.status === 'approvato' ? 'text-emerald-700 bg-emerald-50' : (h.status === 'rifiutato' ? 'text-rose-700 bg-rose-50' : 'text-amber-700 bg-amber-50');
-                            return `<div class="border rounded-xl p-3">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-black uppercase px-2 py-1 rounded ${clr}">${h.status}</span>
-                                    <span class="text-[10px] text-slate-400 font-bold">${new Date(h.updatedAt || h.createdAt || Date.now()).toLocaleString('it-IT')}</span>
-                                </div>
-                                <p class="text-xs font-bold mt-2">${h.dept} - ${h.staff}</p>
-                                <p class="text-xs text-slate-500 italic mt-1">"${h.text}"</p>
-                            </div>`;
-                        }).join('')}</div>`}
-                </div>`;
-
-            container.innerHTML = consolidatedHtml + pendingHtml + historyHtml;
+            const cont = document.getElementById('inbox-list');
+            document.getElementById('inbox-badge').innerText = appState.inbox.length;
+            document.getElementById('inbox-badge').style.display = appState.inbox.length ? 'block' : 'none';
+            cont.innerHTML = appState.inbox.map(req => {
+                const aiHtml = req.aiParsed ? req.aiParsed.items.map(i => {
+                    const p = appState.products.find(x => x.id == i.id);
+                    if(!p) return '';
+                    const best = getBest(p);
+                    return `<span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-[10px] font-black border border-emerald-200">${p.name} x${i.qty} (${best.sup}: €${best.price})</span>`;
+                }).join(' ') : '<span class="text-xs text-slate-400 italic">Attesa revisione.</span>';
+                return `<div class="glass-card p-6"><div class="flex justify-between items-start mb-4"><div><span class="bg-slate-100 px-2 py-1 rounded text-[10px] font-black uppercase">${req.dept}</span><p class="text-xs font-bold text-slate-500 mt-2">${req.staff} - ${req.date}</p></div><button onclick="deleteReq(${req.id})" class="text-rose-500 text-xs font-black">Rifiuta</button></div><p class="text-base italic mb-4 border-l-4 border-amber-400 pl-4">"${req.text}"</p><div class="bg-slate-50 p-4 rounded-xl mb-4"><span class="text-[9px] font-black uppercase text-slate-400 block mb-2">Match IA</span><div class="flex flex-wrap gap-2">${aiHtml}</div></div><button onclick="approveReq(${req.id})" class="w-full brand-gradient text-white py-3 rounded-xl font-black text-[10px] uppercase">Approva</button></div>`;
+            }).join('') || '<p class="text-center py-10 font-bold text-slate-400">Nessun ordine.</p>';
         }
 
-        function getRowsFromRequest(req) {
-            return getMatchesForRequest(req).map(r => ({
-                product: r.product,
-                qty: r.qty,
-                reqId: req.id,
-                dept: req.dept,
-                staff: req.staff
-            }));
+        function getBest(p) {
+            let best = { sup: 'N/D', price: Infinity };
+            for(const [s, pr] of Object.entries(p.prices)) { if(pr < best.price) { best.price = pr; best.sup = s; } }
+            return best;
         }
 
-        async function analyzeAllPendingOrdersAI() {
-            if (!appState.inbox.length) return alert('Nessun ordine in attesa.');
-            for (const req of appState.inbox) {
-                await analyzeOrderAI(req.id);
-            }
-            alert('✓ Analisi AI completata su tutti gli ordini pending.');
-            renderInbox();
-        }
-
-        function getVisibleHomeWidgets() {
-            const cfg = appState.settings.homeWidgets || {};
-            return {
-                pending: cfg.pending !== false,
-                saving: cfg.saving !== false,
-                suppliers: cfg.suppliers !== false,
-                inbox: cfg.inbox !== false,
-                reports: cfg.reports !== false,
-                catalog: cfg.catalog !== false
-            };
-        }
-
-        function resetHomeWidgets() {
-            appState.settings.homeWidgets = { ...DEFAULT_SETTINGS.homeWidgets };
-            saveState();
-            renderHomeView();
-            renderHomeWidgetControls();
-        }
-
-        function toggleHomeWidget(id) {
-            const current = getVisibleHomeWidgets();
-            current[id] = !current[id];
-            appState.settings.homeWidgets = current;
-            saveState();
-            renderHomeView();
-            renderHomeWidgetControls();
-        }
-
-        function renderHomeView() {
-            const grid = document.getElementById('home-widget-grid');
-            if (!grid) return;
-            const widgets = getVisibleHomeWidgets();
-            const pending = appState.inbox.length;
-            const saving = Number(document.getElementById('kpi-saving')?.innerText || '0');
-            const supplierAlert = appState.suppliers.filter(s => s.currentTotal > 0 && s.currentTotal < s.min).length;
-            const cards = [
-                { id: 'pending', icon: 'IN', title: 'Pending', value: String(pending), sub: 'ordini', action: "switchView('inbox')" },
-                { id: 'saving', icon: 'SV', title: 'Saving', value: `EUR ${saving.toFixed(2)}`, sub: 'stimato', action: "switchView('dashboard')" },
-                { id: 'suppliers', icon: 'PF', title: 'Fornitori', value: String(supplierAlert), sub: 'sotto soglia', action: "switchView('dashboard')" },
-                { id: 'inbox', icon: 'BX', title: 'Inbox', value: 'Apri', sub: 'nuovi ordini', action: "switchView('inbox')" },
-                { id: 'reports', icon: 'RP', title: 'Report', value: 'Apri', sub: 'analytics', action: "switchView('reports')" },
-                { id: 'catalog', icon: 'CT', title: 'Catalogo', value: 'Apri', sub: 'prodotti', action: "switchView('catalog')" }
-            ];
-            const visibleCards = cards.filter(c => widgets[c.id]);
-            grid.innerHTML = visibleCards.map(c => `
-                <button onclick="${c.action}" class="text-left bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md active:scale-[0.98] transition-all">
-                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white text-[10px] font-black flex items-center justify-center mb-2 tracking-wider">${c.icon}</div>
-                    <p class="text-[10px] font-black uppercase text-slate-500 tracking-wider">${c.title}</p>
-                    <p class="text-sm font-black text-slate-900 mt-0.5">${c.value}</p>
-                    <p class="text-[10px] text-slate-500 uppercase tracking-wide">${c.sub}</p>
-                </button>
-            `).join('') || '<div class="md:col-span-2 xl:col-span-3 text-center text-xs text-slate-500 py-6 bg-white rounded-2xl border">Nessun widget attivo</div>';
-        }
-
-        function renderHomeWidgetControls() {
-            const controls = document.getElementById('home-widget-controls');
-            if (!controls) return;
-            const widgets = getVisibleHomeWidgets();
-            controls.innerHTML = Object.keys(HOME_WIDGET_LABELS).map(id => `
-                <label class="flex items-center justify-between bg-slate-50 border rounded-xl px-3 py-2">
-                    <span class="text-xs font-bold uppercase tracking-wide text-slate-700">${HOME_WIDGET_LABELS[id]}</span>
-                    <input type="checkbox" ${widgets[id] ? 'checked' : ''} onchange="toggleHomeWidget('${id}')">
-                </label>
-            `).join('');
-        }
-
-        function buildConsolidatedPlan() {
-            const allocationsBySupplier = {};
-            const stagedTotals = {};
-            const requestIds = new Set();
-            const cats = new Set();
-            let rawCost = 0;
-            let linesCount = 0;
-
-            appState.inbox.forEach(req => {
-                const rows = getRowsFromRequest(req);
-                rows.forEach(({ product, qty, reqId, dept, staff }) => {
-                    const best = chooseSupplierForLine(product, qty, stagedTotals);
-                    const rowTotal = best.price * qty;
-                    if (!allocationsBySupplier[best.name]) allocationsBySupplier[best.name] = [];
-                    allocationsBySupplier[best.name].push({
-                        productId: product.id,
-                        productName: product.name,
-                        qty,
-                        unitPrice: best.price,
-                        total: rowTotal,
-                        cat: product.cat,
-                        sub: product.sub,
-                        reqId,
-                        dept,
-                        staff
-                    });
-                    stagedTotals[best.name] = (stagedTotals[best.name] || 0) + rowTotal;
-                    requestIds.add(reqId);
-                    rawCost += rowTotal;
-                    linesCount += 1;
-                    cats.add(product.cat);
-                });
-            });
-
-            const allocations = Object.entries(allocationsBySupplier).map(([supplier, items]) => ({
-                supplier,
-                items,
-                total: items.reduce((sum, i) => sum + i.total, 0)
-            }));
-
-            const effectiveCost = allocations.reduce((sum, a) => {
-                const supObj = appState.suppliers.find(s => s.name === a.supplier);
-                if(!supObj) return sum + a.total;
-                const penaltyRate = Number(appState.settings.penaltyRate || 0.06);
-                const penalty = a.total < supObj.min ? (supObj.min - a.total) * penaltyRate : 0;
-                return sum + a.total + penalty;
-            }, 0);
-
-            return {
-                allocations,
-                rawCost,
-                effectiveCost,
-                requestIds: Array.from(requestIds),
-                linesCount,
-                cat: Array.from(cats)[0] || 'Varie'
-            };
-        }
-
-        function approveConsolidatedOrder() {
-            const plan = buildConsolidatedPlan();
-            if (!plan.linesCount) return alert('Nessun ordine da accorpare.');
-
-            plan.allocations.forEach(a => {
-                const supObj = appState.suppliers.find(s => s.name === a.supplier);
-                if (supObj) {
-                    supObj.currentTotal += a.total;
-                    a.items.forEach(i => supObj.items.push(`${i.productName} x${i.qty}`));
-                }
-            });
-
-            appState.archive.unshift({
-                id: Date.now(),
-                date: new Date().toLocaleDateString('it-IT'),
-                dateISO: new Date().toISOString(),
-                requester: 'AI Consolidation',
-                dept: 'Multi-Reparto',
-                text: `Ordine accorpato da ${plan.requestIds.length} richieste`,
-                cost: Number(plan.effectiveCost.toFixed(2)),
-                rawCost: Number(plan.rawCost.toFixed(2)),
-                cat: plan.cat,
-                allocations: plan.allocations,
-                consolidated: true
-            });
-
-            plan.requestIds.forEach(id => {
-                const h = (appState.orderHistory || []).find(x => x.id === id);
-                if (h) {
-                    h.status = 'approvato';
-                    h.updatedAt = new Date().toISOString();
-                }
-            });
-            appState.inbox = [];
-            saveState();
-            alert('✓ Ordine accorpato approvato e inviato in logistica.');
-            switchView('dashboard');
-        }
-
-        function rejectRequest(id) {
+        async function approveReq(id) {
             const req = appState.inbox.find(r => r.id === id);
+            let total = 0;
+            const items = req.aiParsed ? req.aiParsed.items.map(i => ({p: appState.products.find(x=>x.id == i.id), q: i.qty})) : [];
+            items.forEach(item => {
+                if(!item.p) return;
+                const best = getBest(item.p);
+                const sup = appState.suppliers.find(s => s.name === best.sup);
+                if(sup) { sup.currentTotal = (sup.currentTotal || 0) + (best.price * item.q); total += (best.price * item.q); }
+            });
+            appState.archive.unshift({ date: new Date().toLocaleDateString('it-IT'), requester: req.staff, dept: req.dept, text: req.text, cost: total });
             appState.inbox = appState.inbox.filter(r => r.id !== id);
-            const h = (appState.orderHistory || []).find(x => x.id === id);
-            if (h) {
-                h.status = 'rifiutato';
-                h.updatedAt = new Date().toISOString();
-            } else if (req) {
-                appState.orderHistory.unshift({ ...req, status: 'rifiutato', updatedAt: new Date().toISOString() });
-            }
-            saveState();
-            switchView('inbox');
+            await pushData(); switchView('dashboard');
         }
 
-        function getBestSup(p) {
-            let bestName = 'N/A';
-            let bestPrice = Infinity;
-            Object.entries(p.prices).forEach(([s, pr]) => { if(pr < bestPrice) { bestPrice = pr; bestName = s; } });
-            return { name: bestName, price: Number.isFinite(bestPrice) ? bestPrice : 0 };
-        }
+        function deleteReq(id) { appState.inbox = appState.inbox.filter(r => r.id !== id); pushData(); renderInbox(); }
 
-        function chooseSupplierForLine(product, qty, stagedTotals) {
-            const mode = appState.settings.allocationMode || 'hybrid';
-            const penaltyRate = Number(appState.settings.penaltyRate || 0.06);
-            let best = { supplier: 'N/A', unitPrice: 0, score: Infinity };
-
-            Object.entries(product.prices).forEach(([supplier, unitPrice]) => {
-                const rowTotal = unitPrice * qty;
-                const supObj = appState.suppliers.find(s => s.name === supplier);
-                const historicalTotal = supObj?.currentTotal || 0;
-                const staged = stagedTotals[supplier] || 0;
-                const projected = historicalTotal + staged + rowTotal;
-                const min = supObj?.min || 0;
-                const deficit = Math.max(min - projected, 0);
-
-                let score = rowTotal;
-                if (mode === 'hybrid') score = rowTotal + (deficit * penaltyRate);
-                if (mode === 'porto_franco') score = rowTotal + (deficit * penaltyRate * 1.5);
-                if (mode === 'best_price') score = rowTotal;
-
-                if (score < best.score) best = { supplier, unitPrice, score };
-            });
-            return { name: best.supplier, price: best.unitPrice };
-        }
-
-        function approveRequest(id) {
-            const req = appState.inbox.find(r => r.id === id);
-            if(!req) return;
-            const rows = getMatchesForRequest(req);
-            const allocationsBySupplier = {};
-            let cost = 0;
-            const cats = new Set();
-            const stagedTotals = {};
-
-            rows.forEach(({ product, qty }) => {
-                const best = chooseSupplierForLine(product, qty, stagedTotals);
-                const rowTotal = best.price * qty;
-                if (!allocationsBySupplier[best.name]) allocationsBySupplier[best.name] = [];
-                allocationsBySupplier[best.name].push({ productId: product.id, productName: product.name, qty, unitPrice: best.price, total: rowTotal, cat: product.cat, sub: product.sub });
-                stagedTotals[best.name] = (stagedTotals[best.name] || 0) + rowTotal;
-                cost += rowTotal;
-                cats.add(product.cat);
-            });
-
-            const allocations = Object.entries(allocationsBySupplier).map(([supplier, items]) => ({
-                supplier,
-                items,
-                total: items.reduce((sum, i) => sum + i.total, 0)
-            }));
-
-            allocations.forEach(a => {
-                const supObj = appState.suppliers.find(s => s.name === a.supplier);
-                if (supObj) {
-                    supObj.currentTotal += a.total;
-                    a.items.forEach(i => supObj.items.push(`${i.productName} x${i.qty}`));
-                }
-            });
-
-            const effectiveCost = allocations.reduce((sum, a) => {
-                const supObj = appState.suppliers.find(s => s.name === a.supplier);
-                if(!supObj) return sum + a.total;
-                const penaltyRate = Number(appState.settings.penaltyRate || 0.06);
-                const penalty = a.total < supObj.min ? (supObj.min - a.total) * penaltyRate : 0;
-                return sum + a.total + penalty;
-            }, 0);
-
-            appState.archive.unshift({
-                id: Date.now(),
-                date: new Date().toLocaleDateString('it-IT'),
-                dateISO: new Date().toISOString(),
-                requester: req.staff,
-                dept: req.dept,
-                text: req.text,
-                cost: Number(effectiveCost.toFixed(2)),
-                rawCost: Number(cost.toFixed(2)),
-                cat: Array.from(cats)[0] || 'Varie',
-                allocations
-            });
-            appState.inbox = appState.inbox.filter(r => r.id !== id);
-            const h = (appState.orderHistory || []).find(x => x.id === id);
-            if (h) {
-                h.status = 'approvato';
-                h.updatedAt = new Date().toISOString();
-            } else {
-                appState.orderHistory.unshift({ ...req, status: 'approvato', updatedAt: new Date().toISOString() });
-            }
-            saveState();
-            switchView('dashboard');
-        }
-
-        function renderConsolidation() {
+        function renderDashboard() {
+            document.getElementById('kpi-pending').innerText = appState.inbox.length;
+            document.getElementById('kpi-saving').innerText = (appState.archive.reduce((s, a) => s + a.cost, 0) * 0.15).toFixed(2);
             const grid = document.getElementById('consolidation-grid');
-            const activeSuppliers = appState.suppliers.filter(s => s.currentTotal > 0 || ['METRO', 'OROBICA', 'LINEA MARE'].includes(s.name));
-            grid.innerHTML = activeSuppliers.map(s => {
-                const isBelow = s.currentTotal < s.min && s.currentTotal > 0;
-                const pct = Math.min((s.currentTotal / s.min) * 100, 100) || 0;
-                const statusColor = isBelow ? 'border-amber-400 bg-amber-50/30' : (s.currentTotal > 0 ? 'border-emerald-400 bg-emerald-50/30' : 'border-slate-100 bg-white');
-                return `
-                <div class="p-6 rounded-2xl border-2 shadow-sm ${statusColor}">
-                    <div class="flex justify-between mb-2">
-                        <span class="font-black uppercase text-[10px] tracking-widest">${s.name}</span>
-                        <span class="text-sm font-black">€${s.currentTotal.toFixed(2)}</span>
-                    </div>
-                    <div class="text-[9px] font-bold ${isBelow ? 'text-amber-700' : 'text-emerald-700'} mb-2">${isBelow ? 'Sotto soglia finestra attiva' : 'Soglia in linea'} (${appState.settings.portoFrancoWindow || 'weekly'})</div>
-                    <div class="w-full bg-slate-200 rounded-full h-1.5 mb-4"><div class="h-1.5 rounded-full ${isBelow ? 'bg-amber-500' : 'bg-emerald-500'}" style="width: ${pct}%"></div></div>
-                    <div class="h-16 overflow-y-auto custom-scroll text-[9px] font-bold text-slate-500">${s.items.map(it => `• ${it}`).join('<br>') || 'Nessun prodotto'}</div>
-                </div>`;
+            grid.innerHTML = appState.suppliers.map(s => {
+                const pct = Math.min(((s.currentTotal || 0) / s.min) * 100, 100);
+                return `<div class="p-6 rounded-2xl border bg-white shadow-sm"><div class="flex justify-between items-center mb-2"><span class="font-black uppercase text-[10px]">${s.name}</span><span class="text-sm font-black">€ ${(s.currentTotal || 0).toFixed(2)}</span></div><div class="w-full bg-slate-100 rounded-full h-1.5 mb-2"><div class="h-1.5 rounded-full ${pct < 100 ? 'bg-amber-400' : 'bg-emerald-500'}" style="width: ${pct}%"></div></div><p class="text-[9px] font-bold text-slate-400">Min: €${s.min}</p></div>`;
             }).join('');
-            
-            // Aggiorna KPI
-            document.getElementById('kpi-pending-count').innerText = appState.inbox.length;
-            const saving = appState.archive.reduce((sum, a) => sum + ((a.rawCost || a.cost) * 0.12), 0);
-            document.getElementById('kpi-saving').innerText = saving.toFixed(2);
         }
 
-        // --- REPORTISTICA DINAMICA ---
-        function getRangeDays(period) { return period === 'mensile' ? 30 : 90; }
-        function withinDays(order, days) {
-            const d = new Date(order.dateISO || order.date || Date.now());
-            return (Date.now() - d.getTime()) <= days * 24 * 60 * 60 * 1000;
+        function renderCatalog() {
+            const term = document.getElementById('cat-search').value.toLowerCase();
+            const body = document.getElementById('cat-table-body');
+            body.innerHTML = appState.products.filter(p => p.name.toLowerCase().includes(term)).map(p => `<tr class="hover:bg-slate-50"><td class="px-6 py-4"><p class="font-bold text-sm">${p.name}</p><p class="text-[9px] font-black text-slate-400 uppercase mt-1">${p.cat}</p></td><td class="px-6 py-4 text-right flex flex-wrap justify-end gap-1">${Object.entries(p.prices).map(([s, pr]) => `<div class="bg-white border rounded-lg px-2 py-1 text-[10px] font-black">€${pr.toFixed(2)} <span class="text-slate-400">${s}</span></div>`).join('')}</td></tr>`).join('');
         }
 
-        function populateReportFilters() {
-            const rSel = document.getElementById('filter-reparto');
-            rSel.innerHTML = '<option value="tutti">Tutti i Reparti</option>' + appState.reparti.map(r => `<option value="${r}">${r}</option>`).join('');
-            
-            const cSel = document.getElementById('filter-categoria');
-            const cats = [...new Set(appState.products.map(p => p.cat))];
-            cSel.innerHTML = '<option value="tutte">Tutte le Categorie</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-
-            const subSel = document.getElementById('filter-sottocategoria');
-            const subs = [...new Set(appState.products.map(p => p.sub).filter(Boolean))];
-            subSel.innerHTML = '<option value="tutte">Tutte le Sottocategorie</option>' + subs.map(s => `<option value="${s}">${s}</option>`).join('');
-
-            const pSel = document.getElementById('filter-prodotto');
-            pSel.innerHTML = '<option value="tutti">Tutti i Prodotti</option>' + appState.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        function renderArchive() {
+            document.getElementById('arc-table-body').innerHTML = appState.archive.map(a => `<tr class="hover:bg-slate-50"><td class="px-6 py-4 text-xs font-bold text-slate-500">${a.date}</td><td class="px-6 py-4"><span class="bg-slate-100 px-2 py-1 rounded text-[9px] font-black uppercase">${a.dept}</span><p class="text-[10px] font-bold mt-1">${a.requester}</p></td><td class="px-6 py-4 text-xs italic text-slate-600">"${a.text}"</td><td class="px-6 py-4 text-right font-black text-sm">€ ${a.cost.toFixed(2)}</td></tr>`).join('');
         }
 
-        function toggleReportFilters() {
-            const level = document.getElementById('filter-level').value;
-            document.getElementById('filter-wrap-reparto').style.display = level === 'reparto' ? 'block' : 'none';
-            document.getElementById('filter-wrap-categoria').style.display = level === 'categoria' ? 'block' : 'none';
-            document.getElementById('filter-wrap-sottocategoria').style.display = level === 'sottocategoria' ? 'block' : 'none';
-            document.getElementById('filter-wrap-prodotto').style.display = level === 'prodotto' ? 'block' : 'none';
+        function switchCfg(id) {
+            document.querySelectorAll('.cfg-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.config-sub-tab').forEach(b => b.classList.remove('active'));
+            document.getElementById(`cfg-sec-${id}`).classList.remove('hidden');
+            document.getElementById(`cfg-btn-${id}`).classList.add('active');
+            if(id === 'reparti') {
+                const ql = document.getElementById('cfg-qr-list');
+                ql.innerHTML = appState.reparti.map(r => `<div class="glass-card p-4 flex flex-col items-center gap-2"><div id="qr-${r}"></div><span class="text-[10px] font-black uppercase">${r}</span></div>`).join('');
+                appState.reparti.forEach(r => { new QRCode(document.getElementById(`qr-${r}`), { text: window.location.origin + "?reparto=" + r, width: 80, height: 80 }); });
+            }
         }
 
-        function updateCharts() {
-            if(appState.charts.trend) appState.charts.trend.destroy();
+        function initCharts() {
             if(appState.charts.pie) appState.charts.pie.destroy();
-            
-            const period = document.getElementById('filter-period').value;
-            const level = document.getElementById('filter-level').value;
-            const days = getRangeDays(period);
-            const filteredOrders = appState.archive.filter(a => withinDays(a, days));
-
-            const labels = period === 'mensile'
-                ? ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4']
-                : ['Mese 1', 'Mese 2', 'Mese 3'];
-
-            const bucketSize = period === 'mensile' ? 7 : 30;
-            const trendData = labels.map((_, idx) => {
-                return filteredOrders.filter(order => {
-                    const age = Math.floor((Date.now() - new Date(order.dateISO || Date.now()).getTime()) / (24 * 60 * 60 * 1000));
-                    return age >= idx * bucketSize && age < (idx + 1) * bucketSize;
-                }).reduce((sum, o) => sum + (o.cost || 0), 0);
-            }).reverse();
-            
-            const ctx1 = document.getElementById('analyticsTrendChart').getContext('2d');
-            appState.charts.trend = new Chart(ctx1, { 
-                type: 'line', 
-                data: { labels: labels, datasets: [{ data: trendData, borderColor: '#0a2540', backgroundColor: 'rgba(10, 37, 64, 0.1)', tension: 0.4, fill: true }] }, 
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: false } } 
-            });
-
-            // Calcolo Torta
-            let pieLabels = []; let pieData = [];
-            if(level === 'generale' || level === 'reparto') {
-                pieLabels = appState.reparti;
-                pieData = appState.reparti.map(r => filteredOrders.filter(a => a.dept === r).reduce((s, a) => s + a.cost, 0));
-            } else if(level === 'categoria') {
-                pieLabels = [...new Set(appState.products.map(p=>p.cat))];
-                pieData = pieLabels.map(c => filteredOrders.flatMap(o => o.allocations || []).flatMap(a => a.items || []).filter(i => i.cat === c).reduce((sum, i) => sum + i.total, 0));
-            } else if(level === 'sottocategoria') {
-                const selectedSub = document.getElementById('filter-sottocategoria').value;
-                pieLabels = selectedSub === 'tutte' ? [...new Set(appState.products.map(p => p.sub))] : [selectedSub];
-                pieData = pieLabels.map(s => filteredOrders.flatMap(o => o.allocations || []).flatMap(a => a.items || []).filter(i => i.sub === s).reduce((sum, i) => sum + i.total, 0));
-            } else if(level === 'prodotto') {
-                const selected = document.getElementById('filter-prodotto').value;
-                const pool = selected === 'tutti' ? appState.products : appState.products.filter(p => String(p.id) === String(selected));
-                pieLabels = pool.map(p => p.name);
-                pieData = pool.map(p => filteredOrders.flatMap(o => o.allocations || []).flatMap(a => a.items || []).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.total, 0));
-            }
-            const trendTitle = document.getElementById('trend-title');
-            if (trendTitle) trendTitle.textContent = `Andamento ${period === 'mensile' ? 'Mensile' : 'Trimestrale'} - ${level}`;
-
-            const ctx2 = document.getElementById('analyticsPieChart').getContext('2d');
-            appState.charts.pie = new Chart(ctx2, { 
-                type: 'doughnut', 
-                data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: ['#0a2540', '#c5a059', '#16406b', '#e2e8f0', '#ff8a71'] }] }, 
-                options: { responsive: true, maintainAspectRatio: false, cutout: '70%' } 
-            });
-            renderPriceHeatmap();
+            const repData = appState.reparti.map(r => appState.archive.filter(a => a.dept === r).reduce((s, a) => s + a.cost, 0));
+            appState.charts.pie = new Chart(document.getElementById('chartPie'), { type: 'doughnut', data: { labels: appState.reparti, datasets: [{ data: repData.some(d=>d>0)?repData:[100,200,300,400], backgroundColor: ['#09121e', '#c5a059', '#1e3a5f', '#cbd5e1'] }] }, options: { responsive: true, maintainAspectRatio: false } });
         }
 
-        function getHistoricalAverage(productId, supplier) {
-            const hist = (appState.priceHistory || []).filter(h => h.productId === productId && h.supplier === supplier);
-            if (!hist.length) return null;
-            const avg = hist.reduce((sum, h) => sum + parseNumber(h.newPrice), 0) / hist.length;
-            return Number.isFinite(avg) ? avg : null;
-        }
-
-        function renderPriceHeatmap() {
-            const head = document.getElementById('heatmap-head');
-            const body = document.getElementById('heatmap-body');
-            if (!head || !body) return;
-            const search = normalizeText(document.getElementById('heatmap-search')?.value || '');
-            const suppliers = [...new Set(appState.products.flatMap(p => Object.keys(p.prices || {})))].slice(0, 12);
-            const products = appState.products
-                .filter(p => !search || normalizeText(p.name).includes(search))
-                .slice(0, 120);
-
-            head.innerHTML = `<tr><th class="px-3 py-2 text-[10px] font-black uppercase text-slate-400">Prodotto</th>${suppliers.map(s => `<th class="px-3 py-2 text-[10px] font-black uppercase text-slate-400">${s}</th>`).join('')}</tr>`;
-
-            body.innerHTML = products.map(p => {
-                const cells = suppliers.map(s => {
-                    const cur = p.prices?.[s];
-                    if (cur === undefined) return `<td class="px-3 py-2 bg-slate-50 text-slate-300">-</td>`;
-                    const avg = getHistoricalAverage(p.id, s);
-                    let cls = 'bg-amber-50 text-amber-800';
-                    if (avg === null) cls = 'bg-slate-100 text-slate-600';
-                    else if (cur < avg) cls = 'bg-emerald-100 text-emerald-800';
-                    else if (cur > avg * 1.1) cls = 'bg-rose-100 text-rose-800';
-                    return `<td class="px-3 py-2 ${cls} font-black">€${parseNumber(cur).toFixed(2)}</td>`;
-                }).join('');
-                return `<tr><td class="px-3 py-2 font-bold">${p.name}</td>${cells}</tr>`;
-            }).join('');
-        }
-
-        function renderCatalogMgmt() {
-            const body = document.getElementById('catalog-table-body');
-            const s = (document.getElementById('catalog-mgmt-search')?.value || "").toLowerCase();
-            body.innerHTML = appState.products.filter(p => p.name.toLowerCase().includes(s)).map(p => `
-                <tr id="product-row-${p.id}" class="hover:bg-slate-50 border-b border-slate-50 ${p.id === lastAddedProductId ? 'bg-emerald-50/60' : ''}">
-                    <td class="px-6 py-3">
-                        <p class="font-bold text-xs text-slate-900">${p.name}</p>
-                        <p class="text-[8px] font-black uppercase text-slate-400 tracking-widest">${p.cat} / ${p.sub || 'VARIE'} - ${p.um}</p>
-                    </td>
-                    <td class="px-6 py-3 text-right flex flex-wrap justify-end gap-1 items-center">
-                        ${Object.entries(p.prices).map(([sup, pr]) => `<div class="bg-white border rounded px-1.5 py-0.5 text-[8px] font-black shadow-sm">€${pr.toFixed(2)} <span class="text-slate-400">${sup}</span></div>`).join('')}
-                        <button onclick="editCatalogProduct(${p.id})" class="text-[9px] px-2 py-1 border rounded-lg font-bold uppercase">Modifica</button>
-                        <button onclick="showPriceHistory(${p.id})" class="text-[9px] px-2 py-1 border rounded-lg font-bold uppercase">Storico</button>
-                        <button onclick="deleteCatalogProduct(${p.id})" class="text-[9px] px-2 py-1 border rounded-lg font-bold uppercase text-rose-600">Elimina</button>
-                    </td>
-                </tr>`).join('');
-            if (lastAddedProductId) {
-                const el = document.getElementById(`product-row-${lastAddedProductId}`);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTimeout(() => { lastAddedProductId = null; }, 1500);
-            }
-        }
-
-        function editCatalogProduct(id) {
-            const p = appState.products.find(x => x.id === id);
-            if (!p) return;
-            const newName = prompt('Nome prodotto', p.name);
-            if (!newName) return;
-            const newCat = prompt('Categoria', p.cat || 'Varie') || p.cat;
-            const newSub = prompt('Sottocategoria', p.sub || 'Varie') || p.sub;
-            const newUm = prompt('UM', p.um || 'pz') || p.um;
-            p.name = newName.trim();
-            p.cat = newCat.trim();
-            p.sub = newSub.trim();
-            p.um = newUm.trim();
-            saveState();
-            renderCatalogMgmt();
-        }
-
-        function deleteCatalogProduct(id) {
-            if (!confirm('Confermi eliminazione prodotto dal catalogo?')) return;
-            appState.products = appState.products.filter(p => p.id !== id);
-            saveState();
-            renderCatalogMgmt();
-        }
-        
-
-        function showPriceHistory(productId) {
-            const p = appState.products.find(x => x.id === productId);
-            if (!p) return;
-            const history = (appState.priceHistory || []).filter(h => h.productId === productId).slice(0, 15);
-            if (!history.length) return alert('Nessuno storico prezzo disponibile.');
-            const txt = history.map(h => `${new Date(h.dateISO).toLocaleDateString('it-IT')} | ${h.supplier} | ${h.oldPrice.toFixed(2)} -> ${h.newPrice.toFixed(2)} (${h.source})`).join('\n');
-            alert(`Storico prezzi: ${p.name}\n\n${txt}`);
-        }
-
-        // --- AGGIORNAMENTO FATTURE ---
-        function populateSupplierSelect() {
-            const sel = document.getElementById('update-supplier-select');
-            if(sel) sel.innerHTML = '<option value="">Seleziona Fornitore...</option>' + appState.suppliers.map(x => `<option value="${x.name}">${x.name}</option>`).join('');
-        }
-
-        function renderPriceUpdateTable() {
-            const supplier = document.getElementById('update-supplier-select').value;
-            const body = document.getElementById('update-table-body');
-            if(!supplier) { body.innerHTML = ''; return; }
-
-            body.innerHTML = appState.products.filter(p => p.prices[supplier]).map(p => {
-                const old = p.prices[supplier];
-                const current = appState.pendingUpdates[`${p.id}-${supplier}`] || old;
-                return `
-                <tr>
-                    <td class="px-6 py-3 font-bold text-xs">${p.name} <span class="text-[9px] text-slate-400 block">${p.um}</span></td>
-                    <td class="px-6 py-3 text-center text-[10px] text-slate-400">€ ${old.toFixed(2)}</td>
-                    <td class="px-6 py-3 text-center"><input type="number" step="0.01" value="${current}" oninput="appState.pendingUpdates['${p.id}-${supplier}'] = parseFloat(this.value); renderPriceUpdateTable();" class="w-24 p-2 border rounded-lg text-xs font-bold text-center outline-none"></td>
-                </tr>`;
-            }).join('');
-        }
-
-        function saveInvoicePrices() {
-            let count = 0;
-            const alerts = [];
-            Object.entries(appState.pendingUpdates).forEach(([key, val]) => {
-                const [id, sup] = key.split('-');
-                const p = appState.products.find(x => x.id == id);
-                if(p) {
-                    const old = parseNumber(p.prices[sup]);
-                    const next = parseNumber(val);
-                    if (old > 0) {
-                        const delta = ((next - old) / old) * 100;
-                        if (delta >= 10) alerts.push(`${p.name} (${sup}) +${delta.toFixed(1)}%`);
-                    }
-                    p.prices[sup] = next;
-                    if (old !== next) pushPriceHistory(p.id, sup, old, next, 'invoice-update');
-                    count++;
-                }
-            });
-            appState.pendingUpdates = {};
-            saveState();
-            const msg = alerts.length
-                ? `✓ ${count} prezzi aggiornati.\n\nAttenzione aumenti >10%:\n- ${alerts.slice(0, 10).join('\n- ')}`
-                : `✓ ${count} prezzi aggiornati nel Listino Master.`;
-            alert(msg);
-            if (alerts.length) {
-                notifyAdminEmail('price_alert', {
-                    message: alerts.slice(0, 30).join('\n')
-                });
-            }
-            renderPriceUpdateTable();
-        }
-
-        function exportOrdersCsv() {
-            const headers = ['date', 'reparto', 'richiedente', 'costo_effettivo', 'costo_raw', 'fornitore', 'prodotto', 'qty', 'unit_price', 'line_total'];
-            const rows = [headers.join(',')];
-            appState.archive.forEach(order => {
-                const allocations = order.allocations || [];
-                if (allocations.length === 0) {
-                    rows.push([order.date || '', order.dept || '', order.requester || '', order.cost || 0, order.rawCost || 0, '', '', '', '', ''].join(','));
-                }
-                allocations.forEach(all => {
-                    (all.items || []).forEach(item => {
-                        rows.push([
-                            order.date || '',
-                            order.dept || '',
-                            (order.requester || '').replaceAll(',', ' '),
-                            order.cost || 0,
-                            order.rawCost || 0,
-                            all.supplier || '',
-                            (item.productName || '').replaceAll(',', ' '),
-                            item.qty || 0,
-                            item.unitPrice || 0,
-                            item.total || 0
-                        ].join(','));
-                    });
-                });
-            });
-            const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `seasignora-ordini-${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function exportPriceHistoryCsv() {
-            const sup = document.getElementById('version-filter-supplier')?.value || 'all';
-            const source = document.getElementById('version-filter-source')?.value || 'all';
-            const q = normalizeText(document.getElementById('version-filter-product')?.value || '');
-            const headers = ['date', 'product_id', 'product_name', 'supplier', 'old_price', 'new_price', 'source'];
-            const rows = [headers.join(',')];
-            (appState.priceHistory || []).forEach(h => {
-                if (sup !== 'all' && h.supplier !== sup) return;
-                if (source !== 'all' && h.source !== source) return;
-                const p = appState.products.find(x => x.id === h.productId);
-                const pname = (p?.name || '').replaceAll(',', ' ');
-                if (q && !normalizeText(pname).includes(q)) return;
-                rows.push([
-                    h.dateISO || '',
-                    h.productId || '',
-                    pname,
-                    h.supplier || '',
-                    parseNumber(h.oldPrice),
-                    parseNumber(h.newPrice),
-                    h.source || ''
-                ].join(','));
-            });
-            const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `seasignora-storico-prezzi-${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function rollbackPriceVersion(historyId) {
-            const h = (appState.priceHistory || []).find(x => String(x.id) === String(historyId));
-            if (!h) return alert('Versione non trovata.');
-            const p = appState.products.find(x => x.id === h.productId);
-            if (!p) return alert('Prodotto non trovato.');
-            if (!confirm(`Confermi rollback su ${p.name} / ${h.supplier} a €${parseNumber(h.oldPrice).toFixed(2)}?`)) return;
-            const current = parseNumber(p.prices[h.supplier] ?? 0);
-            const target = parseNumber(h.oldPrice);
-            p.prices[h.supplier] = target;
-            pushPriceHistory(p.id, h.supplier, current, target, 'rollback');
-            saveState();
-            renderCatalogMgmt();
-            renderPriceVersions();
-            alert('✓ Rollback applicato.');
-        }
-
-        function applySettings() {
-            appState.settings.aiEnabled = true;
-            appState.settings.aiProvider = 'gemini';
-            appState.settings.aiModel = 'gemini-2.0-flash';
-            document.getElementById('ui-brand-name').innerText = appState.settings.brandName || 'Sea Signora';
-            document.documentElement.style.setProperty('--brand-accent', appState.settings.accentColor || '#c5a059');
-            const accentEl = document.getElementById('ui-accent-input');
-            if (accentEl) accentEl.value = appState.settings.accentColor || '#c5a059';
-            const modeEl = document.getElementById('ui-allocation-mode');
-            if (modeEl) modeEl.value = appState.settings.allocationMode || 'hybrid';
-            const penaltyEl = document.getElementById('ui-penalty-rate');
-            if (penaltyEl) penaltyEl.value = Number(appState.settings.penaltyRate || 0.06).toFixed(2);
-            const portoEl = document.getElementById('ui-porto-window');
-            if (portoEl) portoEl.value = appState.settings.portoFrancoWindow || 'weekly';
-            const aliasesArea = document.getElementById('ui-aliases-area');
-            if (aliasesArea) {
-                aliasesArea.value = Object.entries(appState.settings.aliases || {}).map(([k, v]) => `${k} => ${v}`).join('\n');
-            }
-            // Gemini API key is server-managed; no browser key input.
-            const serverUrlEl = document.getElementById('ui-server-url');
-            if (serverUrlEl) serverUrlEl.value = appState.settings.serverUrl || '';
-            const serverApiKeyEl = document.getElementById('ui-server-api-key');
-            if (serverApiKeyEl) serverApiKeyEl.value = appState.settings.serverApiKey || '';
-            Object.entries(appState.settings.hiddenModules || {}).forEach(([id, val]) => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = val;
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => { 
-            // Inizializzazione sicura
-            document.querySelectorAll('.view-section').forEach(s => s.style.display = 'none');
-            document.getElementById('view-home').style.display = 'block';
-            const deptFromUrl = new URLSearchParams(window.location.search).get('reparto');
-            if (deptFromUrl && appState.reparti.includes(deptFromUrl)) {
-                document.getElementById('role-selector').value = deptFromUrl;
-                appState.kioskMode = true;
-                appState.forcedDept = deptFromUrl;
-            }
-            applySettings();
-            handleRoleChange(); 
-            updateAiHelpCopy();
-            renderCatalogMgmt();
-            renderInbox();
-            renderConsolidation();
-            renderHomeView();
-            startGlobalStatePolling();
-            pullStateFromServerSilently();
-        });
+        document.addEventListener('DOMContentLoaded', () => { syncData(); handleRoleChange(); });
     </script>
 </body>
 </html>
