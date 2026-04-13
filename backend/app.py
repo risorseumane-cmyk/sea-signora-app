@@ -28,10 +28,7 @@ SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM = os.getenv("RESEND_FROM", SMTP_FROM)
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyB1onn5YUyBbgAJEd7jxqq5lol3myLpNsg").strip()
-# ...
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "AIzaSyB1onn5YUyBbgAJEd7jxqq5lol3myLpNsg").strip()
 
 app = Flask(__name__)
 CORS(app)
@@ -803,6 +800,9 @@ def notify():
 
 def get_gemini_response(prompt, model_name="gemini-1.5-flash"):
     try:
+        if not GEMINI_API_KEY:
+            return None
+        genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         return response.text
@@ -878,8 +878,18 @@ def ai_help():
     return jsonify({"ok": False, "error": "Impossibile ottenere risposta dall'IA"}), 502
 
 
-@app.get("/api/notifications")
-def get_notifications():
+@app.post("/api/admin/reset-db")
+def reset_db_endpoint():
+    # Definiamo default_state qui o lo rendiamo globale
+    # Per semplicità lo recuperiamo dalla funzione init_db (refactoring necessario)
+    # Ma per ora facciamo un reset brutale
+    try:
+        if DB_PATH.exists():
+            os.remove(DB_PATH)
+        init_db()
+        return jsonify({"ok": True, "message": "Database resettato ai valori di fabbrica."})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
     if not check_key():
         return jsonify({"ok": False, "error": "Invalid API key"}), 401
     conn = get_conn()
