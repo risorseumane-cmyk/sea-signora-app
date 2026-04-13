@@ -120,6 +120,38 @@
                     </div>
                     <div id="heatmap-wrap" class="overflow-x-auto min-h-[400px]"></div>
                 </div>
+
+                <div class="glass-card p-8 mt-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                        <h4 class="font-black uppercase text-xs text-slate-400">Storico Ordini (per Reparto / Mese)</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <select id="history-dept" onchange="renderOrderHistory()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none"></select>
+                            <select id="history-month" onchange="renderOrderHistory()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none"></select>
+                            <select id="history-period" onchange="renderOrderHistory()" class="p-2 bg-amber-50 border-amber-200 border rounded-lg text-[10px] font-black uppercase outline-none">
+                                <option value="30">Mensile (Settimane)</option>
+                                <option value="90">Trimestrale (Mesi)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="h-[280px]">
+                            <canvas id="chartOrdersTrend"></canvas>
+                        </div>
+                        <div class="overflow-x-auto max-h-[280px] overflow-y-auto border rounded-2xl">
+                            <table class="w-full text-left text-sm">
+                                <thead class="sticky top-0 bg-white">
+                                    <tr class="text-[10px] font-black uppercase text-slate-400 border-b">
+                                        <th class="p-3">Data</th>
+                                        <th class="p-3">Reparto</th>
+                                        <th class="p-3">Referente</th>
+                                        <th class="p-3 text-right">Totale</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-body" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="view-inbox" class="view-section"><div id="inbox-list" class="max-w-4xl mx-auto space-y-6"></div></div>
@@ -459,6 +491,8 @@
             populateSupplierSelect();
             populateTrendFilters();
             populateHeatmapFilters();
+            populateHistoryFilters();
+            renderOrderHistory();
         }
 
         function populateHeatmapFilters() {
@@ -752,6 +786,166 @@
             wrap.innerHTML = html;
         }
 
+        function parseOrderTimestamp(order) {
+            if(order && typeof order.ts === 'number') return order.ts;
+            const raw = order?.dateISO || order?.date || '';
+            if(typeof raw === 'string') {
+                if(raw.includes('T')) {
+                    const t = Date.parse(raw);
+                    if(!Number.isNaN(t)) return t;
+                }
+                const parts = raw.split(' ').filter(Boolean);
+                const datePart = parts[0] || '';
+                const timePart = parts[1] || '';
+                const dmy = datePart.split('/').map(x => parseInt(x, 10));
+                if(dmy.length === 3 && dmy.every(n => !Number.isNaN(n))) {
+                    const [dd, mm, yyyy] = dmy;
+                    const hm = timePart.split(':').map(x => parseInt(x, 10));
+                    const hh = hm[0] || 0;
+                    const mi = hm[1] || 0;
+                    return new Date(yyyy, mm - 1, dd, hh, mi, 0, 0).getTime();
+                }
+                const t = Date.parse(raw);
+                if(!Number.isNaN(t)) return t;
+            }
+            return Date.now();
+        }
+
+        function monthKeyFromTs(ts) {
+            const d = new Date(ts);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            return `${y}-${m}`;
+        }
+
+        function monthLabelFromKey(key) {
+            const [y, m] = key.split('-').map(x => parseInt(x, 10));
+            const d = new Date(y, (m || 1) - 1, 1);
+            const label = d.toLocaleString('it-IT', { month: 'long', year: 'numeric' });
+            return label.charAt(0).toUpperCase() + label.slice(1);
+        }
+
+        function populateHistoryFilters() {
+            const deptSel = document.getElementById('history-dept');
+            const monthSel = document.getElementById('history-month');
+            if(!deptSel || !monthSel) return;
+
+            const currentDept = deptSel.value;
+            const currentMonth = monthSel.value;
+
+            deptSel.innerHTML = '<option value="">Tutti i Reparti</option>' + appState.reparti.map(r => `<option value="${r}">${r}</option>`).join('');
+            deptSel.value = currentDept;
+
+            const monthKeys = [...new Set(appState.archive.map(o => monthKeyFromTs(parseOrderTimestamp(o))))].sort().reverse();
+            const defaultMonth = monthKeys[0] || monthKeyFromTs(Date.now());
+            monthSel.innerHTML = (monthKeys.length ? monthKeys : [defaultMonth]).map(k => `<option value="${k}">${monthLabelFromKey(k)}</option>`).join('');
+            monthSel.value = currentMonth || defaultMonth;
+        }
+
+        function getHistoryByDept() {
+            const dept = document.getElementById('history-dept')?.value || '';
+            return appState.archive
+                .map(o => ({ ...o, __ts: parseOrderTimestamp(o) }))
+                .filter(o => !dept || o.dept === dept)
+                .sort((a, b) => b.__ts - a.__ts);
+        }
+
+        function renderOrderHistory() {
+            const body = document.getElementById('history-body');
+            if(!body) return;
+
+            const monthKey = document.getElementById('history-month')?.value || '';
+            const rows = getHistoryByDept().filter(o => !monthKey || monthKeyFromTs(o.__ts) === monthKey);
+            body.innerHTML = rows.map(o => {
+                const ts = o.__ts;
+                const dt = new Date(ts).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const staff = o.staff || '—';
+                const dept = o.dept || '—';
+                const total = typeof o.total === 'number' ? o.total : 0;
+                return `
+                    <tr class="hover:bg-slate-50 transition-all">
+                        <td class="p-3 font-bold">${dt}</td>
+                        <td class="p-3 text-[10px] font-black uppercase text-amber-600">${dept}</td>
+                        <td class="p-3 font-bold">${staff}</td>
+                        <td class="p-3 text-right font-black">€ ${total.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="4" class="p-10 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine per i filtri selezionati</td></tr>';
+
+            renderOrderHistoryTrend();
+        }
+
+        function renderOrderHistoryTrend() {
+            const period = document.getElementById('history-period')?.value || '30';
+            const monthKey = document.getElementById('history-month')?.value || monthKeyFromTs(Date.now());
+            const base = getHistoryByDept();
+
+            const ctxEl = document.getElementById('chartOrdersTrend');
+            if(!ctxEl) return;
+            const ctx = ctxEl.getContext('2d');
+
+            if(charts.ordersTrend) charts.ordersTrend.destroy();
+
+            let labels = [];
+            let data = [];
+
+            if(period === '30') {
+                const [y, m] = monthKey.split('-').map(x => parseInt(x, 10));
+                const monthDate = new Date(y, (m || 1) - 1, 1);
+                const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+                const maxWeek = Math.ceil(daysInMonth / 7);
+                labels = Array.from({ length: maxWeek }, (_, i) => `Sett ${i + 1}`);
+                data = new Array(maxWeek).fill(0);
+
+                base.filter(o => monthKeyFromTs(o.__ts) === monthKey).forEach(o => {
+                    const d = new Date(o.__ts);
+                    const week = Math.floor((d.getDate() - 1) / 7);
+                    if(week >= 0 && week < data.length) data[week] += 1;
+                });
+            } else {
+                const [y, m] = monthKey.split('-').map(x => parseInt(x, 10));
+                const end = new Date(y, (m || 1) - 1, 1);
+                const months = [2, 1, 0].map(delta => new Date(end.getFullYear(), end.getMonth() - delta, 1));
+                labels = months.map(d => {
+                    const lbl = d.toLocaleString('it-IT', { month: 'short', year: 'numeric' });
+                    return lbl.charAt(0).toUpperCase() + lbl.slice(1);
+                });
+                data = new Array(3).fill(0);
+
+                base.forEach(o => {
+                    const d = new Date(o.__ts);
+                    const idx = months.findIndex(mm => mm.getFullYear() === d.getFullYear() && mm.getMonth() === d.getMonth());
+                    if(idx !== -1) data[idx] += 1;
+                });
+            }
+
+            charts.ordersTrend = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Ordini',
+                        data: data,
+                        borderColor: appState.settings.color || '#c5a059',
+                        backgroundColor: (appState.settings.color || '#c5a059') + '22',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: appState.settings.color || '#c5a059'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 } } },
+                        x: { grid: { display: false }, ticks: { font: { size: 9, weight: 'bold' } } }
+                    }
+                }
+            });
+        }
+
         async function askAI() {
             const q = document.getElementById('chat-q').value; if(!q) return;
             const btn = document.getElementById('chat-btn'); 
@@ -994,7 +1188,8 @@
                 appState.archive.unshift({ 
                     dept: req.dept, 
                     total: total, 
-                    date: new Date().toLocaleDateString(), 
+                    ts: Date.now(),
+                    date: new Date().toLocaleString('it-IT'), 
                     text: req.text,
                     staff: req.staff,
                     items: finalItems 
@@ -1015,7 +1210,7 @@
                 const sup = appState.suppliers.find(s => s.name === best[0]);
                 if(sup) { sup.current = (sup.current||0) + best[1]; total += best[1]; }
             });
-            appState.archive.unshift({ dept: req.dept, total: total, cat: match[0]?.cat || 'Vario', date: new Date().toLocaleDateString() });
+            appState.archive.unshift({ dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, cat: match[0]?.cat || 'Vario' });
             appState.inbox = appState.inbox.filter(r => r.id !== req.id);
             push();
             refresh();
