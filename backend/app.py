@@ -28,11 +28,11 @@ SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}}) # Permetti CORS per tutte le origini su /api/
 
 # --- DATABASE ---
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10) # Aggiungi timeout per evitare lock
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -77,7 +77,7 @@ def send_email_alert(dept, staff, text):
             msg['Subject'] = subject
             msg['From'] = SMTP_FROM
             msg['To'] = SMTP_TO
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
                 server.starttls()
                 server.login(SMTP_USER, SMTP_PASS)
                 server.send_message(msg)
@@ -89,7 +89,7 @@ def send_email_alert(dept, staff, text):
     if FORMSPREE_ENDPOINT:
         try:
             data = urllib.parse.urlencode({"_subject": subject, "message": body}).encode()
-            urllib.request.urlopen(FORMSPREE_ENDPOINT, data=data)
+            urllib.request.urlopen(FORMSPREE_ENDPOINT, data=data, timeout=5)
             return True
         except Exception as e:
             print(f"Formspree Error: {e}")
@@ -160,44 +160,53 @@ def get_state():
 
 @app.post("/api/state")
 def post_state():
-    data = request.get_json()
-    if not data or 'state' not in data:
-        return jsonify({"ok": False, "error": "Invalid state"}), 400
-    with get_conn() as conn:
-        conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(data['state']),))
-        conn.commit()
-    return jsonify({"ok": True})
+    try:
+        data = request.get_json()
+        if not data or 'state' not in data:
+            return jsonify({"ok": False, "error": "Invalid state"}), 400
+        with get_conn() as conn:
+            conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(data['state']),))
+            conn.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Save error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.post("/api/order")
 def create_order():
-    data = request.get_json()
-    dept = data.get("dept")
-    staff = data.get("staff")
-    text = data.get("text")
-    
-    if not dept or not staff or not text:
-        return jsonify({"ok": False, "error": "Missing fields"}), 400
+    try:
+        data = request.get_json()
+        dept = data.get("dept")
+        staff = data.get("staff")
+        text = data.get("text")
         
-    with get_conn() as conn:
-        row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
-        state = json.loads(row['state'])
+        if not dept or not staff or not text:
+            return jsonify({"ok": False, "error": "Missing fields"}), 400
+            
+        with get_conn() as conn:
+            row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+            if not row: return jsonify({"ok": False, "error": "Database not initialized"}), 500
+            state = json.loads(row['state'])
+            
+            new_req = {
+                "id": int(datetime.now().timestamp()),
+                "dept": dept,
+                "staff": staff,
+                "text": text,
+                "date": datetime.now().strftime("%d/%m/%Y %H:%M")
+            }
+            state["inbox"].insert(0, new_req)
+            
+            conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+            conn.commit()
+            
+        # Notifica via mail (non blocca la risposta se fallisce o è lenta)
+        sent = send_email_alert(dept, staff, text)
         
-        new_req = {
-            "id": int(datetime.now().timestamp()),
-            "dept": dept,
-            "staff": staff,
-            "text": text,
-            "date": datetime.now().strftime("%d/%m/%Y %H:%M")
-        }
-        state["inbox"].insert(0, new_req)
-        
-        conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
-        conn.commit()
-        
-    # Notifica via mail
-    sent = send_email_alert(dept, staff, text)
-    
-    return jsonify({"ok": True, "notified": sent})
+        return jsonify({"ok": True, "notified": sent})
+    except Exception as e:
+        print(f"Order error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.post("/api/ai/order-parse")
 def ai_parse():

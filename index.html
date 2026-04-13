@@ -306,17 +306,16 @@
         };
         let charts = {}; // Spostato fuori da appState per permettere il salvataggio JSON
 
+        const API_BASE = window.location.origin.startsWith('file://') ? 'http://localhost:8080' : '';
         let isPushing = false;
         async function sync() {
-            if(isPushing) return; // Non sincronizzare se stiamo salvando
+            if(isPushing) return;
             const status = document.getElementById('save-status');
             try {
-                const res = await fetch('/api/state');
+                const res = await fetch(`${API_BASE}/api/state`);
                 if(!res.ok) throw new Error("Server non raggiungibile");
                 const d = await res.json();
                 if(d.ok && d.state) { 
-                    // Se siamo admin e ci sono modifiche locali non salvate, potremmo volerle preservare
-                    // Ma per ora, assumiamo che il server sia la fonte della verità
                     appState = {
                         ...appState,
                         ...d.state,
@@ -345,7 +344,7 @@
             }
             
             try {
-                const res = await fetch('/api/state', { 
+                const res = await fetch(`${API_BASE}/api/state`, { 
                     method: 'POST', 
                     headers: {'Content-Type':'application/json'}, 
                     body: JSON.stringify({state: appState}) 
@@ -723,7 +722,7 @@
             box.classList.add('hidden');
 
             try {
-                const res = await fetch('/api/ai/help', { 
+                const res = await fetch(`${API_BASE}/api/ai/help`, { 
                     method: 'POST', 
                     headers: {'Content-Type':'application/json'}, 
                     body: JSON.stringify({
@@ -781,7 +780,7 @@
             btn.innerText = "Analisi in corso..."; btn.disabled = true;
 
             try {
-                const res = await fetch('/api/ai/order-parse', {
+                const res = await fetch(`${API_BASE}/api/ai/order-parse`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ text: req.text, catalog: appState.products })
@@ -884,7 +883,7 @@
             appState.settings = { ...appState.settings, brandName: b, color: c, homeTitle: ht };
             
             if(shouldPush) {
-                await fetch('/api/admin/page-settings', {
+                await fetch(`${API_BASE}/api/admin/page-settings`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ settings: appState.settings })
@@ -945,7 +944,7 @@
 
         async function saveSuppliers() {
             try {
-                const res = await fetch('/api/admin/suppliers', {
+                const res = await fetch(`${API_BASE}/api/admin/suppliers`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ suppliers: appState.suppliers })
@@ -1203,7 +1202,7 @@
             btn.innerText = "Invio in corso..."; btn.disabled = true;
             
             try {
-                const res = await fetch('/api/order', {
+                const res = await fetch(`${API_BASE}/api/order`, {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
                     body: JSON.stringify({ dept, staff, text })
@@ -1230,7 +1229,7 @@
             btn.innerText = "Reset in corso..."; btn.disabled = true;
 
             try {
-                const res = await fetch('/api/admin/reset-db', { method: 'POST' });
+                const res = await fetch(`${API_BASE}/api/admin/reset-db`, { method: 'POST' });
                 const d = await res.json();
                 if(d.ok) {
                     alert("Database resettato con successo. Ricarico l'app...");
@@ -1302,7 +1301,7 @@
 
         async function checkDiagnostics() {
             try {
-                const res = await fetch('/api/diag');
+                const res = await fetch(`${API_BASE}/api/diag`);
                 const d = await res.json();
                 alert(`DIAGNOSTICA:\nDB: ${d.db}\nENGINE: ${d.engine}`);
             } catch(e) {
