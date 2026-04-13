@@ -181,15 +181,18 @@
         };
 
         async function sync() {
+            console.log("Syncing state...");
             try {
                 const res = await fetch('/api/state');
+                if(!res.ok) throw new Error("Server responded with " + res.status);
                 const d = await res.json();
                 if(d.ok && d.state) { 
                     appState = {...appState, ...d.state}; 
-                    applyUI(false); // Non pushare durante il sync
+                    applyUI(false); 
                 }
             } catch(e) {
                 console.error("Sync error:", e);
+                // Non blocchiamo tutto se il sync fallisce temporaneamente
             }
             refresh();
         }

@@ -615,3 +615,7 @@ def reset_db():
 def serve():
     return send_from_directory(FRONTEND_FILE.parent, FRONTEND_FILE.name)
 
+@app.get("/assets/<path:path>")
+def serve_assets(path):
+    return send_from_directory(FRONTEND_FILE.parent / "assets", path)
+
