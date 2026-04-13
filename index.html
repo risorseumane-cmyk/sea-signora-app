@@ -9,6 +9,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap');
+        @font-face {
+            font-family: 'Skanaus';
+            src: url('/assets/fonts/Skanaus-Regular.otf') format('opentype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
         :root {
             --brand-accent: #EF7818;
             --brand-gold: #E2C424;
@@ -31,6 +38,10 @@
         .config-tab { border-bottom: 2px solid transparent; cursor: pointer; padding: 10px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; }
         .config-tab.active { border-color: var(--brand-accent); color: var(--brand-blue); }
         .brand-display { font-family: 'Skanaus', 'Times New Roman', serif; letter-spacing: -0.02em; }
+        h1, h2, h3, h4 { font-family: 'Skanaus', 'Times New Roman', serif; letter-spacing: -0.02em; }
+        .brand-logo-box { background: var(--brand-dark); border-radius: 22px; padding: 14px 18px; width: 100%; }
+        .brand-hero { position: relative; overflow: hidden; }
+        .brand-hero::after { content: ''; position: absolute; inset: 0; background-image: url('/assets/brand/key_visuals_transparent.png'); background-repeat: no-repeat; background-position: right -60px top -40px; background-size: 520px auto; opacity: 0.20; pointer-events: none; }
     </style>
 </head>
 <body class="antialiased">
@@ -38,7 +49,7 @@
     <div class="min-h-screen flex flex-col md:flex-row">
         <aside id="sidebar" class="w-full md:w-72 bg-white border-r p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-40 hidden md:flex">
             <div class="flex flex-col items-center gap-4 py-4 border-b">
-                <div class="w-full flex items-center justify-center">
+                <div class="brand-logo-box flex items-center justify-center">
                     <img id="ui-logo-img" src="/assets/logo-sea-signora.png" alt="Sea Signora" class="h-14 w-auto">
                 </div>
                 <div class="text-center">
@@ -70,7 +81,7 @@
             </header>
 
             <div id="view-home" class="view-section active">
-                <div class="brand-gradient p-10 rounded-3xl text-white shadow-2xl mb-8 relative overflow-hidden">
+                <div class="brand-gradient brand-hero p-10 rounded-3xl text-white shadow-2xl mb-8 relative overflow-hidden">
                     <h3 class="text-4xl font-black uppercase mb-2">Corporate Home</h3>
                     <p class="opacity-80 text-sm font-medium">Benvenuto. Il database è sincronizzato in tempo reale su Railway.</p>
                 </div>
