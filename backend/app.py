@@ -39,12 +39,25 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, state TEXT)")
-        # Inizializza con stato di default se vuoto
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM app_state")
-        if cur.fetchone()[0] == 0:
+        count = cur.fetchone()[0]
+
+        default_settings = {
+            "brandName": "Sea Signora",
+            "color": "#EF7818",
+            "homeTitle": "Corporate Home",
+            "homeSubtitle": "Benvenuto. Il database è sincronizzato in tempo reale su Railway.",
+            "homeVisuals": True,
+            "homeCardsEnabled": True,
+            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"}
+        }
+
+        if count == 0:
             default_state = {
-                "settings": {"brandName": "Sea Signora", "color": "#EF7818", "homeTitle": "Corporate Home"},
+                "seedVersion": "brand_v1",
+                "seededAt": datetime.now().isoformat(),
+                "settings": default_settings,
                 "products": [
                     {"id": 1, "name": "Aragosta Viva", "cat": "Ittico", "prices": {"METRO": 45.00, "Ittica": 42.50}},
                     {"id": 2, "name": "Gin Tonic Premium", "cat": "Spirits", "prices": {"Beverage": 12.00, "METRO": 13.50}},
@@ -62,6 +75,17 @@ def init_db():
             }
             conn.execute("INSERT INTO app_state (id, state) VALUES (1, ?)", (json.dumps(default_state),))
             conn.commit()
+        else:
+            row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+            if row:
+                state = json.loads(row["state"])
+                state.setdefault("seedVersion", "brand_v1")
+                state.setdefault("seededAt", datetime.now().isoformat())
+                state.setdefault("settings", {})
+                for k, v in default_settings.items():
+                    state["settings"].setdefault(k, v)
+                conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+                conn.commit()
 
 init_db()
 
@@ -222,15 +246,15 @@ def ai_help():
     data = request.get_json()
     q = data.get("question", "").lower()
     if "prezzo" in q or "cost" in q: 
-        ans = "I prezzi migliori sono evidenziati nel Master Data e nella Heatmap Comparazione. Puoi aggiornare i prezzi nella sezione 'Aggiorna Fatture'."
+        ans = "Sono Irina, assistente della compagnia. I prezzi migliori sono evidenziati nel Master Data e nella Heatmap (Prodotti vs Fornitori). Puoi aggiornare i prezzi nella sezione 'Aggiorna Fatture'."
     elif "ordine" in q or "reparto" in q: 
-        ans = "Puoi gestire gli ordini in arrivo nella sezione Inbox. I reparti ordinano tramite QR code dedicato."
+        ans = "Sono Irina, assistente della compagnia. Puoi gestire gli ordini in arrivo nella sezione Inbox. I reparti ordinano tramite QR code dedicato."
     elif "heatmap" in q:
-        ans = "La Heatmap mostra l'intensità di spesa incrociando reparti, categorie e fornitori. Si aggiorna automaticamente con ogni ordine approvato."
+        ans = "Sono Irina, assistente della compagnia. La Heatmap confronta Prodotti e Fornitori e mette in evidenza il miglior prezzo. Filtra per categoria per lavorare più velocemente."
     elif "trend" in q or "grafic" in q:
-        ans = "I grafici di trend mostrano l'andamento della spesa su base settimanale, mensile o trimestrale."
+        ans = "Sono Irina, assistente della compagnia. Nei report trovi lo storico ordini per reparto e il trend (mensile e trimestrale) con curva morbida."
     else: 
-        ans = "Sono l'assistente locale di Sea Signora. Posso aiutarti a gestire il catalogo, monitorare gli ordini e analizzare le spese dei fornitori."
+        ans = "Sono Irina, assistente della compagnia. Posso aiutarti a gestire il catalogo, monitorare gli ordini e analizzare i fornitori."
     return jsonify({"ok": True, "answer": ans})
 
 @app.get("/api/diag")
