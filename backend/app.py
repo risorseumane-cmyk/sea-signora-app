@@ -28,9 +28,8 @@ SMTP_TO = os.getenv("SMTP_TO", "Amministrazione@seasignorarest.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM = os.getenv("RESEND_FROM", SMTP_FROM)
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyAM9BA5AvXsyu2RWWJSLh_xQ55isa2sp94").strip()
-
-# Configurazione Gemini
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyB1onn5YUyBbgAJEd7jxqq5lol3myLpNsg").strip()
+# ...
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
@@ -456,12 +455,24 @@ def init_db():
             "aiEnabled": True
         },
     }
-    cur.execute("SELECT id FROM app_state WHERE id = 1")
-    if cur.fetchone() is None:
+    cur.execute("SELECT state_json FROM app_state WHERE id = 1")
+    row = cur.fetchone()
+    if row is None:
         cur.execute(
             "INSERT INTO app_state (id, state_json, updated_at) VALUES (1, ?, ?)",
             (json.dumps(default_state), datetime.utcnow().isoformat()),
         )
+    else:
+        # Se il database esiste già ma non ha prodotti, forziamo il caricamento del catalogo
+        current_state = json.loads(row["state_json"])
+        num_products = len(current_state.get("products") or [])
+        print(f"DB già inizializzato con {num_products} prodotti.")
+        if not current_state.get("products") or num_products < 10:
+            print("Database vuoto o con pochi prodotti, forzo il caricamento del catalogo completo...")
+            cur.execute(
+                "UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1",
+                (json.dumps(default_state), datetime.utcnow().isoformat()),
+            )
     conn.commit()
     conn.close()
 
@@ -717,13 +728,16 @@ def create_order():
     conn.commit()
     conn.close()
 
-    subject = "[Sea Signora] Nuovo ordine reparto"
+    subject = f"[Sea Signora] NUOVO ORDINE da {dept}"
     body = (
-        f"Nuovo ordine ricevuto\n\n"
+        f"🚨 AVVISO NUOVO ORDINE\n\n"
         f"Reparto: {dept}\n"
-        f"Operatore: {staff}\n"
-        f"Testo: {text}\n"
-        f"Data: {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')} UTC\n"
+        f"Inviato da: {staff}\n"
+        f"Data/Ora: {datetime.utcnow().strftime('%d/%m/%Y %H:%M:%S')} UTC\n\n"
+        f"--- TESTO DELL'ORDINE ---\n"
+        f"{text}\n"
+        f"-------------------------\n\n"
+        f"Puoi gestire questo ordine e confrontare i prezzi qui: https://seasignora-ordini.up.railway.app"
     )
     ok, err = send_email(subject, body)
     log_notification("order", subject, body, ok, err)

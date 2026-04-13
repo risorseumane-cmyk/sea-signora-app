@@ -164,26 +164,10 @@
     </div>
 
     <script>
-        // DATABASE COMPLETO
-        const MASTER_DB = [
-            {id:1, name:'Tartufi di Mare', cat:'Ittico', um:'kg', prices:{'METRO':11.12}},
-            {id:2, name:'Astice Blu Vivo', cat:'Ittico', um:'kg', prices:{'OROBICA':65.90}},
-            {id:3, name:'Gambero Rosso 2°', cat:'Ittico', um:'kg', prices:{'OROBICA':59.00}},
-            {id:4, name:'Branzino Grecia', cat:'Ittico', um:'kg', prices:{'METRO':11.71}},
-            {id:5, name:'Carciofi Mammola', cat:'Verdure', um:'pz', prices:{'OROBICA':1.18}},
-            {id:6, name:'Patate', cat:'Verdure', um:'kg', prices:{'ORTOLANO':0.90}},
-            {id:7, name:'Carne Trita 80/20', cat:'Carne', um:'kg', prices:{'CARNI NOBILI':10.00}},
-            {id:8, name:'Pasta Staff', cat:'Secchi', um:'kg', prices:{'METRO':1.16}},
-            {id:9, name:'Sapone Arancia Capri', cat:'Pulizia', um:'pz', prices:{'ACQUA DI PARMA':33.00}},
-            {id:10, name:'Detergente Lavastoviglie', cat:'Pulizia', um:'pz', prices:{'METRO':10.00}},
-            {id:11, name:'Ostriche Gillardeau', cat:'Ittico', um:'pz', prices:{'LINEA MARE':2.44}},
-            {id:12, name:'Tonno Rosso Fuentes', cat:'Ittico', um:'kg', prices:{'OROBICA':29.00}}
-        ];
-
         let appState = {
             settings: { brand: 'Sea Signora', color: '#c5a059' },
-            products: [...MASTER_DB],
-            suppliers: [{name:'METRO', min:150},{name:'OROBICA', min:250},{name:'LINEA MARE', min:200},{name:'REACH FOOD', min:300},{name:'MARR', min:200},{name:'ORTOLANO', min:100}],
+            products: [],
+            suppliers: [],
             reparti: ['Cucina','Sala','Bar','Wine'],
             inbox: [], archive: [], charts: {}
         };
@@ -192,8 +176,13 @@
             try {
                 const res = await fetch('/api/state');
                 const d = await res.json();
-                if(d.ok && d.state) { appState = {...appState, ...d.state}; applyUI(); }
-            } catch(e) {}
+                if(d.ok && d.state) { 
+                    appState = {...appState, ...d.state}; 
+                    applyUI(false); // Non pushare durante il sync
+                }
+            } catch(e) {
+                console.error("Sync error:", e);
+            }
             refresh();
         }
 
@@ -283,7 +272,19 @@
 
         // Caricamento iniziale
         window.onload = () => {
-            sync();
+            const urlParams = new URLSearchParams(window.location.search);
+            const repartoParam = urlParams.get('reparto');
+            
+            if(repartoParam) {
+                // Se c'è un reparto nel QR, vai direttamente alla vista ordine
+                document.getElementById('sidebar').style.display = 'none';
+                document.getElementById('admin-header').style.display = 'none';
+                document.getElementById('dept-display').innerText = repartoParam;
+                switchView('department');
+            } else {
+                sync();
+            }
+            
             // Refresh periodico
             setInterval(sync, 60000); 
         };
@@ -300,17 +301,40 @@
         function renderHeatmap() {
             const wrap = document.getElementById('heatmap-wrap');
             const cats = [...new Set(appState.products.map(p => p.cat))];
-            let html = `<table class="w-full text-left"><thead><tr><th></th>${appState.reparti.map(r=>`<th class="p-2 text-[10px] font-black uppercase text-slate-400">${r}</th>`).join('')}</tr></thead><tbody>`;
+            
+            let html = `
+                <div class="space-y-8">
+                    <div>
+                        <h5 class="text-[10px] font-black uppercase text-slate-400 mb-4">Incidenza per Categoria</h5>
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr>
+                                    <th class="w-24"></th>
+                                    ${appState.reparti.map(r=>`<th class="p-2 text-[10px] font-black uppercase text-slate-400 text-center">${r}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
             cats.forEach(c => {
-                html += `<tr><td class="p-2 text-[10px] font-bold text-slate-500 border-r">${c}</td>`;
+                html += `<tr><td class="p-2 text-[10px] font-bold text-slate-500 border-r uppercase">${c}</td>`;
                 appState.reparti.forEach(r => {
-                    const total = appState.archive.filter(a => a.dept === r && a.cat === c).reduce((s,a)=>s+a.total, 0);
-                    const intensity = total > 500 ? 'bg-amber-500 text-white' : (total > 0 ? 'bg-amber-200' : 'bg-slate-50 text-slate-300');
-                    html += `<td class="p-1"><div class="heatmap-cell ${intensity}">€${total.toFixed(0)}</div></td>`;
+                    const total = appState.archive
+                        .filter(a => a.dept === r && (a.text?.toLowerCase().includes(c.toLowerCase()) || a.cat === c))
+                        .reduce((s,a)=>s+a.total, 0);
+                    const intensity = total > 1000 ? 'bg-amber-600 text-white' : (total > 500 ? 'bg-amber-400 text-white' : (total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
+                    html += `<td class="p-1"><div class="heatmap-cell ${intensity} transition-all">€${total.toFixed(0)}</div></td>`;
                 });
                 html += `</tr>`;
             });
-            wrap.innerHTML = html + `</tbody></table>`;
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            wrap.innerHTML = html;
         }
 
         async function askAI() {
@@ -347,19 +371,28 @@
         function renderInbox() {
             const cont = document.getElementById('inbox-list');
             cont.innerHTML = appState.inbox.map(req => `
-                <div class="glass-card p-8"><div class="flex justify-between border-b pb-4 mb-4"><span class="bg-indigo-50 px-3 py-1 rounded-full text-[10px] font-black uppercase text-indigo-700">${req.dept} - ${req.date}</span><button onclick="appState.inbox=appState.inbox.filter(r=>r.id!=${req.id});refresh();" class="text-rose-500 font-bold text-xs">Rifiuta</button></div>
-                <p class="text-lg italic mb-6">"${req.text}"</p><button onclick="approveReq(${req.id})" class="w-full brand-gradient text-white py-4 rounded-2xl font-black text-xs uppercase">Approva Ordine</button></div>
-            `).join('') || '<p class="text-center py-20 text-slate-400 font-bold uppercase text-xs">Nessun ordine da gestire.</p>';
+                <div class="glass-card p-8 border-l-4 border-amber-500 bg-white">
+                    <div class="flex justify-between items-center border-b pb-4 mb-4">
+                        <div class="flex flex-col">
+                            <span class="bg-amber-50 px-3 py-1 rounded-full text-[10px] font-black uppercase text-amber-700 w-fit mb-1">${req.dept}</span>
+                            <span class="text-[10px] font-bold text-slate-400">Inviato da: <b class="text-slate-800">${req.staff || 'Staff'}</b> • ${req.date}</span>
+                        </div>
+                        <button onclick="if(confirm('Rifiutare questo ordine?')) { appState.inbox=appState.inbox.filter(r=>r.id!=${req.id}); push(); refresh(); }" class="text-rose-500 font-bold text-[10px] uppercase tracking-wider hover:bg-rose-50 px-3 py-2 rounded-xl transition-all">Rifiuta</button>
+                    </div>
+                    <p class="text-lg italic text-slate-700 mb-8 leading-relaxed">"${req.text}"</p>
+                    <div class="flex gap-4">
+                        <button onclick="approveReq(${req.id})" class="flex-1 brand-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-all">🧠 Analisi IA & Approva</button>
+                    </div>
+                </div>
+            `).join('') || '<div class="py-20 text-center"><p class="text-slate-400 font-black uppercase text-xs tracking-widest">📭 Nessun ordine in arrivo</p></div>';
         }
 
         async function approveReq(id) {
             const req = appState.inbox.find(r => r.id === id); if(!req) return;
             
-            // Mostra caricamento
             const btn = event.target;
             const oldText = btn.innerText;
-            btn.innerText = "IA sta analizzando...";
-            btn.disabled = true;
+            btn.innerText = "Analisi in corso..."; btn.disabled = true;
 
             try {
                 const res = await fetch('/api/ai/order-parse', {
@@ -371,21 +404,55 @@
                 
                 if(data.ok && data.parsed && data.parsed.items) {
                     let total = 0;
+                    let summary = "";
+                    let products_to_order = [];
+                    
                     data.parsed.items.forEach(item => {
                         const product = appState.products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name?.toLowerCase());
                         if(product) {
-                            const bestPrice = Object.entries(product.prices).sort((a,b) => a[1]-b[1])[0];
-                            const supplier = appState.suppliers.find(s => s.name === bestPrice[0]);
-                            if(supplier) {
-                                supplier.current = (supplier.current || 0) + (bestPrice[1] * (item.qty || 1));
-                                total += (bestPrice[1] * (item.qty || 1));
-                            }
+                            // Trova TUTTI i prezzi per questo prodotto
+                            const priceEntries = Object.entries(product.prices).sort((a,b) => a[1]-b[1]);
+                            const bestPrice = priceEntries[0]; // Il più basso
+                            
+                            const subtotal = bestPrice[1] * (item.qty || 1);
+                            total += subtotal;
+                            
+                            products_to_order.push({
+                                name: product.name,
+                                qty: item.qty || 1,
+                                bestPrice: bestPrice[1],
+                                supplier: bestPrice[0],
+                                others: priceEntries.slice(1) // Altri fornitori
+                            });
                         }
                     });
-                    appState.archive.unshift({ dept: req.dept, total: total, date: new Date().toLocaleDateString(), text: req.text });
-                    appState.inbox = appState.inbox.filter(r => r.id !== id);
-                    await push();
-                    switchView('dashboard');
+                    
+                    // Crea un riepilogo visivo più bello
+                    summary = products_to_order.map(p => {
+                        let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
+                        return `${p.qty}x ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
+                    }).join('\n');
+
+                    if(confirm(`📦 Analisi Miglior Prezzo completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
+                        // Aggiorna porto franco dei fornitori
+                        products_to_order.forEach(p => {
+                            const sup = appState.suppliers.find(s => s.name === p.supplier);
+                            if(sup) sup.current = (sup.current || 0) + (p.bestPrice * p.qty);
+                        });
+
+                        appState.archive.unshift({ 
+                            dept: req.dept, 
+                            total: total, 
+                            date: new Date().toLocaleDateString(), 
+                            text: req.text,
+                            staff: req.staff,
+                            items: products_to_order 
+                        });
+                        
+                        appState.inbox = appState.inbox.filter(r => r.id !== id);
+                        await push();
+                        switchView('dashboard');
+                    }
                 } else {
                     alert("L'IA non è riuscita a mappare l'ordine. Procedo con il match manuale.");
                     fallbackApprove(req);
@@ -394,8 +461,7 @@
                 console.error(e);
                 fallbackApprove(req);
             } finally {
-                btn.innerText = oldText;
-                btn.disabled = false;
+                btn.innerText = oldText; btn.disabled = false;
             }
         }
 
@@ -413,14 +479,19 @@
             refresh();
         }
 
-        function applyUI() {
-            const c = document.getElementById('set-color').value;
-            const b = document.getElementById('set-brand').value;
+        function applyUI(shouldPush = true) {
+            const c = document.getElementById('set-color')?.value || appState.settings.color || '#c5a059';
+            const b = document.getElementById('set-brand')?.value || appState.settings.brand || 'Sea Signora';
+            
             document.documentElement.style.setProperty('--brand-accent', c);
-            document.getElementById('ui-brand-name').innerText = b;
-            document.querySelectorAll('.brand-gradient').forEach(el => el.style.background = `linear-gradient(135deg, ${c} 0%, #000 100%)`);
+            if(document.getElementById('ui-brand-name')) document.getElementById('ui-brand-name').innerText = b;
+            
+            document.querySelectorAll('.brand-gradient').forEach(el => {
+                el.style.background = `linear-gradient(135deg, ${c} 0%, #000 100%)`;
+            });
+            
             appState.settings = { brand: b, color: c };
-            push();
+            if(shouldPush) push();
         }
 
         function switchConfig(id) {
@@ -440,8 +511,48 @@
         function initCharts() {
             if(appState.charts.pie) appState.charts.pie.destroy();
             const ctx = document.getElementById('chartPie').getContext('2d');
-            const data = appState.reparti.map(r => appState.archive.filter(a => a.dept === r).reduce((s,a) => s + a.total, 0));
-            appState.charts.pie = new Chart(ctx, { type: 'doughnut', data: { labels: appState.reparti, datasets: [{ data: data.some(v=>v>0)?data:[1,1,1,1], backgroundColor: ['#09121e', appState.settings.color, '#1e3a5f', '#cbd5e1'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout:'80%' } });
+            
+            const deptTotals = appState.reparti.map(r => {
+                return appState.archive
+                    .filter(a => a.dept === r)
+                    .reduce((s,a) => s + a.total, 0);
+            });
+            
+            const colors = [
+                '#09121e', 
+                appState.settings.color || '#c5a059', 
+                '#1e3a5f', 
+                '#cbd5e1', 
+                '#94a3b8'
+            ];
+
+            appState.charts.pie = new Chart(ctx, { 
+                type: 'doughnut', 
+                data: { 
+                    labels: appState.reparti, 
+                    datasets: [{ 
+                        data: deptTotals.some(v=>v>0) ? deptTotals : [1,1,1,1], 
+                        backgroundColor: colors,
+                        borderWidth: 0,
+                        hoverOffset: 20
+                    }] 
+                }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '75%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 10, weight: 'bold' },
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                } 
+            });
         }
 
         function populateSupplierSelect() {
@@ -479,6 +590,37 @@
             }
         }
         function savePrices() { push(); alert("Listino aggiornato!"); }
+
+        async function sendOrder() {
+            const text = document.getElementById('order-text').value;
+            if(!text) return alert("Scrivi qualcosa!");
+            
+            const staff = prompt("Inserisci il tuo Nome e Cognome:");
+            if(!staff) return alert("Nome e cognome sono obbligatori per inviare l'ordine.");
+            
+            const dept = document.getElementById('dept-display').innerText;
+            const btn = document.getElementById('btn-send');
+            
+            btn.innerText = "Invio in corso..."; btn.disabled = true;
+            
+            try {
+                const res = await fetch('/api/order', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ dept, staff, text })
+                });
+                const d = await res.json();
+                if(d.ok) {
+                    alert("Ordine inviato con successo!");
+                    document.getElementById('order-text').value = "";
+                } else {
+                    alert("Errore nell'invio: " + d.error);
+                }
+            } catch(e) {
+                alert("Errore di rete.");
+            }
+            btn.innerText = "🚀 Invia Ordine"; btn.disabled = false;
+        }
 
         document.addEventListener('DOMContentLoaded', sync);
     </script>
