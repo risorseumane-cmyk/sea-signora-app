@@ -996,11 +996,66 @@
             }
         }
 
+        async function processImport() {
+            const area = document.getElementById('import-area');
+            const text = area.value.trim();
+            if(!text) return alert("Incolla dei dati prima di elaborare!");
+
+            const lines = text.split('\n');
+            const newProducts = [];
+            const suppliersSet = new Set();
+
+            lines.forEach(line => {
+                // Nome;Categoria;Sub;UM;Prezzo;Fornitore
+                const parts = line.split(';').map(s => s.trim());
+                if(parts.length < 3) return; // Salta se troppo corta
+
+                const [name, cat, sub, um, priceStr, supplier] = parts;
+                if(!name || !priceStr || !supplier) return;
+
+                const price = parseFloat(priceStr.replace(',', '.'));
+                if(isNaN(price)) return;
+
+                let p = newProducts.find(x => x.name.toLowerCase() === name.toLowerCase());
+                if(!p) {
+                    p = {
+                        id: Date.now() + Math.floor(Math.random() * 1000),
+                        name: name,
+                        cat: cat || 'Vario',
+                        sub: sub || '',
+                        um: um || 'pz',
+                        prices: {}
+                    };
+                    newProducts.push(p);
+                }
+                p.prices[supplier] = price;
+                suppliersSet.add(supplier);
+            });
+
+            if(newProducts.length === 0) return alert("Nessun dato valido trovato. Assicurati di usare il formato: Nome;Categoria;Sub;UM;Prezzo;Fornitore");
+
+            // Aggiorna appState preservando impostazioni esistenti
+            appState.products = newProducts;
+            
+            // Aggiorna fornitori (preserva porto franco se esistente)
+            const currentSuppliersMin = new Map(appState.suppliers.map(s => [s.name, s.min]));
+            appState.suppliers = Array.from(suppliersSet).map(s => ({
+                name: s,
+                min: currentSuppliersMin.get(s) || 200,
+                current: 0
+            }));
+
+            await push();
+            refresh();
+            alert(`Importazione completata con successo!\n- Prodotti: ${newProducts.length}\n- Fornitori: ${suppliersSet.size}`);
+            area.value = "";
+        }
+
         async function checkDiagnostics() {
             try {
                 const res = await fetch('/api/diag');
                 const d = await res.json();
-                alert(`DIAGNOSTICA:\nDB: ${d.db}\nGEMINI: ${d.gemini}\nKEY: ${d.key_present ? 'Presente' : 'Assente'}`);
+                alert(`DIAGNOSTICA:\nDB: ${d.db}\nENGINE: ${d.engine}`);
             } catch(e) {
                 alert("Errore nel recupero diagnostica.");
             }
