@@ -83,10 +83,10 @@
                     <div class="glass-card p-8">
                         <div class="flex justify-between items-center mb-6">
                             <h4 class="font-black uppercase text-xs text-slate-400">Incidenza Spesa per Reparto</h4>
-                            <select id="trend-period" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
-                                <option value="7">Ultimi 7 giorni</option>
-                                <option value="30">Ultimi 30 giorni</option>
-                                <option value="all">Sempre</option>
+                            <select id="trend-period" onchange="initCharts()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
+                                <option value="7">Settimanale (GG)</option>
+                                <option value="30">Mensile (Settimane)</option>
+                                <option value="90">Trimestrale (Mesi)</option>
                             </select>
                         </div>
                         <div class="h-[300px]"><canvas id="chartPie"></canvas></div>
@@ -720,9 +720,18 @@
         function initCharts() {
             if(appState.charts.pie) appState.charts.pie.destroy();
             const ctx = document.getElementById('chartPie').getContext('2d');
+            const period = document.getElementById('trend-period').value;
             
+            // Filtra archivio per periodo
+            const now = new Date();
+            const filteredArchive = appState.archive.filter(a => {
+                const orderDate = new Date(a.date.split('/').reverse().join('-')); // Gestisce formato DD/MM/YYYY
+                const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+                return diffDays <= parseInt(period);
+            });
+
             const deptTotals = appState.reparti.map(r => {
-                return appState.archive
+                return filteredArchive
                     .filter(a => a.dept === r)
                     .reduce((s,a) => s + a.total, 0);
             });
@@ -756,24 +765,61 @@
         function updateGaussianTrend() {
             const cat = document.getElementById('trend-filter-cat').value;
             const prodId = document.getElementById('trend-filter-prod').value;
+            const period = document.getElementById('trend-period').value;
             const ctx = document.getElementById('chartGaussian').getContext('2d');
             
             if(appState.charts.gaussian) appState.charts.gaussian.destroy();
             
-            // Genera dati per la curva
-            const labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-            let data = [12, 19, 30, 50, 40, 35, 20]; // Dati placeholder per la forma gaussiana
+            let labels = [];
+            let data = [];
+
+            if(period == "7") {
+                labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+                data = labels.map(() => Math.floor(Math.random() * 50) + 10);
+            } else if(period == "30") {
+                labels = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4'];
+                data = labels.map(() => Math.floor(Math.random() * 200) + 50);
+            } else {
+                labels = ['Mese 1', 'Mese 2', 'Mese 3'];
+                data = labels.map(() => Math.floor(Math.random() * 800) + 200);
+            }
             
-            // Se ci sono dati reali nell'archivio, usali
+            // Se ci sono dati reali nell'archivio, sovrascrivi i placeholder
             if(appState.archive.length > 0) {
-                // Semplificazione: conta ordini per giorno
-                data = labels.map((day, idx) => {
-                    return appState.archive.filter(a => {
-                        const matchCat = !cat || (a.items || []).some(i => i.cat === cat);
-                        const matchProd = !prodId || (a.items || []).some(i => i.productId == prodId);
-                        return matchCat && matchProd;
-                    }).length + (Math.random() * 5); // Aggiungi un po' di variabilità per il demo
+                const now = new Date();
+                const filtered = appState.archive.filter(a => {
+                    const matchCat = !cat || (a.items || []).some(i => i.cat === cat);
+                    const matchProd = !prodId || (a.items || []).some(i => i.productId == prodId);
+                    const orderDate = new Date(a.date.split('/').reverse().join('-'));
+                    const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+                    return matchCat && matchProd && diffDays <= parseInt(period);
                 });
+
+                if(filtered.length > 0) {
+                    if(period == "7") {
+                        // Raggruppa per giorno (0-6)
+                        data = new Array(7).fill(0);
+                        filtered.forEach(a => {
+                            const d = new Date(a.date.split('/').reverse().join('-')).getDay();
+                            data[d === 0 ? 6 : d-1] += a.total;
+                        });
+                    } else if(period == "30") {
+                        // Raggruppa per 4 settimane
+                        data = new Array(4).fill(0);
+                        filtered.forEach(a => {
+                            const diff = Math.floor((now - new Date(a.date.split('/').reverse().join('-'))) / (1000*60*60*24*7));
+                            if(diff < 4) data[3-diff] += a.total;
+                        });
+                    } else {
+                        // Raggruppa per 3 mesi
+                        data = new Array(3).fill(0);
+                        filtered.forEach(a => {
+                            const m = new Date(a.date.split('/').reverse().join('-')).getMonth();
+                            const diff = (now.getMonth() - m + 12) % 12;
+                            if(diff < 3) data[2-diff] += a.total;
+                        });
+                    }
+                }
             }
 
             appState.charts.gaussian = new Chart(ctx, {
@@ -781,22 +827,30 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Intensità Ordini',
+                        label: 'Spesa (€)',
                         data: data,
                         borderColor: appState.settings.color || '#c5a059',
                         backgroundColor: (appState.settings.color || '#c5a059') + '33',
                         fill: true,
-                        tension: 0.4, // Rende la curva morbida (gaussiana)
-                        pointRadius: 0
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: appState.settings.color || '#c5a059'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `Totale: €${ctx.raw.toFixed(2)}`
+                            }
+                        }
+                    },
                     scales: {
-                        y: { beginAtZero: true, display: false },
-                        x: { grid: { display: false }, ticks: { font: { size: 8, weight: 'bold' } } }
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 } } },
+                        x: { grid: { display: false }, ticks: { font: { size: 9, weight: 'bold' } } }
                     }
                 }
             });
