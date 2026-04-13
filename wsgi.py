@@ -7,20 +7,16 @@ import google.generativeai as genai
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# File dove il server salverà ordini e prodotti
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'data.json')
-
-# Configura l'Intelligenza Artificiale di Google
 API_KEY = os.environ.get("GEMINI_API_KEY")
+
 if API_KEY:
     genai.configure(api_key=API_KEY)
 
-# Questa rotta serve la tua interfaccia grafica (index.html)
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
 
-# Rotta per inviare i dati all'app
 @app.route('/api/state', methods=['GET'])
 def get_state():
     if os.path.exists(DATA_FILE):
@@ -30,7 +26,6 @@ def get_state():
     else:
         return jsonify({"ok": False, "error": "Nessun dato presente"})
 
-# Rotta per salvare i dati che arrivano dall'app
 @app.route('/api/state', methods=['POST'])
 def save_state():
     try:
@@ -41,12 +36,12 @@ def save_state():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# Rotta dove lavora Gemini (legge l'ordine e cerca nel catalogo)
+# Rotta 1: Analisi Ordini (Risponde in JSON)
 @app.route('/api/ai/parse', methods=['POST'])
 def parse_order():
     try:
         if not API_KEY:
-            raise ValueError("Chiave GEMINI_API_KEY non configurata su Railway.")
+            raise ValueError("Chiave GEMINI API KEY mancante su Railway.")
         
         req_data = request.json
         text = req_data.get('text', '')
@@ -54,8 +49,7 @@ def parse_order():
         
         model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"""
-        Sei l'assistente acquisti di Sea Signora Milano. 
-        Leggi questo ordine: "{text}". 
+        Sei l'assistente acquisti di Sea Signora Milano. Leggi questo ordine: "{text}". 
         Trova i prodotti in questo catalogo: {json.dumps(catalog)}. 
         RISPONDI SOLO CON UN ARRAY JSON VALIDO: [{{"id": <id_prodotto>, "qty": <quantità>}}]
         Nessun backtick, nessun testo aggiuntivo, solo il JSON puro.
@@ -63,15 +57,37 @@ def parse_order():
         
         response = model.generate_content(prompt)
         response_text = response.text.replace('```json', '').replace('```', '').strip()
-        
         return jsonify({"ok": True, "parsed": {"items": json.loads(response_text)}})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# Entry point per Railway
+# Rotta 2: Chat di Aiuto Libera (Risponde in testo normale)
+@app.route('/api/ai/help', methods=['POST'])
+def ai_help():
+    try:
+        if not API_KEY:
+            raise ValueError("Chiave GEMINI API KEY mancante su Railway.")
+        
+        req_data = request.json
+        question = req_data.get('question', '')
+        
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = f"""
+        Sei l'assistente virtuale dell'applicazione 'PriceTag Smartmind' per il ristorante Sea Signora Milano.
+        Rispondi in italiano, in modo conciso, professionale e utile a questa domanda dell'utente: "{question}".
+        Informazioni di sistema utili:
+        - Per importare il catalogo: usare la tab Configurazione -> Prodotti & Excel.
+        - Per fare un ordine: usare i QR code dei reparti.
+        Non usare formattazioni complesse come il Markdown.
+        """
+        
+        response = model.generate_content(prompt)
+        return jsonify({"ok": True, "answer": response.text.strip()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
-# Gunicorn ha bisogno di chiamare l'app "application"
 application = app
