@@ -9,17 +9,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap');
-        :root { --brand-accent: #c5a059; --brand-blue: #09121e; }
-        body { font-family: 'Inter', sans-serif; background: #f4f7fa; color: #1e293b; }
+        :root {
+            --brand-accent: #EF7818;
+            --brand-gold: #E2C424;
+            --brand-dark: #1B2F1C;
+            --brand-ink: #1D1D1B;
+            --brand-olive: #B1AB6E;
+            --brand-sand: #CEC4AF;
+            --brand-bg: #DDDDD4;
+            --brand-gray: #48453D;
+            --brand-blue: var(--brand-dark);
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--brand-bg); color: var(--brand-ink); }
         .view-section { display: none !important; }
         .view-section.active { display: block !important; }
         .tab-btn { transition: all 0.2s; border-radius: 12px; cursor: pointer; border: 1px solid transparent; }
         .tab-btn.active { background: var(--brand-blue); color: white; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); }
-        .brand-gradient { background: linear-gradient(135deg, var(--brand-accent) 0%, #000 100%); }
-        .glass-card { background: white; border: 1px solid rgba(226, 232, 240, 0.8); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); border-radius: 20px; }
+        .brand-gradient { background: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-dark) 100%); }
+        .glass-card { background: rgba(255, 255, 255, 0.82); border: 1px solid rgba(72, 69, 61, 0.12); box-shadow: 0 12px 30px rgba(29, 29, 27, 0.10); border-radius: 24px; backdrop-filter: blur(10px); }
         .heatmap-cell { height: 35px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
         .config-tab { border-bottom: 2px solid transparent; cursor: pointer; padding: 10px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; }
         .config-tab.active { border-color: var(--brand-accent); color: var(--brand-blue); }
+        .brand-display { font-family: 'Skanaus', 'Times New Roman', serif; letter-spacing: -0.02em; }
     </style>
 </head>
 <body class="antialiased">
@@ -27,10 +38,12 @@
     <div class="min-h-screen flex flex-col md:flex-row">
         <aside id="sidebar" class="w-full md:w-72 bg-white border-r p-6 flex flex-col gap-6 h-screen sticky top-0 overflow-y-auto z-40 hidden md:flex">
             <div class="flex flex-col items-center gap-4 py-4 border-b">
-                <div id="ui-logo" class="w-16 h-16 brand-gradient rounded-2xl flex items-center justify-center text-white text-2xl font-black italic shadow-xl">SS</div>
+                <div class="w-full flex items-center justify-center">
+                    <img id="ui-logo-img" src="/assets/logo-sea-signora.png" alt="Sea Signora" class="h-14 w-auto">
+                </div>
                 <div class="text-center">
-                    <h1 id="ui-brand-name" class="text-base font-black uppercase">Sea Signora</h1>
-                    <p class="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Milano</p>
+                    <h1 id="ui-brand-name" class="text-base font-black uppercase brand-display">Sea Signora</h1>
+                    <p class="text-[9px] font-bold uppercase tracking-widest" style="color: var(--brand-accent);">Milano</p>
                 </div>
             </div>
             <nav class="flex flex-col gap-1">
@@ -1229,10 +1242,11 @@
             }
             
             document.querySelectorAll('.brand-gradient').forEach(el => {
-                el.style.background = `linear-gradient(135deg, ${c} 0%, #000 100%)`;
+                el.style.background = `linear-gradient(135deg, ${c} 0%, var(--brand-dark) 100%)`;
             });
             
             appState.settings = { ...appState.settings, brandName: b, color: c, homeTitle: ht };
+            if(document.getElementById('ui-logo-img')) document.getElementById('ui-logo-img').alt = b;
             
             if(shouldPush) {
                 await fetch(`${API_BASE}/api/admin/page-settings`, {

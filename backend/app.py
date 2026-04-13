@@ -28,11 +28,11 @@ SMTP_TO = os.getenv("SMTP_TO", "amministrazione@seasignorarest.com")
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}}) # Permetti CORS per tutte le origini su /api/
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- DATABASE ---
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, timeout=10) # Aggiungi timeout per evitare lock
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -44,7 +44,7 @@ def init_db():
         cur.execute("SELECT count(*) FROM app_state")
         if cur.fetchone()[0] == 0:
             default_state = {
-                "settings": {"brandName": "Sea Signora", "color": "#c5a059", "homeTitle": "Corporate Home"},
+                "settings": {"brandName": "Sea Signora", "color": "#EF7818", "homeTitle": "Corporate Home"},
                 "products": [
                     {"id": 1, "name": "Aragosta Viva", "cat": "Ittico", "prices": {"METRO": 45.00, "Ittica": 42.50}},
                     {"id": 2, "name": "Gin Tonic Premium", "cat": "Spirits", "prices": {"Beverage": 12.00, "METRO": 13.50}},
@@ -285,6 +285,11 @@ def update_suppliers():
 @app.route("/")
 def index():
     return send_from_directory(FRONTEND_FILE.parent, "index.html")
+
+@app.get("/assets/<path:filename>")
+def assets(filename):
+    assets_dir = FRONTEND_FILE.parent / "assets"
+    return send_from_directory(assets_dir, filename)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)), debug=True)
