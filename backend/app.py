@@ -521,15 +521,15 @@ def get_gemini_response(prompt):
         except urllib.error.HTTPError as e:
             err_msg = e.read().decode('utf-8')
             print(f"Gemini API Error ({url.split('/')[-2]}): {e.code} - {err_msg}")
-            last_err = f"{e.code}: {err_msg}"
+            last_err = f"HTTP {e.code}: {err_msg}"
             continue
         except Exception as e:
             print(f"Gemini Error ({url.split('/')[-2]}): {e}")
-            last_err = str(e)
+            last_err = f"Error: {str(e)}"
             continue
             
     print(f"Gemini Fallback Failed. Last error: {last_err}")
-    return None
+    return last_err # Return error message instead of None for diagnostics
 
 print("Backend booting... Checking DB and environment...")
 init_db()
@@ -570,7 +570,8 @@ def ai_parse():
     p = request.get_json()
     prompt = f"Catalog: {json.dumps(p.get('catalog'))}\nOrder: {p.get('text')}\nReturn JSON: {{\"items\":[{{\"productId\":ID,\"qty\":NUM,\"name\":\"NAME\"}}]}}"
     res = get_gemini_response(prompt)
-    if not res: return jsonify({"ok": False, "error": "No response from Gemini"}), 502
+    if not res or res.startswith("HTTP") or res.startswith("Error"): 
+        return jsonify({"ok": False, "error": res or "Unknown Gemini error"}), 502
     try:
         start, end = res.find("{"), res.rfind("}")
         return jsonify({"ok": True, "parsed": json.loads(res[start:end+1])})
@@ -584,12 +585,43 @@ def ai_help():
     ctx = data.get("context", {})
     prompt = f"User Question: {q}\nContext: {json.dumps(ctx)}\nBe helpful, concise, and professional. You are the AI assistant for Sea Signora restaurant logistics."
     res = get_gemini_response(prompt)
-    if not res: return jsonify({"ok": False, "error": "Gemini error"}), 502
+    if not res or res.startswith("HTTP") or res.startswith("Error"):
+        return jsonify({"ok": False, "error": res or "Gemini error"}), 502
     return jsonify({"ok": True, "answer": res})
+
+@app.post("/api/admin/suppliers")
+def update_suppliers():
+    data = request.get_json()
+    new_suppliers = data.get("suppliers")
+    if not new_suppliers: return jsonify({"ok": False, "error": "No suppliers data"}), 400
+    
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT state_json FROM app_state WHERE id = 1")
+        state = json.loads(cur.fetchone()["state_json"])
+        state["suppliers"] = new_suppliers
+        cur.execute("UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1", (json.dumps(state), datetime.utcnow().isoformat()))
+        conn.commit()
+    return jsonify({"ok": True})
+
+@app.post("/api/admin/page-settings")
+def update_page_settings():
+    data = request.get_json()
+    new_settings = data.get("settings")
+    if not new_settings: return jsonify({"ok": False, "error": "No settings data"}), 400
+    
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT state_json FROM app_state WHERE id = 1")
+        state = json.loads(cur.fetchone()["state_json"])
+        state["settings"] = {**state.get("settings", {}), **new_settings}
+        cur.execute("UPDATE app_state SET state_json = ?, updated_at = ? WHERE id = 1", (json.dumps(state), datetime.utcnow().isoformat()))
+        conn.commit()
+    return jsonify({"ok": True})
 
 @app.get("/api/diag")
 def diagnostics():
-    diag = {"db": "unknown", "gemini": "unknown", "key_present": bool(GEMINI_API_KEY)}
+    diag = {"db": "unknown", "gemini": "unknown", "key_present": bool(GEMINI_API_KEY), "key_prefix": GEMINI_API_KEY[:6] if GEMINI_API_KEY else ""}
     try:
         with get_conn() as conn:
             cur = conn.cursor()
@@ -599,7 +631,11 @@ def diagnostics():
         diag["db"] = f"Error: {str(e)}"
     
     test_res = get_gemini_response("Say 'OK'")
-    diag["gemini"] = "OK" if test_res and "OK" in test_res.upper() else f"Failed: {test_res}"
+    if test_res and "OK" in test_res.upper():
+        diag["gemini"] = "OK"
+    else:
+        # If fallback failed, show the specific error from the last attempt
+        diag["gemini"] = f"Failed: {test_res}"
     
     return jsonify(diag)
 

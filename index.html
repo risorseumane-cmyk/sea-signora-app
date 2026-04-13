@@ -81,13 +81,46 @@
             <div id="view-reports" class="view-section">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
                     <div class="glass-card p-8">
-                        <h4 class="font-black uppercase text-xs mb-6 text-slate-400">Incidenza Spesa per Reparto</h4>
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="font-black uppercase text-xs text-slate-400">Incidenza Spesa per Reparto</h4>
+                            <select id="trend-period" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
+                                <option value="7">Ultimi 7 giorni</option>
+                                <option value="30">Ultimi 30 giorni</option>
+                                <option value="all">Sempre</option>
+                            </select>
+                        </div>
                         <div class="h-[300px]"><canvas id="chartPie"></canvas></div>
                     </div>
                     <div class="glass-card p-8">
-                        <h4 class="font-black uppercase text-xs mb-6 text-slate-400">Heatmap: Intensità Acquisti</h4>
-                        <div id="heatmap-wrap" class="overflow-x-auto"></div>
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="font-black uppercase text-xs text-slate-400">Analisi Prezzi e Trend</h4>
+                            <div class="flex gap-2">
+                                <select id="trend-filter-cat" onchange="renderTrends()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none"></select>
+                                <select id="trend-filter-prod" onchange="renderTrends()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none"></select>
+                            </div>
+                        </div>
+                        <div id="trends-list" class="space-y-4 max-h-[300px] overflow-y-auto"></div>
                     </div>
+                </div>
+                
+                <div class="glass-card p-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                        <h4 class="font-black uppercase text-xs text-slate-400">Heatmap Dinamica: Analisi Intensità</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <select id="heatmap-y" onchange="renderHeatmap()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
+                                <option value="cat">Categoria</option>
+                                <option value="prod">Prodotto</option>
+                                <option value="sup">Fornitore</option>
+                            </select>
+                            <span class="text-[10px] font-black text-slate-400 py-2">VS</span>
+                            <select id="heatmap-x" onchange="renderHeatmap()" class="p-2 bg-slate-50 border rounded-lg text-[10px] font-black uppercase outline-none">
+                                <option value="dept">Reparto</option>
+                                <option value="sup">Fornitore</option>
+                                <option value="cat">Categoria</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="heatmap-wrap" class="overflow-x-auto min-h-[400px]"></div>
                 </div>
             </div>
 
@@ -113,14 +146,32 @@
                 <div class="glass-card p-10">
                     <div class="flex gap-8 border-b mb-8">
                         <div onclick="switchConfig('ui')" id="tab-ui" class="config-tab active">Layout</div>
+                        <div onclick="switchConfig('suppliers')" id="tab-suppliers" class="config-tab">Fornitori</div>
                         <div onclick="switchConfig('data')" id="tab-data" class="config-tab">Importazione</div>
                         <div onclick="switchConfig('qr')" id="tab-qr" class="config-tab">QR Reparti</div>
                     </div>
 
                     <div id="sec-ui" class="config-sec space-y-6">
                         <div class="grid grid-cols-2 gap-6">
-                            <input id="set-brand" type="text" oninput="applyUI()" class="p-3 border rounded-xl font-bold" value="Sea Signora">
-                            <input id="set-color" type="color" oninput="applyUI()" class="w-full h-12 p-1 border rounded-xl" value="#c5a059">
+                            <div>
+                                <label class="text-[10px] font-black uppercase text-slate-400">Nome Brand</label>
+                                <input id="set-brand" type="text" oninput="applyUI()" class="w-full p-3 border rounded-xl font-bold mt-1" value="Sea Signora">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black uppercase text-slate-400">Colore Accent</label>
+                                <input id="set-color" type="color" oninput="applyUI()" class="w-full h-12 p-1 border rounded-xl mt-1" value="#c5a059">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Titolo Homepage</label>
+                            <input id="set-home-title" type="text" oninput="applyUI()" class="w-full p-3 border rounded-xl font-bold mt-1" value="Corporate Home">
+                        </div>
+                    </div>
+
+                    <div id="sec-suppliers" class="config-sec hidden space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="suppliers-edit-grid"></div>
+                        <div class="mt-8 flex justify-end">
+                            <button onclick="saveSuppliers()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Porto Franco</button>
                         </div>
                     </div>
 
@@ -226,16 +277,11 @@
             const saving = totalSpent * 0.12; // Stimato 12% saving ottimizzando fornitori
             document.getElementById('kpi-saving').innerText = saving.toFixed(2);
             
-            // Griglia Home con Alerts
-            const alerts = [];
-            appState.suppliers.forEach(s => {
-                if(s.current > 0 && s.current < s.min) {
-                    alerts.push(`<div class="bg-amber-100 p-2 rounded text-[9px] font-bold text-amber-700">⚠️ ${s.name}: Sotto Porto Franco (€${(s.min - s.current).toFixed(2)} mancanti)</div>`);
-                }
-            });
-
-            const hg = document.getElementById('home-grid');
-            hg.innerHTML = `
+            // UI Brand Settings
+            if(appState.settings.brandName) document.getElementById('ui-brand-name').innerText = appState.settings.brandName;
+            
+            const homeGrid = document.getElementById('home-grid');
+            homeGrid.innerHTML = `
                 <div onclick="switchView('inbox')" class="glass-card p-8 border-l-4 border-amber-400 cursor-pointer hover:shadow-xl transition-all">
                     <div class="flex justify-between items-start">
                         <b>Ordini Inbox</b>
@@ -276,9 +322,50 @@
 
             renderCatalog();
             renderHeatmap();
+            renderTrends();
             renderInbox();
             initCharts();
             populateSupplierSelect();
+            populateTrendFilters();
+        }
+
+        function populateTrendFilters() {
+            const catSel = document.getElementById('trend-filter-cat');
+            const prodSel = document.getElementById('trend-filter-prod');
+            if(!catSel.options.length) {
+                const cats = [...new Set(appState.products.map(p => p.cat))];
+                catSel.innerHTML = '<option value="">Tutte le Categorie</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            }
+            if(!prodSel.options.length) {
+                const prods = appState.products.slice(0, 50); // Mostriamo solo i primi 50 per ora
+                prodSel.innerHTML = '<option value="">Tutti i Prodotti</option>' + prods.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            }
+        }
+
+        function renderTrends() {
+            const cat = document.getElementById('trend-filter-cat').value;
+            const prodId = document.getElementById('trend-filter-prod').value;
+            const list = document.getElementById('trends-list');
+            
+            let filtered = appState.products;
+            if(cat) filtered = filtered.filter(p => p.cat === cat);
+            if(prodId) filtered = filtered.filter(p => p.id == prodId);
+            
+            list.innerHTML = filtered.map(p => {
+                const best = Object.entries(p.prices).sort((a,b)=>a[1]-b[1])[0];
+                return `
+                    <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl border">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-tighter">${p.name}</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">${p.cat} • ${best[0]}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-black">€${best[1].toFixed(2)}</p>
+                            <p class="text-[8px] font-black text-emerald-500">MIGLIOR PREZZO</p>
+                        </div>
+                    </div>
+                `;
+            }).join('') || '<p class="text-center py-10 text-xs text-slate-400 font-bold uppercase">Nessun dato per i filtri selezionati</p>';
         }
 
         // Caricamento iniziale
@@ -311,40 +398,50 @@
 
         function renderHeatmap() {
             const wrap = document.getElementById('heatmap-wrap');
-            const cats = [...new Set(appState.products.map(p => p.cat))];
+            const axisX = document.getElementById('heatmap-x').value;
+            const axisY = document.getElementById('heatmap-y').value;
             
-            let html = `
-                <div class="space-y-8">
-                    <div>
-                        <h5 class="text-[10px] font-black uppercase text-slate-400 mb-4">Incidenza per Categoria</h5>
-                        <table class="w-full text-left">
-                            <thead>
-                                <tr>
-                                    <th class="w-24"></th>
-                                    ${appState.reparti.map(r=>`<th class="p-2 text-[10px] font-black uppercase text-slate-400 text-center">${r}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
+            let xLabels = [];
+            let yLabels = [];
             
-            cats.forEach(c => {
-                html += `<tr><td class="p-2 text-[10px] font-bold text-slate-500 border-r uppercase">${c}</td>`;
-                appState.reparti.forEach(r => {
-                    const total = appState.archive
-                        .filter(a => a.dept === r && (a.text?.toLowerCase().includes(c.toLowerCase()) || a.cat === c))
-                        .reduce((s,a)=>s+a.total, 0);
-                    const intensity = total > 1000 ? 'bg-amber-600 text-white' : (total > 500 ? 'bg-amber-400 text-white' : (total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
-                    html += `<td class="p-1"><div class="heatmap-cell ${intensity} transition-all">€${total.toFixed(0)}</div></td>`;
+            if(axisX === 'dept') xLabels = appState.reparti;
+            else if(axisX === 'sup') xLabels = appState.suppliers.map(s => s.name);
+            else if(axisX === 'cat') xLabels = [...new Set(appState.products.map(p => p.cat))];
+            
+            if(axisY === 'cat') yLabels = [...new Set(appState.products.map(p => p.cat))];
+            else if(axisY === 'prod') yLabels = appState.products.slice(0, 30).map(p => p.name);
+            else if(axisY === 'sup') yLabels = appState.suppliers.map(s => s.name);
+            
+            let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="p-2 border-b"></th>`;
+            xLabels.forEach(x => { html += `<th class="p-2 text-[8px] font-black uppercase text-slate-400 text-center border-b border-l">${x}</th>`; });
+            html += `</tr></thead><tbody>`;
+            
+            yLabels.forEach(y => {
+                html += `<tr><td class="p-2 text-[9px] font-bold text-slate-500 border-b uppercase max-w-[120px] truncate">${y}</td>`;
+                xLabels.forEach(x => {
+                    let total = 0;
+                    appState.archive.forEach(a => {
+                        let matchX = false;
+                        let matchY = false;
+                        
+                        if(axisX === 'dept' && a.dept === x) matchX = true;
+                        else if(axisX === 'sup' && (a.items || []).some(i => i.supplier === x)) matchX = true;
+                        else if(axisX === 'cat' && (a.items || []).some(i => i.cat === x)) matchX = true;
+                        
+                        if(axisY === 'cat' && (a.items || []).some(i => i.cat === y)) matchY = true;
+                        else if(axisY === 'prod' && (a.items || []).some(i => i.name === y)) matchY = true;
+                        else if(axisY === 'sup' && (a.items || []).some(i => i.supplier === y)) matchY = true;
+                        
+                        if(matchX && matchY) total += a.total;
+                    });
+                    
+                    const intensity = total > 500 ? 'bg-amber-600 text-white' : (total > 100 ? 'bg-amber-400 text-white' : (total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-50 text-slate-300'));
+                    html += `<td class="p-1 border-b border-l"><div class="heatmap-cell ${intensity} transition-all">€${total.toFixed(0)}</div></td>`;
                 });
                 html += `</tr>`;
             });
             
-            html += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
+            html += `</tbody></table>`;
             wrap.innerHTML = html;
         }
 
@@ -500,19 +597,31 @@
             refresh();
         }
 
-        function applyUI(shouldPush = true) {
+        async function applyUI(shouldPush = true) {
             const c = document.getElementById('set-color')?.value || appState.settings.color || '#c5a059';
-            const b = document.getElementById('set-brand')?.value || appState.settings.brand || 'Sea Signora';
+            const b = document.getElementById('set-brand')?.value || appState.settings.brandName || 'Sea Signora';
+            const ht = document.getElementById('set-home-title')?.value || 'Corporate Home';
             
             document.documentElement.style.setProperty('--brand-accent', c);
             if(document.getElementById('ui-brand-name')) document.getElementById('ui-brand-name').innerText = b;
+            if(document.getElementById('view-home')) {
+                const h3 = document.querySelector('#view-home h3');
+                if(h3) h3.innerText = ht;
+            }
             
             document.querySelectorAll('.brand-gradient').forEach(el => {
                 el.style.background = `linear-gradient(135deg, ${c} 0%, #000 100%)`;
             });
             
-            appState.settings = { brand: b, color: c };
-            if(shouldPush) push();
+            appState.settings = { ...appState.settings, brandName: b, color: c, homeTitle: ht };
+            
+            if(shouldPush) {
+                await fetch('/api/admin/page-settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ settings: appState.settings })
+                });
+            }
         }
 
         function switchConfig(id) {
@@ -521,6 +630,35 @@
             document.getElementById(`sec-${id}`).classList.remove('hidden');
             document.getElementById(`tab-${id}`).classList.add('active');
             if(id === 'qr') renderQR();
+            if(id === 'suppliers') renderSuppliersEdit();
+        }
+
+        function renderSuppliersEdit() {
+            const grid = document.getElementById('suppliers-edit-grid');
+            grid.innerHTML = appState.suppliers.map((s, idx) => `
+                <div class="p-4 border rounded-2xl bg-slate-50">
+                    <label class="text-[9px] font-black uppercase text-slate-400">${s.name}</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs font-bold text-slate-500">Min: €</span>
+                        <input type="number" value="${s.min}" 
+                            onchange="appState.suppliers[${idx}].min = parseFloat(this.value)"
+                            class="w-full p-2 border rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-slate-900">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function saveSuppliers() {
+            try {
+                const res = await fetch('/api/admin/suppliers', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ suppliers: appState.suppliers })
+                });
+                const d = await res.json();
+                if(d.ok) alert("Porto Franco aggiornato con successo!");
+                else alert("Errore: " + d.error);
+            } catch(e) { alert("Errore di connessione."); }
         }
 
         function renderQR() {
