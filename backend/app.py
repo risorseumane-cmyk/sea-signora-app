@@ -627,9 +627,18 @@ def log_notification(kind, subject, body, delivered, error_text=""):
 init_db()
 
 
-@app.get("/api/health")
-def health():
-    return jsonify({"ok": True, "time": datetime.utcnow().isoformat()})
+@app.get("/api/admin/debug-info")
+def debug_info():
+    key_status = "configurata" if GEMINI_API_KEY else "non configurata"
+    key_preview = f"{GEMINI_API_KEY[:5]}...{GEMINI_API_KEY[-5:]}" if GEMINI_API_KEY else "n/a"
+    return jsonify({
+        "ok": True,
+        "gemini_key": key_status,
+        "gemini_preview": key_preview,
+        "db_path": str(DB_PATH),
+        "db_exists": DB_PATH.exists(),
+        "api_key_check": check_key()
+    })
 
 
 @app.get("/api/state")
@@ -799,15 +808,51 @@ def notify():
 
 
 def get_gemini_response(prompt, model_name="gemini-1.5-flash"):
+    """Fetch response from Gemini using official SDK with fallback."""
     try:
         if not GEMINI_API_KEY:
+            print("GEMINI_API_KEY missing.")
             return None
+        
+        # Inizializza SDK
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
-        return response.text
+        
+        # Prova con diversi modelli in caso di fallimento
+        models = [model_name, "gemini-1.5-pro", "gemini-2.0-flash"]
+        for m in models:
+            try:
+                print(f"Tentativo con modello: {m}")
+                model = genai.GenerativeModel(m)
+                response = model.generate_content(prompt)
+                if response and response.text:
+                    return response.text
+            except Exception as inner_e:
+                print(f"Modello {m} fallito: {inner_e}")
+                continue
+        
+        # Se SDK fallisce, prova con urllib (molto più leggero e meno incline a errori di libreria)
+        print("Fallback su urllib per Gemini...")
+        req_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        try:
+            req = urllib.request.Request(
+                req_url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=30) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                return res_data['candidates'][0]['content']['parts'][0]['text']
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8")
+            print(f"Gemini HTTP Error: {e.code} - {error_body}")
+            return None
+
     except Exception as e:
-        print(f"Errore Gemini ({model_name}): {e}")
+        print(f"Errore critico Gemini: {e}")
         return None
 
 
@@ -880,31 +925,22 @@ def ai_help():
 
 @app.post("/api/admin/reset-db")
 def reset_db_endpoint():
-    # Definiamo default_state qui o lo rendiamo globale
-    # Per semplicità lo recuperiamo dalla funzione init_db (refactoring necessario)
-    # Ma per ora facciamo un reset brutale
+    """Reset the database to default state without deleting the file (to avoid locks)."""
     try:
-        if DB_PATH.exists():
-            os.remove(DB_PATH)
+        conn = get_conn()
+        cur = conn.cursor()
+        # Drop and recreate tables to ensure a clean slate
+        cur.execute("DROP TABLE IF EXISTS app_state")
+        cur.execute("DROP TABLE IF EXISTS notification_log")
+        conn.commit()
+        conn.close()
+        
+        # Re-initialize the DB
         init_db()
-        return jsonify({"ok": True, "message": "Database resettato ai valori di fabbrica."})
+        return jsonify({"ok": True, "message": "Database resettato con successo."})
     except Exception as e:
+        print(f"Errore reset DB: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
-    if not check_key():
-        return jsonify({"ok": False, "error": "Invalid API key"}), 401
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, kind, subject, delivered, error, created_at
-        FROM notification_log
-        ORDER BY id DESC
-        LIMIT 200
-        """
-    )
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return jsonify({"ok": True, "items": rows})
 
 
 @app.get("/")
