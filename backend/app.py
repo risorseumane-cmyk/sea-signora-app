@@ -126,9 +126,23 @@ def init_db():
 init_db()
 
 # --- UTILITIES ---
-def send_email_alert(dept, staff, text):
+def get_public_base_url(req):
+    env_url = os.getenv("PUBLIC_APP_URL", "").strip()
+    if env_url:
+        return env_url.rstrip("/")
+    proto = req.headers.get("X-Forwarded-Proto", req.scheme)
+    host = req.headers.get("X-Forwarded-Host", req.host)
+    return f"{proto}://{host}".rstrip("/")
+
+def send_email_alert(dept, staff, text, admin_link):
     subject = f"NUOVO ORDINE: {dept} da {staff}"
-    body = f"Reparto: {dept}\nStaff: {staff}\nData: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\nOrdine:\n{text}"
+    body = (
+        f"Apri App (Admin): {admin_link}\n\n"
+        f"Reparto: {dept}\n"
+        f"Staff: {staff}\n"
+        f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n"
+        f"Ordine:\n{text}"
+    )
     
     # SMTP
     if SMTP_USER and SMTP_PASS:
@@ -265,8 +279,11 @@ def extract_qty_and_unit(raw_line: str) -> tuple[float, str | None, str]:
 def local_smart_parse(text, products):
     """Motore di parsing locale 'Smart Matcher' (senza chiavi API)."""
     items = []
+    unmatched = []
     lines = text.split('\n')
     product_names = [p['name'] for p in products]
+    product_names_l = [n.lower() for n in product_names]
+    product_by_name_l = {p["name"].lower(): p for p in products if isinstance(p.get("name"), str)}
     
     # Parole comuni da ignorare nel match del nome
     stop_words = {'di', 'da', 'il', 'la', 'un', 'una', 'con', 'per', 'kg', 'g', 'gr', 'grammi', 'hg', 'etto', 'l', 'lt', 'litri', 'ml', 'cl', 'casse', 'cassa', 'pz', 'pezzi', 'pezzo'}
@@ -285,11 +302,11 @@ def local_smart_parse(text, products):
         if not clean_line:
             continue
 
-        # Match fuzzy sul nome prodotto
-        matches = difflib.get_close_matches(clean_line, [n.lower() for n in product_names], n=1, cutoff=0.25)
-        if matches:
-            match_name = matches[0]
-            p_orig = next(p for p in products if p['name'].lower() == match_name)
+        # Match fuzzy sul nome prodotto + suggerimenti
+        suggestions = difflib.get_close_matches(clean_line, product_names_l, n=5, cutoff=0.2)
+        best = suggestions[0] if suggestions else None
+        if best and difflib.SequenceMatcher(None, clean_line, best).ratio() >= 0.45:
+            p_orig = product_by_name_l.get(best)
             target_um = normalize_unit(p_orig.get("um"))
             if not target_um and unit_in:
                 if unit_in in {"g", "hg", "kg"}:
@@ -308,7 +325,24 @@ def local_smart_parse(text, products):
                 "inputUm": unit_in,
                 "cat": p_orig.get('cat', '')
             })
-    return {"items": items}
+        else:
+            unmatched.append({
+                "line": raw,
+                "inputQty": qty_in,
+                "inputUm": unit_in,
+                "clean": clean_line,
+                "suggestions": [
+                    {
+                        "productId": product_by_name_l[s]["id"],
+                        "name": product_by_name_l[s]["name"],
+                        "cat": product_by_name_l[s].get("cat", ""),
+                        "um": product_by_name_l[s].get("um") or "pz",
+                    }
+                    for s in suggestions
+                    if s in product_by_name_l
+                ],
+            })
+    return {"items": items, "unmatched": unmatched}
 
 # --- API ROUTES ---
 @app.get("/api/state")
@@ -325,8 +359,23 @@ def post_state():
         data = request.get_json()
         if not data or 'state' not in data:
             return jsonify({"ok": False, "error": "Invalid state"}), 400
+        incoming = data["state"]
+        force = bool(data.get("force"))
         with get_conn() as conn:
-            conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(data['state']),))
+            existing_row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+            existing = json.loads(existing_row["state"]) if existing_row else {}
+
+            if not force:
+                ex_p = existing.get("products") or []
+                in_p = incoming.get("products") or []
+                ex_s = existing.get("suppliers") or []
+                in_s = incoming.get("suppliers") or []
+                if isinstance(ex_p, list) and isinstance(in_p, list) and len(ex_p) > 0 and len(in_p) == 0:
+                    return jsonify({"ok": False, "error": "Refused save: incoming products empty. Use force=true if intended."}), 409
+                if isinstance(ex_s, list) and isinstance(in_s, list) and len(ex_s) > 0 and len(in_s) == 0:
+                    return jsonify({"ok": False, "error": "Refused save: incoming suppliers empty. Use force=true if intended."}), 409
+
+            conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(incoming),))
             conn.commit()
         return jsonify({"ok": True})
     except Exception as e:
@@ -361,8 +410,8 @@ def create_order():
             conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
             conn.commit()
             
-        # Notifica via mail (non blocca la risposta se fallisce o è lenta)
-        email = send_email_alert(dept, staff, text)
+        admin_link = f"{get_public_base_url(request)}/?admin=1"
+        email = send_email_alert(dept, staff, text, admin_link)
         
         return jsonify({"ok": True, "notified": bool(email.get("sent")), "email": email})
     except Exception as e:
@@ -429,7 +478,8 @@ def test_email():
     if isinstance(to_override, str) and "@" in to_override:
         SMTP_TO = to_override.strip()
     try:
-        result = send_email_alert("TEST", "Irina", "Questo è un test di invio email alert.")
+        admin_link = f"{get_public_base_url(request)}/?admin=1"
+        result = send_email_alert("TEST", "Irina", "Questo è un test di invio email alert.", admin_link)
         return jsonify({"ok": True, "result": result})
     finally:
         SMTP_TO = original_to

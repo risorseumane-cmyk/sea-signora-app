@@ -1134,20 +1134,22 @@
                         linesToClarify: []
                     };
 
-                    // Trova le righe originali che non hanno un match
-                    const originalLines = req.text.split('\n').map(l => l.trim()).filter(l => l);
-                    originalLines.forEach(line => {
-                        // Verifica se questa riga è stata mappata a un prodotto
-                        // Usiamo una logica fuzzy semplice: se il nome del prodotto mappato è contenuto nella riga
-                        const isMapped = data.parsed.items.some(item => {
-                            const words = item.name.toLowerCase().split(' ');
-                            return words.some(w => line.toLowerCase().includes(w));
-                        });
+                    if(Array.isArray(data.parsed.unmatched) && data.parsed.unmatched.length) {
+                        approvalContext.linesToClarify = data.parsed.unmatched;
+                    } else {
+                        // Trova le righe originali che non hanno un match (fallback)
+                        const originalLines = req.text.split('\n').map(l => l.trim()).filter(l => l);
+                        originalLines.forEach(line => {
+                            const isMapped = data.parsed.items.some(item => {
+                                const words = item.name.toLowerCase().split(' ');
+                                return words.some(w => line.toLowerCase().includes(w));
+                            });
 
-                        if(!isMapped) {
-                            approvalContext.linesToClarify.push(line);
-                        }
-                    });
+                            if(!isMapped) {
+                                approvalContext.linesToClarify.push({ line });
+                            }
+                        });
+                    }
 
                     // Aggiungi gli articoli già riconosciuti ai finalItems
                     data.parsed.items.forEach(item => {
@@ -1186,22 +1188,28 @@
                 return;
             }
 
-            const currentLine = approvalContext.linesToClarify[0];
+            const currentObj = approvalContext.linesToClarify[0] || {};
+            const currentLine = currentObj.line || String(currentObj);
             document.getElementById('clarify-text').innerText = `"${currentLine}"`;
             
-            // Genera suggerimenti fuzzy dal catalogo
-            const suggestions = appState.products
-                .map(p => ({ 
-                    p, 
-                    score: calculateFuzzyScore(currentLine.toLowerCase(), p.name.toLowerCase()) 
-                }))
-                .filter(s => s.score > 0.1)
-                .sort((a,b) => b.score - a.score)
-                .slice(0, 3);
+            let suggestions = [];
+            if(Array.isArray(currentObj.suggestions) && currentObj.suggestions.length) {
+                suggestions = currentObj.suggestions.map(s => ({ p: s, score: 1 }));
+            } else {
+                // Genera suggerimenti fuzzy dal catalogo (fallback)
+                suggestions = appState.products
+                    .map(p => ({ 
+                        p, 
+                        score: calculateFuzzyScore(currentLine.toLowerCase(), p.name.toLowerCase()) 
+                    }))
+                    .filter(s => s.score > 0.1)
+                    .sort((a,b) => b.score - a.score)
+                    .slice(0, 5);
+            }
 
             const sugDiv = document.getElementById('clarify-suggestions');
             sugDiv.innerHTML = suggestions.map(s => `
-                <button onclick="selectClarifySuggestion(${s.p.id})" class="w-full p-4 bg-slate-50 border rounded-xl flex justify-between items-center hover:border-amber-400 transition-all text-left">
+                <button onclick="selectClarifySuggestion(${s.p.productId || s.p.id})" class="w-full p-4 bg-slate-50 border rounded-xl flex justify-between items-center hover:border-amber-400 transition-all text-left">
                     <div>
                         <b class="text-sm uppercase">${s.p.name}</b>
                         <p class="text-[9px] text-slate-400 uppercase">${s.p.cat}</p>
@@ -1287,7 +1295,8 @@
                 const bestPrice = priceEntries[0];
                 
                 // Estrai quantità dalla riga se possibile
-                const currentLine = approvalContext.linesToClarify[0];
+                const currentObj = approvalContext.linesToClarify[0] || {};
+                const currentLine = currentObj.line || String(currentObj);
                 const extracted = extractQtyUnit(currentLine);
                 const inferredUm = extracted.unit && ['g','hg','kg'].includes(extracted.unit) ? 'kg'
                     : (extracted.unit && ['ml','cl','l'].includes(extracted.unit) ? 'l'
@@ -1310,7 +1319,8 @@
         }
 
         function openProductModalFromClarify() {
-            const currentLine = approvalContext.linesToClarify[0];
+            const currentObj = approvalContext.linesToClarify[0] || {};
+            const currentLine = currentObj.line || String(currentObj);
             closeClarifyModal();
             // Prepariamo il modal prodotto con il testo della riga
             openProductModal();
