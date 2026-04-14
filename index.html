@@ -1666,6 +1666,7 @@
             }).join("");
 
             const w = window.open("", "_blank");
+            if(!w) return alert("Popup bloccato dal browser. Consenti i popup e riprova.");
             w.document.write(`
                 <html><head><title>Storico Ordini</title>
                 <style>
@@ -1682,10 +1683,10 @@
                     <thead><tr><th>OrderID</th><th>Data</th><th>Reparto</th><th>Referente</th><th>Totale</th><th>Dettagli</th></tr></thead>
                     <tbody>${htmlRows}</tbody>
                 </table>
-                <script>window.onload=()=>{window.print();}</script>
                 </body></html>
             `);
             w.document.close();
+            w.addEventListener('load', () => w.print());
         }
 
         function renderOrderHistoryTrend() {
