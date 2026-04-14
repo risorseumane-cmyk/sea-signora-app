@@ -187,7 +187,7 @@ class TestParsingAndEmail(unittest.TestCase):
 
             r = client.post(
                 "/api/public/product-intake",
-                json={"reparto": "Cucina", "name": "Broccoli", "category": "Ortofrutta", "um": "kg"},
+                json={"reparto": "Cucina", "name": "Broccoli", "category": "Ortofrutta", "um": "kg", "supplierName": "TestSup", "supplierPrice": 1.23, "supplierUm": "kg"},
             )
             self.assertEqual(r.status_code, 200)
             intake_id = r.get_json()["id"]
@@ -200,7 +200,9 @@ class TestParsingAndEmail(unittest.TestCase):
             self.assertTrue(app.get("ok"))
 
             state = client.get("/api/state").get_json()["state"]
-            self.assertTrue(any(p.get("name") == "Broccoli" for p in state.get("products", [])))
+            prod = next((p for p in state.get("products", []) if p.get("name") == "Broccoli"), None)
+            self.assertIsNotNone(prod)
+            self.assertIn("TestSup", prod.get("prices", {}))
 
 
 if __name__ == "__main__":

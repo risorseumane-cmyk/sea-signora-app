@@ -518,6 +518,9 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="suppliers-edit-grid"></div>
+                        <div class="flex justify-end">
+                            <button id="suppliers-save-btn" onclick="saveSuppliers(false)" disabled class="px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg" style="background: rgba(29,29,27,0.10); color: rgba(29,29,27,0.50);">SALVA</button>
+                        </div>
 
                         <div class="bg-white p-6 rounded-2xl border">
                             <div class="text-[10px] font-black uppercase text-slate-400 mb-4">Log Modifiche Fornitori</div>
@@ -542,6 +545,14 @@
                             <h4 class="font-black uppercase text-xs mb-4">📥 Importazione Excel / Elenco</h4>
                             <textarea id="import-area" class="w-full h-40 p-4 border rounded-xl mb-4 text-xs font-mono" placeholder="Nome;Categoria;Sub;UM;Prezzo;Fornitore"></textarea>
                             <button onclick="processImport()" class="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase">Elabora Database</button>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl border">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                                <h4 class="font-black uppercase text-xs">🔎 Verifica Associazione Prodotti-Fornitori</h4>
+                                <button onclick="renderAssociationsReport()" class="px-4 py-2 rounded-xl font-black text-[10px] uppercase border" style="border-color: rgba(72,69,61,0.25); color: var(--brand-ink); background: rgba(255,255,255,0.8);">Genera Report</button>
+                            </div>
+                            <div id="assoc-summary" class="text-[10px] font-black uppercase text-slate-400 mb-4"></div>
+                            <div id="assoc-body" class="space-y-3"></div>
                         </div>
                         <div class="bg-white p-6 rounded-2xl border">
                             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
@@ -653,10 +664,16 @@
                         <ol class="text-xs font-bold text-slate-700 space-y-2">
                             <li>1) Compila i campi obbligatori</li>
                             <li>2) Aggiungi eventuali note/immagine (opzionale)</li>
-                            <li>3) Invia: l’amministrazione riceve una notifica e lo approva nel catalogo</li>
+                            <li>3) Salva: l’amministrazione riceve una notifica e lo approva nel catalogo</li>
                         </ol>
                     </div>
 
+                    <div id="intake-step-select" class="border rounded-2xl bg-white p-6 mb-8">
+                        <div class="text-[10px] font-black uppercase text-slate-400 mb-4">Seleziona Reparto</div>
+                        <div id="intake-reparti-buttons" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+                    </div>
+
+                    <div id="intake-form" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
                             <label class="text-[10px] font-black uppercase text-slate-400">Reparto *</label>
@@ -683,6 +700,38 @@
                             <input id="intake-cat" type="text" placeholder="Es: Ortofrutta" class="w-full p-4 bg-slate-50 border rounded-2xl text-sm font-bold outline-none">
                         </div>
                     </div>
+                    <div class="border rounded-2xl bg-slate-50 p-6">
+                        <div class="text-[10px] font-black uppercase text-slate-400 mb-4">Fornitore e Prezzo</div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="md:col-span-1">
+                                <label class="text-[10px] font-black uppercase text-slate-400">Seleziona fornitore</label>
+                                <select id="intake-supplier" class="w-full mt-1 p-3 bg-white border rounded-xl text-[10px] font-black uppercase outline-none"></select>
+                            </div>
+                            <div class="md:col-span-1">
+                                <label class="text-[10px] font-black uppercase text-slate-400">Oppure nuovo fornitore</label>
+                                <input id="intake-new-supplier" type="text" placeholder="Nome azienda" class="w-full mt-1 p-3 bg-white border rounded-xl text-xs font-bold outline-none">
+                            </div>
+                            <div class="md:col-span-1">
+                                <label class="text-[10px] font-black uppercase text-slate-400">Prezzo *</label>
+                                <input id="intake-price" type="number" step="0.01" min="0" value="" placeholder="0.00" class="w-full mt-1 p-3 bg-white border rounded-xl text-xs font-bold outline-none">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div>
+                                <label class="text-[10px] font-black uppercase text-slate-400">UM prezzo *</label>
+                                <select id="intake-price-um" class="w-full mt-1 p-3 bg-white border rounded-xl text-[10px] font-black uppercase outline-none">
+                                    <option value="pz">pz</option>
+                                    <option value="kg">kg</option>
+                                    <option value="g">g</option>
+                                    <option value="l">l</option>
+                                    <option value="ml">ml</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <div class="text-[10px] font-bold text-slate-500">Il prezzo viene salvato per il fornitore selezionato.</div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 gap-4 mb-6">
                         <div>
                             <label class="text-[10px] font-black uppercase text-slate-400">Descrizione (opzionale)</label>
@@ -697,8 +746,9 @@
                             <textarea id="intake-specs" rows="2" class="w-full p-4 bg-slate-50 border rounded-2xl text-sm font-bold outline-none" placeholder="Allergeni, formato, confezione..."></textarea>
                         </div>
                     </div>
-                    <button id="intake-send" onclick="submitProductIntake()" class="w-full py-6 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all">📩 Invia Proposta</button>
+                    <button id="intake-send" onclick="submitProductIntake()" class="w-full py-6 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all">SALVA</button>
                     <div id="intake-msg" class="hidden mt-4 text-[10px] font-black uppercase rounded-xl px-4 py-3"></div>
+                    </div>
                 </div>
             </div>
 
@@ -986,6 +1036,7 @@
             populateHistoryFilters();
             renderOrderHistory();
             renderDeptOrderUI();
+            if(document.getElementById('view-intake')?.classList.contains('active')) initIntakeForm();
         }
 
         function initHomeAssistant() {
@@ -1475,6 +1526,7 @@
                 const el = document.getElementById('intake-reparto');
                 if(el) el.value = reparto;
                 switchView('intake');
+                sync();
             } else {
                 const migrated = localStorage.getItem('ss_seed_brand_v1');
                 if(!migrated) {
@@ -2113,8 +2165,38 @@
                     `;
                 }).join('') || `<tr><td colspan="4" class="p-6 text-xs font-bold text-slate-500">Nessun dettaglio articoli.</td></tr>`;
 
+                const bySupplier = {};
+                items.forEach(it => {
+                    const sup = it.supplier || 'N/D';
+                    if(!bySupplier[sup]) bySupplier[sup] = [];
+                    bySupplier[sup].push(it);
+                });
+                const supplierBlocks = Object.entries(bySupplier).map(([sup, its]) => {
+                    const subtotal = its.reduce((s, it) => s + ((it.bestPrice || 0) * (it.qty || 0)), 0);
+                    const lines = its.map(it => {
+                        const qty = formatQty(it.qty || 0);
+                        const um = it.um || 'pz';
+                        const price = Number(it.bestPrice || 0).toFixed(2);
+                        const lineTotal = ((it.bestPrice || 0) * (it.qty || 0)).toFixed(2);
+                        return `<div class="flex justify-between items-center text-xs font-bold text-slate-700"><span>${qty} ${um} ${it.name || ''}</span><span>€ ${price} • € ${lineTotal}</span></div>`;
+                    }).join('');
+                    return `
+                        <div class="p-4 bg-slate-50 rounded-2xl border">
+                            <div class="flex justify-between items-center">
+                                <div class="text-[10px] font-black uppercase" style="color: var(--brand-dark);">${sup}</div>
+                                <div class="text-[10px] font-black uppercase text-slate-700">Totale parziale: € ${subtotal.toFixed(2)}</div>
+                            </div>
+                            <div class="mt-3 space-y-2">${lines}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                const ageHours = (Date.now() - o.__ts) / 3600000;
+                const urgent = ful === 'DA_ORDINARE' && ageHours > 24;
+                const statusColor = urgent ? '#ef4444' : (ful === 'DA_ORDINARE' ? '#f59e0b' : '#10b981');
+
                 return `
-                    <div id="active-order-${oid}" class="border rounded-3xl bg-white overflow-hidden">
+                    <div id="active-order-${oid}" class="border rounded-3xl bg-white overflow-hidden" style="border-left: 6px solid ${statusColor};">
                         <div class="p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
                                 <div class="flex items-center gap-3">
@@ -2145,6 +2227,12 @@
                                 </thead>
                                 <tbody>${rows}</tbody>
                             </table>
+                        </div>
+                        <div class="p-6 border-t">
+                            <div class="text-[10px] font-black uppercase text-slate-400 mb-4">Lista per Fornitore Selezionato</div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                ${supplierBlocks || `<div class="text-xs font-bold text-slate-500">Nessuna riga.</div>`}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2430,7 +2518,46 @@
         function initIntakeForm() {
             const sel = document.getElementById('intake-reparto');
             if(!sel) return;
-            sel.innerHTML = (appState.reparti || ['Cucina','Sala','Bar','Wine']).map(r => `<option value="${r}">${r}</option>`).join('');
+            const reparti = (appState.reparti || ['Cucina','Sala','Bar','Wine']);
+            const current = sel.value || '';
+            sel.innerHTML = `<option value="">Seleziona...</option>` + reparti.map(r => `<option value="${r}">${r}</option>`).join('');
+            if(current) sel.value = current;
+
+            const btns = document.getElementById('intake-reparti-buttons');
+            const step = document.getElementById('intake-step-select');
+            if(btns && step) {
+                btns.innerHTML = reparti.map(r => `
+                    <button type="button" onclick="selectIntakeReparto('${r}')" class="p-4 rounded-2xl border bg-slate-50 hover:bg-white transition-all font-black text-[10px] uppercase">${r}</button>
+                `).join('');
+                step.classList.remove('hidden');
+            }
+
+            const supSel = document.getElementById('intake-supplier');
+            if(supSel) {
+                const names = (appState.suppliers || []).map(s => s.name).filter(Boolean).sort();
+                supSel.innerHTML = `<option value="">Seleziona...</option>` + names.map(n => `<option value="${n}">${n}</option>`).join('');
+            }
+
+            const um = document.getElementById('intake-um');
+            const priceUm = document.getElementById('intake-price-um');
+            if(um && priceUm) {
+                priceUm.value = normalizeUnit(um.value) || um.value;
+                um.addEventListener('change', () => { priceUm.value = normalizeUnit(um.value) || um.value; }, { once: true });
+            }
+
+            if(step) {
+                if(sel.value) step.classList.add('hidden');
+                else step.classList.remove('hidden');
+            }
+        }
+
+        function selectIntakeReparto(reparto) {
+            const sel = document.getElementById('intake-reparto');
+            const step = document.getElementById('intake-step-select');
+            if(sel) sel.value = reparto;
+            if(step) step.classList.add('hidden');
+            const name = document.getElementById('intake-name');
+            if(name) name.focus();
         }
 
         function showIntakeMsg(text, kind) {
@@ -2458,9 +2585,17 @@
             const description = (document.getElementById('intake-desc')?.value || '').trim();
             const imageUrl = (document.getElementById('intake-image')?.value || '').trim();
             const specs = (document.getElementById('intake-specs')?.value || '').trim();
+            const supplierSel = (document.getElementById('intake-supplier')?.value || '').trim();
+            const supplierNew = (document.getElementById('intake-new-supplier')?.value || '').trim();
+            const supplierName = supplierNew || supplierSel;
+            const price = parseFloat(String(document.getElementById('intake-price')?.value || '').replace(',', '.'));
+            const priceUm = document.getElementById('intake-price-um')?.value || '';
             const btn = document.getElementById('intake-send');
 
             if(!reparto || !name || !category || !um) return showIntakeMsg("Compila tutti i campi obbligatori.", "err");
+            if(!supplierName) return showIntakeMsg("Seleziona o inserisci un fornitore.", "err");
+            if(!Number.isFinite(price) || price <= 0) return showIntakeMsg("Inserisci un prezzo valido.", "err");
+            if(!priceUm) return showIntakeMsg("Seleziona l’UM del prezzo.", "err");
             if(imageUrl && !imageUrl.startsWith('http')) return showIntakeMsg("URL immagine non valido.", "err");
 
             if(btn) { btn.disabled = true; btn.innerText = "Invio in corso..."; }
@@ -2468,16 +2603,17 @@
                 const res = await fetch(`${API_BASE}/api/public/product-intake`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ reparto, name, category, um, description, imageUrl, specs })
+                    body: JSON.stringify({ reparto, name, category, um, description, imageUrl, specs, supplierName, supplierPrice: price, supplierUm: priceUm })
                 });
                 const d = await res.json().catch(() => ({}));
                 if(!res.ok) throw new Error(d.error || "Errore invio");
                 showIntakeMsg("Proposta inviata. L’amministrazione riceve la notifica.", "ok");
-                ['intake-name','intake-cat','intake-desc','intake-image','intake-specs'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+                ['intake-name','intake-cat','intake-desc','intake-image','intake-specs','intake-new-supplier','intake-price'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+                const supSelEl = document.getElementById('intake-supplier'); if(supSelEl) supSelEl.value = '';
             } catch(e) {
                 showIntakeMsg("Errore: " + (e.message || 'invio'), "err");
             } finally {
-                if(btn) { btn.disabled = false; btn.innerText = "📩 Invia Proposta"; }
+                if(btn) { btn.disabled = false; btn.innerText = "SALVA"; }
             }
         }
 
@@ -2501,7 +2637,7 @@
                                 <div>
                                     <div class="text-[10px] font-black uppercase text-slate-400">#${i.id} • ${dt} • ${i.reparto}</div>
                                     <div class="text-sm font-black uppercase text-slate-800 mt-1">${i.name}</div>
-                                    <div class="text-[10px] font-bold text-slate-500">${i.category} • ${i.um}</div>
+                                    <div class="text-[10px] font-bold text-slate-500">${i.category} • ${i.um} • ${i.supplierName || ''} €${Number(i.supplierPrice || 0).toFixed(2)} / ${i.supplierUm || ''}</div>
                                     ${i.description ? `<div class="text-xs font-bold text-slate-600 mt-2">${i.description}</div>` : ``}
                                 </div>
                                 <div class="flex gap-2 justify-end">
@@ -2544,6 +2680,40 @@
             if(!res.ok || !d.ok) return alert("Errore: " + (d.error || 'rifiuto'));
             renderProductIntakeAdmin();
             alert("Proposta rifiutata.");
+        }
+
+        async function renderAssociationsReport() {
+            const summary = document.getElementById('assoc-summary');
+            const body = document.getElementById('assoc-body');
+            if(!summary || !body) return;
+            summary.innerText = "Caricamento...";
+            body.innerHTML = "";
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/associations-report`);
+                const d = await res.json().catch(() => ({}));
+                if(!res.ok || !d.ok) throw new Error(d.error || "Errore");
+
+                const counts = d.counts || {};
+                summary.innerText = `Senza fornitori: ${counts.productsWithoutSuppliers || 0} • Duplicati: ${counts.caseDuplicates || 0} • Fornitori mancanti: ${counts.unknownSuppliers || 0}`;
+
+                const blocks = [];
+                if((d.productsWithoutSuppliers || []).length) {
+                    blocks.push(`<div class="p-4 bg-rose-50 rounded-2xl border border-rose-200"><div class="text-[10px] font-black uppercase text-rose-700 mb-2">Prodotti senza fornitori</div><div class="text-xs font-bold text-rose-800">${d.productsWithoutSuppliers.map(p => p.name).join(', ')}</div></div>`);
+                }
+                if((d.caseDuplicateAssociations || []).length) {
+                    blocks.push(`<div class="p-4 bg-amber-50 rounded-2xl border border-amber-200"><div class="text-[10px] font-black uppercase text-amber-700 mb-2">Associazioni duplicate (case)</div><div class="text-xs font-bold text-amber-800">${d.caseDuplicateAssociations.map(x => `${x.product}: ${x.suppliers.join(' / ')}`).join('<br>')}</div></div>`);
+                }
+                if((d.unknownSuppliersInPrices || []).length) {
+                    blocks.push(`<div class="p-4 bg-amber-50 rounded-2xl border border-amber-200"><div class="text-[10px] font-black uppercase text-amber-700 mb-2">Fornitori non presenti ma usati nei prezzi</div><div class="text-xs font-bold text-amber-800">${d.unknownSuppliersInPrices.map(x => `${x.product}: ${x.suppliers.join(', ')}`).join('<br>')}</div></div>`);
+                }
+                if(!blocks.length) {
+                    blocks.push(`<div class="p-4 bg-emerald-50 rounded-2xl border border-emerald-200"><div class="text-[10px] font-black uppercase text-emerald-700">Nessuna anomalia rilevata</div></div>`);
+                }
+                body.innerHTML = blocks.join('');
+            } catch(e) {
+                summary.innerText = "Errore caricamento report.";
+                body.innerHTML = `<div class="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-xs font-bold text-rose-800">${e.message || 'Errore'}</div>`;
+            }
         }
 
         async function deleteInboxOrder(id) {
@@ -2867,6 +3037,34 @@
                 const price = typeof it.bestPrice === 'number' ? it.bestPrice : (opts.find(o => o.name === supplier)?.price || 0);
                 const qty = typeof it.qty === 'number' ? it.qty : parseFloat(it.qty || 1);
                 const um = it.um || product?.um || 'pz';
+                const minPrice = opts.length ? Math.min(...opts.map(o => o.price)) : price;
+                const maxPrice = opts.length ? Math.max(...opts.map(o => o.price)) : price;
+                const rec = product ? chooseSupplierForProduct(product)?.best : null;
+                const recName = rec?.name || (opts[0]?.name || supplier);
+                const recPrice = typeof rec?.price === 'number' ? rec.price : minPrice;
+
+                const supplierChoices = (opts.length ? opts : [{name: supplier, price: price}]).map(o => {
+                    const porto = getSupplierMeta(o.name).portoProgress || 0;
+                    const risk = Math.round((1 - porto) * 100);
+                    const saving = o.price - minPrice;
+                    const isRec = o.name === recName && o.price === recPrice;
+                    const highlight = isRec ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white';
+                    return `
+                        <label class="flex items-center justify-between gap-3 p-3 rounded-xl border ${highlight} cursor-pointer">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="sup-${idx}" value="${o.name}" ${o.name===supplier?'checked':''} onchange="reviewSetSupplier(${idx}, this.value)">
+                                <div>
+                                    <div class="text-[10px] font-black uppercase text-slate-800">${o.name}</div>
+                                    <div class="text-[10px] font-bold text-slate-500">€ ${Number(o.price).toFixed(2)} • Porto ${Math.round(porto*100)}% • Risk ${risk}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-[10px] font-black uppercase ${saving<=0?'text-emerald-700':'text-slate-500'}">${saving<=0?'Migliore':'+' + Number(saving).toFixed(2)}</div>
+                                ${maxPrice !== minPrice ? `<div class="text-[9px] font-bold text-slate-400 uppercase">range € ${(minPrice).toFixed(2)}–€ ${(maxPrice).toFixed(2)}</div>` : ``}
+                            </div>
+                        </label>
+                    `;
+                }).join('');
 
                 return `
                     <div class="grid grid-cols-12 gap-2 px-5 py-4 items-center">
@@ -2882,12 +3080,9 @@
                                 ${['pz','kg','g','l','ml'].map(u => `<option value="${u}" ${normalizeUnit(um)===u?'selected':''}>${u}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="col-span-3">
-                            <select onchange="reviewSetSupplier(${idx}, this.value)" class="w-full p-2 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
-                                ${(opts.length ? opts : [{name: supplier, price: price}]).map(o => `<option value="${o.name}" ${o.name===supplier?'selected':''}>${o.name}</option>`).join('')}
-                            </select>
+                        <div class="col-span-4 space-y-2">
+                            ${supplierChoices}
                         </div>
-                        <div class="col-span-1 text-right text-xs font-black">€ ${Number(price).toFixed(2)}</div>
                         <div class="col-span-12 flex justify-end">
                             <button onclick="reviewRemoveLine(${idx})" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(239,68,68,0.12); color:#b91c1c;">Rimuovi Riga</button>
                         </div>
@@ -3212,7 +3407,7 @@
             }
         }
 
-        let suppliersSaveTimer = null;
+        let suppliersDirty = false;
         function showSuppliersSaveMsg(text, kind) {
             const el = document.getElementById('suppliers-save-msg');
             if(!el) return;
@@ -3230,9 +3425,24 @@
             setTimeout(() => el.classList.add('hidden'), 2000);
         }
 
-        function scheduleSuppliersSave() {
-            if(suppliersSaveTimer) clearTimeout(suppliersSaveTimer);
-            suppliersSaveTimer = setTimeout(() => saveSuppliers(true), 900);
+        function updateSuppliersSaveButton() {
+            const btn = document.getElementById('suppliers-save-btn');
+            if(!btn) return;
+            btn.disabled = !suppliersDirty;
+            if(btn.disabled) {
+                btn.style.background = 'rgba(29,29,27,0.10)';
+                btn.style.color = 'rgba(29,29,27,0.50)';
+                btn.style.transform = '';
+            } else {
+                btn.style.background = 'linear-gradient(135deg, var(--brand-accent), #FF9A3D)';
+                btn.style.color = '#ffffff';
+                btn.style.transform = 'scale(1.02)';
+            }
+        }
+
+        function markSuppliersDirty() {
+            suppliersDirty = true;
+            updateSuppliersSaveButton();
         }
 
         function parseCategories(value) {
@@ -3253,6 +3463,7 @@
 
         function renderSuppliersEdit() {
             ensureSupplierIds();
+            updateSuppliersSaveButton();
             const grid = document.getElementById('suppliers-edit-grid');
             if(!grid) return;
             grid.innerHTML = (appState.suppliers || []).map((s, idx) => `
@@ -3316,7 +3527,7 @@
             } else {
                 s[field] = String(value);
             }
-            scheduleSuppliersSave();
+            markSuppliersDirty();
         }
 
         async function addSupplierManual() {
@@ -3366,7 +3577,23 @@
             refresh();
         }
 
+        function validateSuppliersClient() {
+            const suppliers = appState.suppliers || [];
+            for(const s of suppliers) {
+                const name = (s?.name || '').trim();
+                if(!name) return "Nome fornitore obbligatorio.";
+                const cats = s?.categories;
+                const catArr = Array.isArray(cats) ? cats : parseCategories(cats);
+                if(!catArr.length) return `Categorie obbligatorie per ${name}.`;
+                const email = (s?.email || '').trim();
+                if(email && !email.includes('@')) return `Email non valida per ${name}.`;
+            }
+            return null;
+        }
+
         async function saveSuppliers(silent) {
+            const err = validateSuppliersClient();
+            if(err) return showSuppliersSaveMsg(err, "err");
             try {
                 const res = await fetch(`${API_BASE}/api/admin/suppliers`, {
                     method: 'POST',
@@ -3376,6 +3603,8 @@
                 const d = await res.json();
                 if(d.ok) {
                     if(!silent) showSuppliersSaveMsg("Fornitori salvati.", "ok");
+                    suppliersDirty = false;
+                    updateSuppliersSaveButton();
                     renderSuppliersAudit();
                     refresh();
                 } else {
@@ -3424,15 +3653,16 @@
                     </div>
                 </div>
             `).join('');
-            gridIntake.innerHTML = appState.reparti.map(r => `
+            gridIntake.innerHTML = `
                 <div class="glass-card p-6 flex flex-col items-center gap-4 border hover:shadow-lg transition-all">
-                    <div id="qr-intake-${r}" class="p-2 bg-white rounded-lg"></div>
+                    <div id="qr-intake-unique" class="p-2 bg-white rounded-lg"></div>
                     <div class="text-center">
-                        <b class="text-xs uppercase block">${r}</b>
-                        <button onclick="printIntakeQR('${r}')" class="mt-3 text-[9px] font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-all">🖨️ Stampa QR</button>
+                        <b class="text-xs uppercase block">Import Prodotti</b>
+                        <p class="text-[9px] font-bold uppercase text-slate-400 mt-1">Seleziona reparto dopo scan</p>
+                        <button onclick="printIntakeQR()" class="mt-3 text-[9px] font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-all">🖨️ Stampa QR</button>
                     </div>
                 </div>
-            `).join('');
+            `;
 
             appState.reparti.forEach(r => { 
                 new QRCode(document.getElementById(`qr-order-${r}`), { 
@@ -3443,14 +3673,14 @@
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.H
                 });
-                new QRCode(document.getElementById(`qr-intake-${r}`), { 
-                    text: window.location.origin + "?intake=1&reparto=" + encodeURIComponent(r), 
-                    width: 120, 
-                    height: 120,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                }); 
+            });
+            new QRCode(document.getElementById(`qr-intake-unique`), { 
+                text: window.location.origin + "?intake=1", 
+                width: 120, 
+                height: 120,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
             });
         }
 
@@ -3486,14 +3716,14 @@
             printWin.document.close();
         }
 
-        function printIntakeQR(reparto) {
-            const qrDiv = document.getElementById(`qr-intake-${reparto}`);
+        function printIntakeQR() {
+            const qrDiv = document.getElementById(`qr-intake-unique`);
             const qrImg = qrDiv.querySelector('img').src;
             const printWin = window.open('', '', 'width=600,height=600');
             printWin.document.write(`
                 <html>
                     <head>
-                        <title>Stampa QR - Import Prodotti - ${reparto}</title>
+                        <title>Stampa QR - Import Prodotti</title>
                         <style>
                             body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
                             .container { border: 2px solid #000; padding: 40px; border-radius: 20px; text-align: center; }
@@ -3506,7 +3736,7 @@
                         <div class="container">
                             <p>SEA SIGNORA MILANO</p>
                             <img src="${qrImg}">
-                            <h1>IMPORT PRODOTTI<br>${reparto}</h1>
+                            <h1>IMPORT PRODOTTI</h1>
                             <p>Scansiona per proporre un prodotto</p>
                         </div>
                         <script>

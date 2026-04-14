@@ -105,12 +105,25 @@ def init_db():
             "name TEXT NOT NULL, "
             "category TEXT NOT NULL, "
             "um TEXT NOT NULL, "
+            "supplier_name TEXT, "
+            "supplier_price REAL, "
+            "supplier_um TEXT, "
             "description TEXT, "
             "image_url TEXT, "
             "specs TEXT, "
             "status TEXT NOT NULL DEFAULT 'PENDING'"
             ")"
         )
+        try:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(product_intake)").fetchall()}
+            if "supplier_name" not in cols:
+                conn.execute("ALTER TABLE product_intake ADD COLUMN supplier_name TEXT")
+            if "supplier_price" not in cols:
+                conn.execute("ALTER TABLE product_intake ADD COLUMN supplier_price REAL")
+            if "supplier_um" not in cols:
+                conn.execute("ALTER TABLE product_intake ADD COLUMN supplier_um TEXT")
+        except Exception:
+            pass
         conn.execute(
             "CREATE TABLE IF NOT EXISTS product_intake_audit ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -753,17 +766,28 @@ def product_intake_create():
     name = (data.get("name") or "").strip()
     cat = (data.get("category") or "").strip()
     um = (data.get("um") or "").strip()
+    supplier_name = (data.get("supplierName") or "").strip() or None
+    supplier_price_raw = data.get("supplierPrice")
+    supplier_um = (data.get("supplierUm") or "").strip() or None
     desc = (data.get("description") or "").strip() or None
     image_url = (data.get("imageUrl") or "").strip() or None
     specs = (data.get("specs") or "").strip() or None
 
     if not reparto or not name or not cat or not um:
         return jsonify({"ok": False, "error": "Missing required fields"}), 400
+    supplier_price = None
+    if supplier_price_raw is not None and supplier_price_raw != "":
+        try:
+            supplier_price = float(supplier_price_raw)
+        except Exception:
+            return jsonify({"ok": False, "error": "Invalid supplierPrice"}), 400
+    if not supplier_name or supplier_price is None or supplier_price <= 0 or not supplier_um:
+        return jsonify({"ok": False, "error": "Missing supplier data"}), 400
 
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO product_intake (ts, reparto, name, category, um, description, image_url, specs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')",
-            (int(datetime.now().timestamp()), reparto, name, cat, um, desc, image_url, specs),
+            "INSERT INTO product_intake (ts, reparto, name, category, um, supplier_name, supplier_price, supplier_um, description, image_url, specs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')",
+            (int(datetime.now().timestamp()), reparto, name, cat, um, supplier_name, supplier_price, supplier_um, desc, image_url, specs),
         )
         intake_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute(
@@ -774,14 +798,20 @@ def product_intake_create():
 
     base = get_public_base_url(request)
     admin_link = f"{base}/?admin=1&view=catalog&intake=1"
-    send_email_alert("PRODOTTO", "QR Import", f"Nuovo prodotto proposto:\n- Reparto: {reparto}\n- Nome: {name}\n- Categoria: {cat}\n- UM: {um}", admin_link, cta_url=admin_link)
+    send_email_alert(
+        "PRODOTTO",
+        "QR Import",
+        f"Nuovo prodotto proposto:\n- Reparto: {reparto}\n- Nome: {name}\n- Categoria: {cat}\n- UM: {um}\n- Fornitore: {supplier_name}\n- Prezzo: {supplier_price} / {supplier_um}",
+        admin_link,
+        cta_url=admin_link,
+    )
     return jsonify({"ok": True, "id": intake_id})
 
 @app.get("/api/admin/product-intake")
 def product_intake_list():
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, ts, reparto, name, category, um, description, image_url, specs, status FROM product_intake WHERE status = 'PENDING' ORDER BY id DESC LIMIT 500"
+            "SELECT id, ts, reparto, name, category, um, supplier_name, supplier_price, supplier_um, description, image_url, specs, status FROM product_intake WHERE status = 'PENDING' ORDER BY id DESC LIMIT 500"
         ).fetchall()
         return jsonify(
             {
@@ -794,6 +824,9 @@ def product_intake_list():
                         "name": r["name"],
                         "category": r["category"],
                         "um": r["um"],
+                        "supplierName": r["supplier_name"],
+                        "supplierPrice": r["supplier_price"],
+                        "supplierUm": r["supplier_um"],
                         "description": r["description"],
                         "imageUrl": r["image_url"],
                         "specs": r["specs"],
@@ -816,7 +849,7 @@ def product_intake_approve():
 
     with get_conn() as conn:
         row_intake = conn.execute(
-            "SELECT id, reparto, name, category, um, description, image_url, specs FROM product_intake WHERE id = ? AND status = 'PENDING'",
+            "SELECT id, reparto, name, category, um, supplier_name, supplier_price, supplier_um, description, image_url, specs FROM product_intake WHERE id = ? AND status = 'PENDING'",
             (intake_id,),
         ).fetchone()
         if not row_intake:
@@ -824,6 +857,25 @@ def product_intake_approve():
 
         row_state = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
         state = json.loads(row_state["state"])
+
+        supplier_name = (row_intake["supplier_name"] or "").strip()
+        supplier_price = row_intake["supplier_price"]
+        if supplier_name and isinstance(supplier_price, (int, float)):
+            suppliers = state.get("suppliers") or []
+            if isinstance(suppliers, list):
+                exists = any(isinstance(s, dict) and s.get("name") == supplier_name for s in suppliers)
+                if not exists:
+                    suppliers.append(
+                        {
+                            "id": int(datetime.now().timestamp() * 1000),
+                            "name": supplier_name,
+                            "min": 200,
+                            "current": 0,
+                            "categories": [row_intake["category"]],
+                        }
+                    )
+                    state["suppliers"] = suppliers
+
         products = state.get("products") or []
         max_id = 0
         for p in products:
@@ -839,7 +891,7 @@ def product_intake_approve():
                 "desc": row_intake["description"],
                 "imageUrl": row_intake["image_url"],
                 "specs": row_intake["specs"],
-                "prices": {},
+                "prices": {supplier_name: float(supplier_price)} if supplier_name and isinstance(supplier_price, (int, float)) else {},
             }
         )
         state["products"] = products
@@ -1142,6 +1194,62 @@ def suppliers_audit_list():
                 ],
             }
         )
+
+@app.get("/api/admin/associations-report")
+def associations_report():
+    with get_conn() as conn:
+        row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "No state"}), 404
+        state = json.loads(row["state"])
+
+    products = state.get("products") or []
+    suppliers = state.get("suppliers") or []
+    supplier_names = {s.get("name") for s in suppliers if isinstance(s, dict) and s.get("name")}
+    supplier_names_l = {str(n).lower() for n in supplier_names}
+
+    products_without_suppliers = []
+    case_dupes = []
+    unknown_suppliers_in_prices = []
+
+    for p in products:
+        if not isinstance(p, dict):
+            continue
+        name = p.get("name") or ""
+        prices = p.get("prices")
+        if not isinstance(prices, dict) or len(prices) == 0:
+            products_without_suppliers.append({"id": p.get("id"), "name": name})
+            continue
+
+        keys = [k for k in prices.keys() if isinstance(k, str)]
+        lower_map = {}
+        dup_groups = []
+        for k in keys:
+            lk = k.lower()
+            lower_map.setdefault(lk, []).append(k)
+        for lk, variants in lower_map.items():
+            if len(variants) > 1:
+                dup_groups.append(variants)
+        if dup_groups:
+            case_dupes.append({"id": p.get("id"), "product": name, "suppliers": sorted({v for g in dup_groups for v in g})})
+
+        unknown = sorted({k for k in keys if k.lower() not in supplier_names_l})
+        if unknown:
+            unknown_suppliers_in_prices.append({"id": p.get("id"), "product": name, "suppliers": unknown})
+
+    return jsonify(
+        {
+            "ok": True,
+            "counts": {
+                "productsWithoutSuppliers": len(products_without_suppliers),
+                "caseDuplicates": len(case_dupes),
+                "unknownSuppliers": len(unknown_suppliers_in_prices),
+            },
+            "productsWithoutSuppliers": products_without_suppliers,
+            "caseDuplicateAssociations": case_dupes,
+            "unknownSuppliersInPrices": unknown_suppliers_in_prices,
+        }
+    )
 
 @app.post("/api/admin/migrate")
 def migrate_state():
