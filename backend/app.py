@@ -241,6 +241,9 @@ def normalize_unit(unit: str | None) -> str | None:
     if not unit:
         return None
     u = unit.strip().lower()
+    m = re.search(r"\b(kg|hg|g|ml|cl|l|pz)\b", u)
+    if m:
+        u = m.group(1)
     aliases = {
         "g": "g",
         "gr": "g",
@@ -707,7 +710,9 @@ def ai_audit_list():
 # --- SERVING FRONTEND ---
 @app.route("/")
 def index():
-    return send_from_directory(FRONTEND_FILE.parent, "index.html")
+    resp = send_from_directory(FRONTEND_FILE.parent, "index.html")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 @app.get("/assets/<path:filename>")
 def assets(filename):

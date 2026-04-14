@@ -1239,9 +1239,9 @@
                     .then(r => r.json())
                     .then(d => {
                         const storage = document.getElementById('storage-status');
-                        if(storage && d && d.db_persistent_hint === false) {
-                            storage.classList.remove('hidden');
-                        }
+                        if(!storage) return;
+                        if(d && d.db_persistent_hint === false) storage.classList.remove('hidden');
+                        else storage.classList.add('hidden');
                     })
                     .catch(() => {});
             }
