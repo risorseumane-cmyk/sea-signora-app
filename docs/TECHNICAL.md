@@ -29,6 +29,8 @@ Path DB:
 - `GET /api/admin/versions` – elenco versioni
 - `POST /api/admin/restore-version` – ripristino versione
 - `GET /api/admin/ai-audit` – audit log pesi AI
+- `POST /api/admin/delete-order` – elimina ordine da inbox o storico (role=admin)
+- `GET /api/admin/orders-audit` – audit log eliminazioni ordini
 
 ### Email alert
 
@@ -59,4 +61,3 @@ Componenti del punteggio “Porto Franco + Servizio”:
 - affidabilità (`reliability`, default 0.85)
 
 Il fornitore con punteggio più basso viene proposto come migliore.
-

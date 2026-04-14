@@ -64,6 +64,17 @@ def init_db():
             "new_weights TEXT"
             ")"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS orders_audit ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts INTEGER NOT NULL, "
+            "actor TEXT, "
+            "action TEXT NOT NULL, "
+            "target_list TEXT NOT NULL, "
+            "target_id TEXT NOT NULL, "
+            "payload TEXT"
+            ")"
+        )
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM app_state")
         count = cur.fetchone()[0]
@@ -168,6 +179,10 @@ def validate_ai_weights(weights):
     if int(price + porto) != 100:
         return False, "aiWeights sum must be 100"
     return True, None
+
+def is_admin_request(data):
+    role = (data or {}).get("role")
+    return role == "admin"
 
 def get_public_base_url(req):
     env_url = os.getenv("PUBLIC_APP_URL", "").strip()
@@ -585,6 +600,93 @@ def test_email():
         return jsonify({"ok": True, "result": result})
     finally:
         SMTP_TO = original_to
+
+@app.post("/api/admin/delete-order")
+def delete_order():
+    data = request.get_json(silent=True) or {}
+    if not is_admin_request(data):
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+
+    target_list = data.get("list")
+    target_id = data.get("id")
+    actor = data.get("actor") or "admin"
+
+    if target_list not in {"inbox", "archive"}:
+        return jsonify({"ok": False, "error": "Invalid list"}), 400
+    if target_id is None:
+        return jsonify({"ok": False, "error": "Missing id"}), 400
+
+    with get_conn() as conn:
+        row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "No state found"}), 404
+        state = json.loads(row["state"])
+
+        arr = state.get(target_list) or []
+        if not isinstance(arr, list):
+            return jsonify({"ok": False, "error": "Invalid state list"}), 500
+
+        before_len = len(arr)
+        removed = None
+
+        if target_list == "inbox":
+            arr2 = []
+            for it in arr:
+                if str(it.get("id")) == str(target_id) and removed is None:
+                    removed = it
+                    continue
+                arr2.append(it)
+            state["inbox"] = arr2
+        else:
+            arr2 = []
+            for it in arr:
+                key = it.get("orderId")
+                if key is None:
+                    key = it.get("ts")
+                if str(key) == str(target_id) and removed is None:
+                    removed = it
+                    continue
+                arr2.append(it)
+            state["archive"] = arr2
+
+        if removed is None or len(arr2) == before_len:
+            return jsonify({"ok": False, "error": "Order not found"}), 404
+
+        conn.execute(
+            "INSERT INTO orders_audit (ts, actor, action, target_list, target_id, payload) VALUES (?, ?, ?, ?, ?, ?)",
+            (int(datetime.now().timestamp()), actor, "delete", target_list, str(target_id), json.dumps(removed)),
+        )
+        conn.execute(
+            "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+            (int(datetime.now().timestamp()), f"order_delete_{target_list}", json.dumps(state)),
+        )
+        conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+        conn.commit()
+
+    return jsonify({"ok": True})
+
+@app.get("/api/admin/orders-audit")
+def list_orders_audit():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, ts, actor, action, target_list, target_id FROM orders_audit ORDER BY id DESC LIMIT 200"
+        ).fetchall()
+        return jsonify(
+            {
+                "ok": True,
+                "audit": [
+                    {
+                        "id": r["id"],
+                        "ts": r["ts"],
+                        "actor": r["actor"],
+                        "action": r["action"],
+                        "list": r["target_list"],
+                        "target_id": r["target_id"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
 
 @app.post("/api/admin/reset-db")
 def reset_db():

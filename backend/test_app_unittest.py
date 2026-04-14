@@ -102,6 +102,35 @@ class TestParsingAndEmail(unittest.TestCase):
             r = client.post("/api/state", json={"state": incoming})
             self.assertEqual(r.status_code, 409)
 
+    def test_delete_order_endpoints_and_audit(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["APP_DB_PATH"] = os.path.join(td, "test.db")
+            app_module = self._load_app_module()
+            client = app_module.app.test_client()
+
+            state = client.get("/api/state").get_json()["state"]
+            state["inbox"] = [{"id": 111, "dept": "CUCINA", "staff": "Mario Rossi", "text": "test", "date": "01/01/2026 10:00"}]
+            state["archive"] = [{"orderId": 222, "dept": "CUCINA", "staff": "Mario Rossi", "text": "test", "total": 1.0, "ts": 1, "date": "01/01/2026 10:00", "items": []}]
+            ok = client.post("/api/state", json={"state": state, "force": True}).get_json()
+            self.assertTrue(ok.get("ok"))
+
+            r_forbidden = client.post("/api/admin/delete-order", json={"list": "inbox", "id": 111})
+            self.assertEqual(r_forbidden.status_code, 403)
+
+            r_ok = client.post("/api/admin/delete-order", json={"role": "admin", "actor": "admin", "list": "inbox", "id": 111})
+            self.assertEqual(r_ok.status_code, 200)
+            st2 = client.get("/api/state").get_json()["state"]
+            self.assertEqual(len(st2.get("inbox") or []), 0)
+
+            r_ok2 = client.post("/api/admin/delete-order", json={"role": "admin", "actor": "admin", "list": "archive", "id": 222})
+            self.assertEqual(r_ok2.status_code, 200)
+            st3 = client.get("/api/state").get_json()["state"]
+            self.assertEqual(len(st3.get("archive") or []), 0)
+
+            audit = client.get("/api/admin/orders-audit").get_json()
+            self.assertTrue(audit.get("ok"))
+            self.assertTrue(len(audit.get("audit") or []) >= 2)
+
 
 if __name__ == "__main__":
     unittest.main()

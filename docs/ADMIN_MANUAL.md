@@ -23,6 +23,10 @@ In **Inbox** trovi gli ordini in arrivo.
   - suggerimenti di prodotti simili
   - possibilità di aggiungere un nuovo prodotto al catalogo
   - possibilità di ignorare la riga
+- Al termine dell’analisi, si apre la **Revisione Ordine**:
+  - modifica quantità e UM
+  - seleziona manualmente il fornitore per ogni riga
+  - aggiunge righe manuali (prodotto + quantità + UM + fornitore) con conferma
 
 ### 3) Storico Ordini
 
@@ -33,6 +37,10 @@ In **Analytics** → **Storico Ordini**:
 - esporta:
   - **Export Excel (CSV)** per analisi su Excel/Google Sheets
   - **Export PDF** (stampa) per archiviazione
+
+Eliminazione:
+
+- da Storico è possibile eliminare un ordine (azione admin, con conferma).
 
 ### 4) AI Fornitori (pesi)
 
@@ -55,4 +63,3 @@ Audit:
 Il sistema protegge catalogo e fornitori da salvataggi “vuoti” accidentali.
 
 In caso di bisogno, esiste uno storico interno di versioni lato server (contattare lo sviluppatore per ripristino).
-

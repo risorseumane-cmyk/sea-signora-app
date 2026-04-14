@@ -247,7 +247,7 @@
                                         <th class="p-3">Reparto</th>
                                         <th class="p-3">Referente</th>
                                         <th class="p-3 text-right">Totale</th>
-                                        <th class="p-3 text-right">Dettagli</th>
+                                        <th class="p-3 text-right">Azioni</th>
                                     </tr>
                                 </thead>
                                 <tbody id="history-body" class="divide-y"></tbody>
@@ -555,6 +555,80 @@
                     <button onclick="openProductModalFromClarify()" class="w-full py-4 border-2 border-slate-900 text-slate-900 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50 transition-all">➕ Aggiungi come nuovo prodotto</button>
                     <button onclick="ignoreClarifyItem()" class="w-full py-4 text-slate-400 font-bold text-[10px] uppercase hover:text-slate-600 transition-all">Ignora questa riga</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Revisione Ordine (selezione fornitori manuale) -->
+    <div id="modal-review" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[210] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden">
+            <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-black uppercase text-xs tracking-widest">Revisione Ordine</h3>
+                <button onclick="closeReviewModal()" class="text-xl opacity-50 hover:opacity-100">&times;</button>
+            </div>
+            <div class="p-8 space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="text-xs font-bold text-slate-600" id="review-meta"></div>
+                    <div class="flex gap-2 justify-end">
+                        <button onclick="openAddLineModal()" class="px-4 py-3 rounded-xl font-black text-[10px] uppercase border" style="border-color: rgba(72,69,61,0.25); color: var(--brand-ink); background: rgba(255,255,255,0.8);">+ Aggiungi Riga</button>
+                        <button onclick="confirmReviewArchive()" class="brand-gradient text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Conferma Archiviazione</button>
+                    </div>
+                </div>
+                <div class="border rounded-2xl overflow-hidden">
+                    <div class="grid grid-cols-12 gap-2 px-5 py-3 bg-slate-50 border-b text-[10px] font-black uppercase text-slate-400">
+                        <div class="col-span-4">Prodotto</div>
+                        <div class="col-span-2 text-right">Quantità</div>
+                        <div class="col-span-2">UM</div>
+                        <div class="col-span-3">Fornitore</div>
+                        <div class="col-span-1 text-right">€</div>
+                    </div>
+                    <div id="review-items" class="divide-y max-h-[55vh] overflow-y-auto"></div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <div class="text-[10px] font-black uppercase text-slate-400">Totale stimato</div>
+                    <div class="text-xl font-black" id="review-total">€ 0.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Aggiungi Riga Manuale -->
+    <div id="modal-add-line" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[220] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+            <div class="p-6 bg-amber-500 text-white flex justify-between items-center">
+                <h3 class="font-black uppercase text-xs tracking-widest">Aggiungi Riga</h3>
+                <button onclick="closeAddLineModal()" class="text-xl opacity-50 hover:opacity-100">&times;</button>
+            </div>
+            <div class="p-8 space-y-5">
+                <div>
+                    <label class="text-[10px] font-black uppercase text-slate-400">Prodotto</label>
+                    <div class="relative mt-1">
+                        <input id="addline-prod" type="text" autocomplete="off" placeholder="Cerca prodotto..." class="w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none">
+                        <div id="addline-suggest" class="absolute left-0 right-0 mt-2 bg-white border rounded-2xl shadow-2xl overflow-hidden hidden z-50"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-slate-400">Quantità</label>
+                        <input id="addline-qty" type="number" step="0.01" value="1" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-slate-400">UM</label>
+                        <select id="addline-um" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                            <option value="pz">pz</option>
+                            <option value="kg">kg</option>
+                            <option value="g">g</option>
+                            <option value="l">l</option>
+                            <option value="ml">ml</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-slate-400">Fornitore</label>
+                        <select id="addline-supplier" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none"></select>
+                    </div>
+                </div>
+                <div id="addline-msg" class="hidden text-[10px] font-black uppercase rounded-xl px-4 py-3"></div>
+                <button onclick="confirmAddLine()" class="w-full py-4 brand-gradient text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl">Conferma Aggiunta</button>
             </div>
         </div>
     </div>
@@ -1378,6 +1452,7 @@
                     const qty = convertQty(extracted.qty, extracted.unit, targetUm);
 
                     approvalContext.finalItems.push({
+                        productId: newProd.id,
                         name: name,
                         qty: qty,
                         um: targetUm,
@@ -1597,7 +1672,10 @@
                         <td class="p-3 font-bold">${staff}</td>
                         <td class="p-3 text-right font-black">€ ${total.toFixed(2)}</td>
                         <td class="p-3 text-right">
-                            <button onclick="toggleHistoryDetails('${String(oid)}')" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(29,29,27,0.06); color: var(--brand-ink);">${isOpen ? 'Chiudi' : 'Apri'}</button>
+                            <div class="flex justify-end gap-2">
+                                <button onclick="toggleHistoryDetails('${String(oid)}')" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(29,29,27,0.06); color: var(--brand-ink);">${isOpen ? 'Chiudi' : 'Apri'}</button>
+                                <button onclick="deleteArchiveOrder('${String(oid)}')" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(239,68,68,0.12); color:#b91c1c;">Elimina</button>
+                            </div>
                         </td>
                     </tr>
                     ${isOpen ? `<tr><td colspan="5" class="bg-white">${detailsHtml}</td></tr>` : ``}
@@ -1612,6 +1690,25 @@
             if(historyExpanded.has(key)) historyExpanded.delete(key);
             else historyExpanded.add(key);
             renderOrderHistory();
+        }
+
+        async function deleteArchiveOrder(id) {
+            if(!confirm("Eliminare questo ordine dallo storico?")) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/delete-order`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ role: 'admin', actor: 'admin', list: 'archive', id: id })
+                });
+                const d = await res.json().catch(() => ({}));
+                if(!res.ok) throw new Error(d.error || "Eliminazione fallita");
+                historyExpanded.delete(String(id));
+                await sync();
+                refresh();
+                alert("Ordine eliminato dallo storico.");
+            } catch(e) {
+                alert("Errore eliminazione: " + (e.message || "Errore"));
+            }
         }
 
         function exportOrderHistoryCSV() {
@@ -1810,7 +1907,7 @@
                             <span class="bg-amber-50 px-3 py-1 rounded-full text-[10px] font-black uppercase text-amber-700 w-fit mb-1">${req.dept}</span>
                             <span class="text-[10px] font-bold text-slate-400">Inviato da: <b class="text-slate-800">${req.staff || 'Staff'}</b> • ${req.date}</span>
                         </div>
-                        <button onclick="if(confirm('Rifiutare questo ordine?')) { appState.inbox=appState.inbox.filter(r=>r.id!=${req.id}); push(); refresh(); }" class="text-rose-500 font-bold text-[10px] uppercase tracking-wider hover:bg-rose-50 px-3 py-2 rounded-xl transition-all">Rifiuta</button>
+                        <button onclick="deleteInboxOrder(${req.id})" class="text-rose-500 font-bold text-[10px] uppercase tracking-wider hover:bg-rose-50 px-3 py-2 rounded-xl transition-all">Elimina</button>
                     </div>
                     <p class="text-lg italic text-slate-700 mb-8 leading-relaxed">"${req.text}"</p>
                     <div class="flex gap-4">
@@ -1818,6 +1915,24 @@
                     </div>
                 </div>
             `).join('') || '<div class="py-20 text-center"><p class="text-slate-400 font-black uppercase text-xs tracking-widest">📭 Nessun ordine in arrivo</p></div>';
+        }
+
+        async function deleteInboxOrder(id) {
+            if(!confirm("Eliminare definitivamente questo ordine dalla Inbox?")) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/delete-order`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ role: 'admin', actor: 'admin', list: 'inbox', id: id })
+                });
+                const d = await res.json().catch(() => ({}));
+                if(!res.ok) throw new Error(d.error || "Eliminazione fallita");
+                await sync();
+                refresh();
+                alert("Ordine eliminato.");
+            } catch(e) {
+                alert("Errore eliminazione: " + (e.message || "Errore"));
+            }
         }
 
         async function approveReq(id) {
@@ -1869,6 +1984,7 @@
                             const bestPrice = choice.best;
                             const priceEntries = choice.others.map(x => [x.name, x.price]);
                             approvalContext.finalItems.push({
+                                productId: product.id,
                                 name: product.name,
                                 qty: item.qty || 1,
                                 um: item.um || product.um || 'pz',
@@ -1895,7 +2011,7 @@
         function clarifyNextItem() {
             if(approvalContext.linesToClarify.length === 0) {
                 closeClarifyModal();
-                finalizeApproval();
+                openReviewModal();
                 return;
             }
 
@@ -2033,6 +2149,7 @@
                 const qty = convertQty(extracted.qty, extracted.unit, targetUm);
 
                 approvalContext.finalItems.push({
+                    productId: product.id,
                     name: product.name,
                     qty: qty,
                     um: targetUm,
@@ -2067,7 +2184,232 @@
             document.getElementById('modal-clarify').classList.add('hidden');
         }
 
-        async function finalizeApproval() {
+        function openReviewModal() {
+            if(!approvalContext) return;
+            renderReviewModal();
+            document.getElementById('modal-review').classList.remove('hidden');
+        }
+
+        function closeReviewModal() {
+            document.getElementById('modal-review').classList.add('hidden');
+        }
+
+        function getProductForLine(line) {
+            if(line && line.productId) {
+                const p = appState.products.find(x => x.id == line.productId);
+                if(p) return p;
+            }
+            if(line && line.name) {
+                const n = String(line.name).toLowerCase();
+                return appState.products.find(x => String(x.name || '').toLowerCase() === n) || null;
+            }
+            return null;
+        }
+
+        function buildSupplierOptions(product) {
+            const choice = chooseSupplierForProduct(product);
+            if(!choice) return [];
+            const best = choice.best ? [choice.best] : [];
+            const others = choice.others || [];
+            const seen = new Set();
+            const all = [];
+            [...best, ...others].forEach(x => {
+                if(!x || !x.name || seen.has(x.name)) return;
+                seen.add(x.name);
+                all.push({ name: x.name, price: x.price });
+            });
+            return all;
+        }
+
+        function renderReviewModal() {
+            const meta = document.getElementById('review-meta');
+            const itemsEl = document.getElementById('review-items');
+            const totalEl = document.getElementById('review-total');
+            if(!meta || !itemsEl || !totalEl || !approvalContext) return;
+
+            const req = approvalContext.req || {};
+            meta.innerText = `Reparto: ${req.dept || '—'} • Referente: ${req.staff || '—'} • ID: ${req.id || '—'}`;
+
+            const items = approvalContext.finalItems || [];
+            itemsEl.innerHTML = items.map((it, idx) => {
+                const product = getProductForLine(it);
+                const opts = product ? buildSupplierOptions(product) : [];
+                const supplier = it.supplier || (opts[0]?.name || 'N/D');
+                const price = typeof it.bestPrice === 'number' ? it.bestPrice : (opts.find(o => o.name === supplier)?.price || 0);
+                const qty = typeof it.qty === 'number' ? it.qty : parseFloat(it.qty || 1);
+                const um = it.um || product?.um || 'pz';
+
+                return `
+                    <div class="grid grid-cols-12 gap-2 px-5 py-4 items-center">
+                        <div class="col-span-4">
+                            <div class="text-xs font-black uppercase text-slate-800">${it.name || ''}</div>
+                            <div class="text-[10px] font-bold uppercase text-slate-400">${product?.cat || ''}</div>
+                        </div>
+                        <div class="col-span-2 text-right">
+                            <input type="number" step="0.01" min="0" value="${qty}" oninput="reviewSetQty(${idx}, this.value)" class="w-full p-2 bg-slate-50 border rounded-xl text-xs font-bold text-right outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <select onchange="reviewSetUm(${idx}, this.value)" class="w-full p-2 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                ${['pz','kg','g','l','ml'].map(u => `<option value="${u}" ${normalizeUnit(um)===u?'selected':''}>${u}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-span-3">
+                            <select onchange="reviewSetSupplier(${idx}, this.value)" class="w-full p-2 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                ${(opts.length ? opts : [{name: supplier, price: price}]).map(o => `<option value="${o.name}" ${o.name===supplier?'selected':''}>${o.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="col-span-1 text-right text-xs font-black">€ ${Number(price).toFixed(2)}</div>
+                        <div class="col-span-12 flex justify-end">
+                            <button onclick="reviewRemoveLine(${idx})" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(239,68,68,0.12); color:#b91c1c;">Rimuovi Riga</button>
+                        </div>
+                    </div>
+                `;
+            }).join('') || `<div class="p-6 text-xs font-bold text-slate-500">Nessuna riga. Aggiungi una riga manuale oppure annulla.</div>`;
+
+            const total = (approvalContext.finalItems || []).reduce((s, i) => s + ((i.bestPrice || 0) * (i.qty || 0)), 0);
+            totalEl.innerText = `€ ${total.toFixed(2)}`;
+        }
+
+        function reviewSetQty(idx, value) {
+            const v = parseFloat(String(value).replace(',', '.'));
+            if(!approvalContext || !approvalContext.finalItems || !approvalContext.finalItems[idx]) return;
+            approvalContext.finalItems[idx].qty = Number.isFinite(v) ? v : 0;
+            renderReviewModal();
+        }
+
+        function reviewSetUm(idx, um) {
+            if(!approvalContext || !approvalContext.finalItems || !approvalContext.finalItems[idx]) return;
+            approvalContext.finalItems[idx].um = normalizeUnit(um) || um;
+            renderReviewModal();
+        }
+
+        function reviewSetSupplier(idx, supplier) {
+            if(!approvalContext || !approvalContext.finalItems || !approvalContext.finalItems[idx]) return;
+            const line = approvalContext.finalItems[idx];
+            const product = getProductForLine(line);
+            if(product) {
+                const price = (product.prices || {})[supplier];
+                if(typeof price === 'number') line.bestPrice = price;
+            }
+            line.supplier = supplier;
+            renderReviewModal();
+        }
+
+        function reviewRemoveLine(idx) {
+            if(!approvalContext || !approvalContext.finalItems) return;
+            approvalContext.finalItems.splice(idx, 1);
+            renderReviewModal();
+        }
+
+        function openAddLineModal() {
+            if(!approvalContext) return;
+            document.getElementById('addline-prod').value = '';
+            document.getElementById('addline-qty').value = '1';
+            document.getElementById('addline-um').value = 'pz';
+            document.getElementById('addline-supplier').innerHTML = '';
+            document.getElementById('modal-add-line').classList.remove('hidden');
+
+            const input = document.getElementById('addline-prod');
+            const list = document.getElementById('addline-suggest');
+            if(input && !input.dataset.bound) {
+                input.dataset.bound = '1';
+                input.addEventListener('input', renderAddLineSuggestions);
+                input.addEventListener('focus', renderAddLineSuggestions);
+                input.addEventListener('blur', () => setTimeout(() => list?.classList.add('hidden'), 120));
+            }
+            window.__addLineProductId = null;
+        }
+
+        function closeAddLineModal() {
+            document.getElementById('modal-add-line').classList.add('hidden');
+        }
+
+        function renderAddLineSuggestions() {
+            const input = document.getElementById('addline-prod');
+            const list = document.getElementById('addline-suggest');
+            if(!input || !list) return;
+            const q = (input.value || '').trim();
+            if(!q) { list.classList.add('hidden'); return; }
+
+            const candidates = appState.products
+                .map(p => ({ p, score: scoreProductMatch(q, p.name) }))
+                .filter(x => x.score > 0)
+                .sort((a,b) => b.score - a.score)
+                .slice(0, 8);
+
+            list.innerHTML = candidates.map(({p}) => `
+                <button type="button" class="w-full px-4 py-3 text-left hover:bg-slate-50 flex justify-between items-center" onclick="selectAddLineProduct(${p.id})">
+                    <div>
+                        <div class="text-sm font-black uppercase text-slate-800">${p.name}</div>
+                        <div class="text-[10px] font-bold uppercase text-slate-400">${p.cat || ''}</div>
+                    </div>
+                    <div class="text-[10px] font-black uppercase" style="color: var(--brand-accent);">Seleziona</div>
+                </button>
+            `).join('') || `<div class="p-4 text-xs font-bold text-slate-500">Nessun match.</div>`;
+            list.classList.remove('hidden');
+        }
+
+        function selectAddLineProduct(id) {
+            const p = appState.products.find(x => x.id == id);
+            if(!p) return;
+            window.__addLineProductId = p.id;
+            document.getElementById('addline-prod').value = p.name;
+            document.getElementById('addline-um').value = normalizeUnit(p.um) || 'pz';
+            document.getElementById('addline-suggest').classList.add('hidden');
+            populateAddLineSuppliers(p);
+        }
+
+        function populateAddLineSuppliers(product) {
+            const sel = document.getElementById('addline-supplier');
+            if(!sel) return;
+            const opts = buildSupplierOptions(product);
+            sel.innerHTML = opts.map(o => `<option value="${o.name}">${o.name} (€ ${o.price.toFixed(2)})</option>`).join('');
+        }
+
+        function showAddLineMsg(text, kind) {
+            const el = document.getElementById('addline-msg');
+            if(!el) return;
+            el.innerText = text;
+            el.classList.remove('hidden');
+            if(kind === 'ok') {
+                el.style.background = 'rgba(16,185,129,0.12)';
+                el.style.color = '#065f46';
+                el.style.border = '1px solid rgba(16,185,129,0.30)';
+            } else {
+                el.style.background = 'rgba(239,68,68,0.10)';
+                el.style.color = '#7f1d1d';
+                el.style.border = '1px solid rgba(239,68,68,0.25)';
+            }
+            setTimeout(() => el.classList.add('hidden'), 2500);
+        }
+
+        function confirmAddLine() {
+            if(!approvalContext) return;
+            const pid = window.__addLineProductId;
+            const p = appState.products.find(x => x.id == pid);
+            const qty = parseFloat(String(document.getElementById('addline-qty')?.value || '1').replace(',', '.'));
+            const um = normalizeUnit(document.getElementById('addline-um')?.value || 'pz') || 'pz';
+            const sup = document.getElementById('addline-supplier')?.value || '';
+            if(!p) return showAddLineMsg("Seleziona un prodotto dal catalogo.", "err");
+            if(!Number.isFinite(qty) || qty <= 0) return showAddLineMsg("Quantità non valida.", "err");
+            if(!sup) return showAddLineMsg("Seleziona un fornitore.", "err");
+            const price = (p.prices || {})[sup];
+            if(typeof price !== 'number') return showAddLineMsg("Prezzo non disponibile per il fornitore.", "err");
+
+            const others = Object.entries(p.prices || {}).filter(([n, v]) => n !== sup && typeof v === 'number').map(([n, v]) => [n, v]);
+            approvalContext.finalItems.push({ productId: p.id, name: p.name, qty: qty, um: um, supplier: sup, bestPrice: price, others: others });
+            closeAddLineModal();
+            renderReviewModal();
+            alert("Riga aggiunta.");
+        }
+
+        async function confirmReviewArchive() {
+            if(!approvalContext) return;
+            closeReviewModal();
+            await finalizeApproval(true);
+        }
+
+        async function finalizeApproval(confirmed = false) {
             const { req, finalItems } = approvalContext;
             if(finalItems.length === 0) {
                 alert("Nessun prodotto riconosciuto. L'ordine resta in Inbox: apri di nuovo e usa i suggerimenti oppure aggiungi i prodotti al catalogo.");
@@ -2082,7 +2424,8 @@
                 return `${formatQty(p.qty)}${um} ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
             }).join('\n');
 
-            if(confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
+            const ok = confirmed ? true : confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`);
+            if(ok) {
                 // Aggiorna porto franco dei fornitori
                 finalItems.forEach(p => {
                     const sup = appState.suppliers.find(s => s.name === p.supplier);
@@ -2118,7 +2461,7 @@
                 const sup = appState.suppliers.find(s => s.name === best.name);
                 if(sup) { sup.current = (sup.current||0) + best.price; }
                 total += best.price;
-                items.push({ name: p.name, qty: 1, um: p.um || 'pz', bestPrice: best.price, supplier: best.name, others: choice.others.map(x => [x.name, x.price]) });
+                items.push({ productId: p.id, name: p.name, qty: 1, um: p.um || 'pz', bestPrice: best.price, supplier: best.name, others: choice.others.map(x => [x.name, x.price]) });
             });
             appState.archive.unshift({ orderId: req.id, dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, items: items, cat: match[0]?.cat || 'Vario' });
             appState.inbox = appState.inbox.filter(r => r.id !== req.id);
