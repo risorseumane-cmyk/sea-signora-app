@@ -1918,15 +1918,31 @@
             }
 
             const sugDiv = document.getElementById('clarify-suggestions');
-            sugDiv.innerHTML = suggestions.map(s => `
-                <button onclick="selectClarifySuggestion(${s.p.productId || s.p.id})" class="w-full p-4 bg-slate-50 border rounded-xl flex justify-between items-center hover:border-amber-400 transition-all text-left">
-                    <div>
-                        <b class="text-sm uppercase">${s.p.name}</b>
-                        <p class="text-[9px] text-slate-400 uppercase">${s.p.cat}</p>
-                    </div>
-                    <span class="text-amber-500 font-black text-[10px]">SELEZIONA</span>
-                </button>
-            `).join('') || '<p class="text-center py-4 text-xs text-slate-400 italic">Nessun suggerimento trovato nel catalogo</p>';
+            sugDiv.innerHTML = (suggestions && suggestions.length > 0)
+  ? suggestions.map(s => {
+      const p = s?.p || {};
+      const id = Number(p.productId ?? p.id) || 0;
+      const name = p.name || 'Prodotto sconosciuto';
+      const cat = p.cat || '';
+
+      return `
+        <button 
+          onclick="selectClarifySuggestion(${id})"
+          class="w-full p-4 bg-slate-50 border rounded-xl flex justify-between items-center hover:border-amber-400 transition-all text-left"
+        >
+          <div>
+            <b class="text-sm uppercase">${name}</b>
+            <p class="text-[9px] text-slate-400 uppercase">${cat}</p>
+          </div>
+          <span class="text-amber-500 font-black text-[10px]">SELEZIONA</span>
+        </button>
+      `;
+    }).join('')
+  : `
+    <p class="text-center py-4 text-xs text-slate-400 italic">
+      Nessun suggerimento trovato nel catalogo
+    </p>
+  `;
 
             document.getElementById('modal-clarify').classList.remove('hidden');
         }
