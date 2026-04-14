@@ -65,3 +65,21 @@ Il DB usa:
 
 Consigliato: abilitare un Volume su Railway montato in `/data`.
 
+## Home Assistant (ricerca + proposta fornitore)
+
+In homepage è presente un box interattivo che permette:
+
+- ricerca prodotto con autocompletamento
+- filtro per reparto merceologico (categoria)
+- visualizzazione ordini in arrivo (Inbox) con numero, data e stato
+- proposta fornitore migliore per prezzo con miglioramento euristico su tempi/affidabilità
+
+Algoritmo:
+
+- base: prezzo più basso del prodotto (`product.prices`)
+- aggiustamenti: `supplier.leadDays`, `supplier.reliability`, avanzamento porto franco (`current/min`) e urgenza (numero ordini in Inbox)
+
+Campi fornitori (facoltativi):
+
+- `leadDays` (numero, default 2)
+- `reliability` (0–1, default 0.85)
