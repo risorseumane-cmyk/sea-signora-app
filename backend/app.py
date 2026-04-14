@@ -15,7 +15,15 @@ from flask_cors import CORS
 
 # --- CONFIGURAZIONE ---
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "app_data.db"
+DB_PATH_ENV = os.getenv("APP_DB_PATH", "").strip()
+if DB_PATH_ENV:
+    DB_PATH = Path(DB_PATH_ENV)
+else:
+    data_dir = Path("/data")
+    if data_dir.exists():
+        DB_PATH = data_dir / "app_data.db"
+    else:
+        DB_PATH = BASE_DIR / "app_data.db"
 FRONTEND_FILE = BASE_DIR.parent / "index.html"
 
 # Chiavi e Configurazione (GEMINI RIMOSSO - Motore Locale Attivo)
@@ -25,7 +33,7 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER or "noreply@seasignorarest.com")
 SMTP_TO = os.getenv("SMTP_TO", "amministrazione@seasignorarest.com")
-FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
+FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "https://formspree.io/f/xykbonje")
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -146,8 +154,24 @@ def send_email_alert(dept, staff, text):
     # Formspree Fallback
     if FORMSPREE_ENDPOINT:
         try:
-            data = urllib.parse.urlencode({"_subject": subject, "message": body}).encode()
-            urllib.request.urlopen(FORMSPREE_ENDPOINT, data=data, timeout=5)
+            payload = {
+                "_subject": subject,
+                "message": body,
+                "email": SMTP_FROM or SMTP_USER or "noreply@seasignorarest.com",
+            }
+            data = urllib.parse.urlencode(payload).encode()
+            req = urllib.request.Request(
+                FORMSPREE_ENDPOINT,
+                data=data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                    "User-Agent": "SeaSignora/1.0",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                _ = resp.read()
             return {"sent": True, "channel": "formspree", "to": SMTP_TO, "error": None}
         except Exception as e:
             err = str(e)
@@ -267,6 +291,13 @@ def local_smart_parse(text, products):
             match_name = matches[0]
             p_orig = next(p for p in products if p['name'].lower() == match_name)
             target_um = normalize_unit(p_orig.get("um"))
+            if not target_um and unit_in:
+                if unit_in in {"g", "hg", "kg"}:
+                    target_um = "kg"
+                elif unit_in in {"ml", "cl", "l"}:
+                    target_um = "l"
+                elif unit_in in {"pz"}:
+                    target_um = "pz"
             qty = convert_qty(qty_in, unit_in, target_um)
             items.append({
                 "productId": p_orig['id'],
@@ -367,6 +398,8 @@ def ai_help():
 def diagnostics():
     diag = {
         "db": "unknown",
+        "db_path": str(DB_PATH),
+        "db_exists": DB_PATH.exists(),
         "engine": "Local Smart Matcher (OK)",
         "email": {
             "smtp_host": SMTP_HOST,

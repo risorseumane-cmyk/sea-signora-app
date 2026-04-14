@@ -1181,6 +1181,7 @@
 
         function clarifyNextItem() {
             if(approvalContext.linesToClarify.length === 0) {
+                closeClarifyModal();
                 finalizeApproval();
                 return;
             }
@@ -1288,7 +1289,10 @@
                 // Estrai quantità dalla riga se possibile
                 const currentLine = approvalContext.linesToClarify[0];
                 const extracted = extractQtyUnit(currentLine);
-                const targetUm = product.um || 'pz';
+                const inferredUm = extracted.unit && ['g','hg','kg'].includes(extracted.unit) ? 'kg'
+                    : (extracted.unit && ['ml','cl','l'].includes(extracted.unit) ? 'l'
+                    : (extracted.unit && ['pz'].includes(extracted.unit) ? 'pz' : null));
+                const targetUm = product.um || inferredUm || 'pz';
                 const qty = convertQty(extracted.qty, extracted.unit, targetUm);
 
                 approvalContext.finalItems.push({
@@ -1328,10 +1332,8 @@
         async function finalizeApproval() {
             const { req, finalItems } = approvalContext;
             if(finalItems.length === 0) {
-                alert("Nessun prodotto valido nell'ordine. L'ordine verrà rimosso.");
-                appState.inbox = appState.inbox.filter(r => r.id !== req.id);
-                await push();
-                refresh();
+                alert("Nessun prodotto riconosciuto. L'ordine resta in Inbox: apri di nuovo e usa i suggerimenti oppure aggiungi i prodotti al catalogo.");
+                approvalContext = null;
                 return;
             }
 
