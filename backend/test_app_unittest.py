@@ -131,6 +131,77 @@ class TestParsingAndEmail(unittest.TestCase):
             self.assertTrue(audit.get("ok"))
             self.assertTrue(len(audit.get("audit") or []) >= 2)
 
+    def test_suppliers_update_requires_admin_and_logs(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["APP_DB_PATH"] = os.path.join(td, "test.db")
+            app_module = self._load_app_module()
+            client = app_module.app.test_client()
+
+            state = client.get("/api/state").get_json()["state"]
+            state["products"] = [{"id": 1, "name": "X", "cat": "C", "um": "pz", "prices": {"OldSup": 1.0}}]
+            state["suppliers"] = [{"id": 1, "name": "OldSup", "min": 10, "current": 0, "categories": ["C"]}]
+            ok = client.post("/api/state", json={"state": state, "force": True}).get_json()
+            self.assertTrue(ok.get("ok"))
+
+            forbidden = client.post("/api/admin/suppliers", json={"suppliers": state["suppliers"]})
+            self.assertEqual(forbidden.status_code, 403)
+
+            updated = [{"id": 1, "name": "NewSup", "min": 10, "current": 0, "categories": ["C"]}]
+            r = client.post("/api/admin/suppliers", json={"role": "admin", "actor": "admin", "suppliers": updated})
+            self.assertEqual(r.status_code, 200)
+            self.assertTrue(r.get_json().get("ok"))
+
+            st2 = client.get("/api/state").get_json()["state"]
+            self.assertIn("NewSup", st2["products"][0]["prices"])
+            self.assertNotIn("OldSup", st2["products"][0]["prices"])
+
+            audit = client.get("/api/admin/suppliers-audit").get_json()
+            self.assertTrue(audit.get("ok"))
+            self.assertTrue(len(audit.get("audit") or []) >= 1)
+
+    def test_email_click_tracking_redirects(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["APP_DB_PATH"] = os.path.join(td, "test.db")
+            app_module = self._load_app_module()
+            client = app_module.app.test_client()
+
+            with app_module.get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO email_clicks (token, ts, order_id, target_url, click_count, last_click_ts) VALUES (?, ?, ?, ?, 0, NULL)",
+                    ("tok", 1, "1", "https://example.com/?admin=1&view=dashboard"),
+                )
+                conn.commit()
+
+            r = client.get("/api/email/click/tok")
+            self.assertEqual(r.status_code, 302)
+
+            with app_module.get_conn() as conn:
+                row = conn.execute("SELECT click_count FROM email_clicks WHERE token = ?", ("tok",)).fetchone()
+                self.assertEqual(row["click_count"], 1)
+
+    def test_product_intake_create_and_approve(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["APP_DB_PATH"] = os.path.join(td, "test.db")
+            app_module = self._load_app_module()
+            client = app_module.app.test_client()
+
+            r = client.post(
+                "/api/public/product-intake",
+                json={"reparto": "Cucina", "name": "Broccoli", "category": "Ortofrutta", "um": "kg"},
+            )
+            self.assertEqual(r.status_code, 200)
+            intake_id = r.get_json()["id"]
+
+            lst = client.get("/api/admin/product-intake").get_json()
+            self.assertTrue(lst.get("ok"))
+            self.assertTrue(any(i["id"] == intake_id for i in lst.get("items", [])))
+
+            app = client.post("/api/admin/product-intake/approve", json={"role": "admin", "actor": "admin", "id": intake_id}).get_json()
+            self.assertTrue(app.get("ok"))
+
+            state = client.get("/api/state").get_json()["state"]
+            self.assertTrue(any(p.get("name") == "Broccoli" for p in state.get("products", [])))
+
 
 if __name__ == "__main__":
     unittest.main()

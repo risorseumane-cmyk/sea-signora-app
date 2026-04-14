@@ -31,6 +31,12 @@ Path DB:
 - `GET /api/admin/ai-audit` – audit log pesi AI
 - `POST /api/admin/delete-order` – elimina ordine da inbox o storico (role=admin)
 - `GET /api/admin/orders-audit` – audit log eliminazioni ordini
+- `POST /api/public/product-intake` – inserimento prodotto via QR (public)
+- `GET /api/admin/product-intake` – lista prodotti in attesa
+- `POST /api/admin/product-intake/approve` – approva e inserisce nel catalogo
+- `POST /api/admin/product-intake/reject` – rifiuta proposta
+- `GET /api/admin/suppliers-audit` – audit log modifiche fornitori
+- `GET /api/admin/email-clicks` – statistiche click email
 
 ### Email alert
 
@@ -46,6 +52,10 @@ Canali:
 Base URL:
 
 - `PUBLIC_APP_URL` se impostata, altrimenti `X-Forwarded-*` / host della request.
+
+Tracking click:
+
+- il link nelle email passa da `/api/email/click/<token>` che registra il click e fa redirect alla deep link admin.
 
 ### Selezione fornitore (AI weights)
 

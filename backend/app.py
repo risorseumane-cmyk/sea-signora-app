@@ -6,11 +6,13 @@ import urllib.parse
 import urllib.request
 import difflib
 import re
+import secrets
 from datetime import datetime
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, redirect
 from flask_cors import CORS
 
 # --- CONFIGURAZIONE ---
@@ -75,6 +77,50 @@ def init_db():
             "payload TEXT"
             ")"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS suppliers_audit ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts INTEGER NOT NULL, "
+            "actor TEXT, "
+            "action TEXT NOT NULL, "
+            "supplier_id TEXT, "
+            "payload TEXT"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS email_clicks ("
+            "token TEXT PRIMARY KEY, "
+            "ts INTEGER NOT NULL, "
+            "order_id TEXT, "
+            "target_url TEXT NOT NULL, "
+            "click_count INTEGER NOT NULL DEFAULT 0, "
+            "last_click_ts INTEGER"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS product_intake ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts INTEGER NOT NULL, "
+            "reparto TEXT NOT NULL, "
+            "name TEXT NOT NULL, "
+            "category TEXT NOT NULL, "
+            "um TEXT NOT NULL, "
+            "description TEXT, "
+            "image_url TEXT, "
+            "specs TEXT, "
+            "status TEXT NOT NULL DEFAULT 'PENDING'"
+            ")"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS product_intake_audit ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts INTEGER NOT NULL, "
+            "actor TEXT, "
+            "action TEXT NOT NULL, "
+            "intake_id INTEGER NOT NULL, "
+            "payload TEXT"
+            ")"
+        )
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM app_state")
         count = cur.fetchone()[0]
@@ -86,7 +132,7 @@ def init_db():
             "homeSubtitle": "Benvenuto. Il database è sincronizzato in tempo reale su Railway.",
             "homeVisuals": True,
             "homeCardsEnabled": True,
-            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"},
+            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Catalogo Prodotti"},
             "aiWeights": {"price": 80, "porto": 20},
         }
 
@@ -157,6 +203,19 @@ def init_db():
                     settings.setdefault(k, v)
 
             state["settings"] = settings
+
+            suppliers = state.get("suppliers") or []
+            if isinstance(suppliers, list):
+                base_id = int(datetime.now().timestamp() * 1000)
+                changed = False
+                for i, s in enumerate(suppliers):
+                    if not isinstance(s, dict):
+                        continue
+                    if s.get("id") is None:
+                        s["id"] = base_id + i
+                        changed = True
+                if changed:
+                    state["suppliers"] = suppliers
             conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
             conn.execute(
                 "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
@@ -184,6 +243,26 @@ def is_admin_request(data):
     role = (data or {}).get("role")
     return role == "admin"
 
+def validate_supplier(s):
+    if not isinstance(s, dict):
+        return False, "Supplier must be an object"
+    name = (s.get("name") or "").strip()
+    if not name:
+        return False, "Supplier name is required"
+    email = (s.get("email") or "").strip()
+    if email and "@" not in email:
+        return False, "Supplier email is invalid"
+    cats = s.get("categories")
+    if cats is None:
+        return False, "Supplier categories are required"
+    if not isinstance(cats, (list, str)):
+        return False, "Supplier categories must be a list or string"
+    if isinstance(cats, list) and len([c for c in cats if isinstance(c, str) and c.strip()]) == 0:
+        return False, "Supplier categories are required"
+    if isinstance(cats, str) and len([c for c in cats.split(",") if c.strip()]) == 0:
+        return False, "Supplier categories are required"
+    return True, None
+
 def get_public_base_url(req):
     env_url = os.getenv("PUBLIC_APP_URL", "").strip()
     if env_url:
@@ -192,23 +271,35 @@ def get_public_base_url(req):
     host = req.headers.get("X-Forwarded-Host", req.host)
     return f"{proto}://{host}".rstrip("/")
 
-def send_email_alert(dept, staff, text, admin_link):
+def send_email_alert(dept, staff, text, admin_link, cta_url=None):
     subject = f"NUOVO ORDINE: {dept} da {staff}"
-    body = (
-        f"Apri App (Admin): {admin_link}\n\n"
+    body_text = (
+        f"Visualizza ordine sull'app (Admin): {admin_link}\n\n"
         f"Reparto: {dept}\n"
         f"Staff: {staff}\n"
         f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n"
         f"Ordine:\n{text}"
     )
+    btn_href = cta_url or admin_link
+    body_html = f"""
+        <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+          <p><a href="{btn_href}" style="display:inline-block;background:#1B2F1C;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:12px;">Visualizza ordine sull'app</a></p>
+          <p style="color:#666;font-size:12px;">Se il pulsante non funziona, apri questo link: <a href="{admin_link}">{admin_link}</a></p>
+          <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+          <p><b>Reparto:</b> {dept}<br><b>Staff:</b> {staff}<br><b>Data:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+          <pre style="white-space:pre-wrap;background:#f7f7f7;padding:12px;border-radius:12px;border:1px solid #eee;">{text}</pre>
+        </div>
+    """.strip()
     
     # SMTP
     if SMTP_USER and SMTP_PASS:
         try:
-            msg = MIMEText(body)
-            msg['Subject'] = subject
-            msg['From'] = SMTP_FROM or SMTP_USER
-            msg['To'] = SMTP_TO
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = SMTP_FROM or SMTP_USER
+            msg["To"] = SMTP_TO
+            msg.attach(MIMEText(body_text, "plain", "utf-8"))
+            msg.attach(MIMEText(body_html, "html", "utf-8"))
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
                 server.ehlo()
                 server.starttls()
@@ -228,7 +319,7 @@ def send_email_alert(dept, staff, text, admin_link):
         try:
             payload = {
                 "_subject": subject,
-                "message": body,
+                "message": body_text,
                 "email": SMTP_FROM or SMTP_USER or "noreply@seasignorarest.com",
             }
             data = urllib.parse.urlencode(payload).encode()
@@ -472,7 +563,7 @@ def create_order():
             state = json.loads(row['state'])
             
             new_req = {
-                "id": int(datetime.now().timestamp()),
+                "id": int(datetime.now().timestamp() * 1000),
                 "dept": dept,
                 "staff": staff,
                 "text": text,
@@ -483,8 +574,17 @@ def create_order():
             conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
             conn.commit()
             
-        admin_link = f"{get_public_base_url(request)}/?admin=1"
-        email = send_email_alert(dept, staff, text, admin_link)
+        base = get_public_base_url(request)
+        admin_link = f"{base}/?admin=1&view=dashboard&focus={new_req['id']}"
+        token = secrets.token_urlsafe(16)
+        cta_url = f"{base}/api/email/click/{token}"
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO email_clicks (token, ts, order_id, target_url, click_count, last_click_ts) VALUES (?, ?, ?, ?, 0, NULL)",
+                (token, int(datetime.now().timestamp()), str(new_req["id"]), admin_link),
+            )
+            conn.commit()
+        email = send_email_alert(dept, staff, text, admin_link, cta_url=cta_url)
         
         return jsonify({"ok": True, "notified": bool(email.get("sent")), "email": email})
     except Exception as e:
@@ -505,9 +605,9 @@ def ai_help():
     data = request.get_json()
     q = data.get("question", "").lower()
     if "prezzo" in q or "cost" in q: 
-        ans = "Sono Irina, assistente della compagnia. I prezzi migliori sono evidenziati nel Master Data e nella Heatmap (Prodotti vs Fornitori). Puoi aggiornare i prezzi nella sezione 'Aggiorna Fatture'."
+        ans = "Sono Irina, assistente della compagnia. I prezzi migliori sono evidenziati nel Catalogo Prodotti e nella Heatmap (Prodotti vs Fornitori). Puoi aggiornare i prezzi nella sezione 'Fatture & Storico'."
     elif "ordine" in q or "reparto" in q: 
-        ans = "Sono Irina, assistente della compagnia. Puoi gestire gli ordini in arrivo nella sezione Inbox. I reparti ordinano tramite QR code dedicato."
+        ans = "Sono Irina, assistente della compagnia. Gli ordini in attesa sono in Ordini Attivi (sezione Inbox). I reparti ordinano tramite QR code dedicato."
     elif "heatmap" in q:
         ans = "Sono Irina, assistente della compagnia. La Heatmap confronta Prodotti e Fornitori e mette in evidenza il miglior prezzo. Filtra per categoria per lavorare più velocemente."
     elif "trend" in q or "grafic" in q:
@@ -595,11 +695,185 @@ def test_email():
     if isinstance(to_override, str) and "@" in to_override:
         SMTP_TO = to_override.strip()
     try:
-        admin_link = f"{get_public_base_url(request)}/?admin=1"
-        result = send_email_alert("TEST", "Irina", "Questo è un test di invio email alert.", admin_link)
+        base = get_public_base_url(request)
+        admin_link = f"{base}/?admin=1&view=dashboard"
+        token = secrets.token_urlsafe(16)
+        cta_url = f"{base}/api/email/click/{token}"
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO email_clicks (token, ts, order_id, target_url, click_count, last_click_ts) VALUES (?, ?, ?, ?, 0, NULL)",
+                (token, int(datetime.now().timestamp()), "TEST", admin_link),
+            )
+            conn.commit()
+        result = send_email_alert("TEST", "Irina", "Questo è un test di invio email alert.", admin_link, cta_url=cta_url)
         return jsonify({"ok": True, "result": result})
     finally:
         SMTP_TO = original_to
+
+@app.get("/api/email/click/<token>")
+def email_click(token):
+    with get_conn() as conn:
+        row = conn.execute("SELECT target_url, click_count FROM email_clicks WHERE token = ?", (token,)).fetchone()
+        if not row:
+            return redirect(get_public_base_url(request) + "/?admin=1&view=dashboard", code=302)
+        conn.execute(
+            "UPDATE email_clicks SET click_count = ?, last_click_ts = ? WHERE token = ?",
+            (int(row["click_count"] or 0) + 1, int(datetime.now().timestamp()), token),
+        )
+        conn.commit()
+        return redirect(row["target_url"], code=302)
+
+@app.get("/api/admin/email-clicks")
+def email_clicks_stats():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT token, ts, order_id, target_url, click_count, last_click_ts FROM email_clicks ORDER BY ts DESC LIMIT 200"
+        ).fetchall()
+        return jsonify(
+            {
+                "ok": True,
+                "clicks": [
+                    {
+                        "token": r["token"],
+                        "ts": r["ts"],
+                        "orderId": r["order_id"],
+                        "target": r["target_url"],
+                        "clicks": r["click_count"],
+                        "lastClickTs": r["last_click_ts"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
+
+@app.post("/api/public/product-intake")
+def product_intake_create():
+    data = request.get_json(silent=True) or {}
+    reparto = (data.get("reparto") or "").strip()
+    name = (data.get("name") or "").strip()
+    cat = (data.get("category") or "").strip()
+    um = (data.get("um") or "").strip()
+    desc = (data.get("description") or "").strip() or None
+    image_url = (data.get("imageUrl") or "").strip() or None
+    specs = (data.get("specs") or "").strip() or None
+
+    if not reparto or not name or not cat or not um:
+        return jsonify({"ok": False, "error": "Missing required fields"}), 400
+
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO product_intake (ts, reparto, name, category, um, description, image_url, specs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')",
+            (int(datetime.now().timestamp()), reparto, name, cat, um, desc, image_url, specs),
+        )
+        intake_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute(
+            "INSERT INTO product_intake_audit (ts, actor, action, intake_id, payload) VALUES (?, ?, ?, ?, ?)",
+            (int(datetime.now().timestamp()), "public", "create", intake_id, json.dumps(data)),
+        )
+        conn.commit()
+
+    base = get_public_base_url(request)
+    admin_link = f"{base}/?admin=1&view=catalog&intake=1"
+    send_email_alert("PRODOTTO", "QR Import", f"Nuovo prodotto proposto:\n- Reparto: {reparto}\n- Nome: {name}\n- Categoria: {cat}\n- UM: {um}", admin_link, cta_url=admin_link)
+    return jsonify({"ok": True, "id": intake_id})
+
+@app.get("/api/admin/product-intake")
+def product_intake_list():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, ts, reparto, name, category, um, description, image_url, specs, status FROM product_intake WHERE status = 'PENDING' ORDER BY id DESC LIMIT 500"
+        ).fetchall()
+        return jsonify(
+            {
+                "ok": True,
+                "items": [
+                    {
+                        "id": r["id"],
+                        "ts": r["ts"],
+                        "reparto": r["reparto"],
+                        "name": r["name"],
+                        "category": r["category"],
+                        "um": r["um"],
+                        "description": r["description"],
+                        "imageUrl": r["image_url"],
+                        "specs": r["specs"],
+                        "status": r["status"],
+                    }
+                    for r in rows
+                ],
+            }
+        )
+
+@app.post("/api/admin/product-intake/approve")
+def product_intake_approve():
+    data = request.get_json(silent=True) or {}
+    if not is_admin_request(data):
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+    intake_id = data.get("id")
+    if not isinstance(intake_id, int):
+        return jsonify({"ok": False, "error": "Missing intake id"}), 400
+    actor = data.get("actor") or "admin"
+
+    with get_conn() as conn:
+        row_intake = conn.execute(
+            "SELECT id, reparto, name, category, um, description, image_url, specs FROM product_intake WHERE id = ? AND status = 'PENDING'",
+            (intake_id,),
+        ).fetchone()
+        if not row_intake:
+            return jsonify({"ok": False, "error": "Not found"}), 404
+
+        row_state = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+        state = json.loads(row_state["state"])
+        products = state.get("products") or []
+        max_id = 0
+        for p in products:
+            if isinstance(p, dict) and isinstance(p.get("id"), int):
+                max_id = max(max_id, p["id"])
+        new_id = max_id + 1
+        products.append(
+            {
+                "id": new_id,
+                "name": row_intake["name"],
+                "cat": row_intake["category"],
+                "um": row_intake["um"],
+                "desc": row_intake["description"],
+                "imageUrl": row_intake["image_url"],
+                "specs": row_intake["specs"],
+                "prices": {},
+            }
+        )
+        state["products"] = products
+        conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+        conn.execute("UPDATE product_intake SET status = 'APPROVED' WHERE id = ?", (intake_id,))
+        conn.execute(
+            "INSERT INTO product_intake_audit (ts, actor, action, intake_id, payload) VALUES (?, ?, ?, ?, ?)",
+            (int(datetime.now().timestamp()), actor, "approve", intake_id, json.dumps({"newProductId": new_id})),
+        )
+        conn.execute(
+            "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+            (int(datetime.now().timestamp()), "product_intake_approve", json.dumps(state)),
+        )
+        conn.commit()
+
+    return jsonify({"ok": True, "productId": new_id})
+
+@app.post("/api/admin/product-intake/reject")
+def product_intake_reject():
+    data = request.get_json(silent=True) or {}
+    if not is_admin_request(data):
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+    intake_id = data.get("id")
+    if not isinstance(intake_id, int):
+        return jsonify({"ok": False, "error": "Missing intake id"}), 400
+    actor = data.get("actor") or "admin"
+    with get_conn() as conn:
+        conn.execute("UPDATE product_intake SET status = 'REJECTED' WHERE id = ?", (intake_id,))
+        conn.execute(
+            "INSERT INTO product_intake_audit (ts, actor, action, intake_id, payload) VALUES (?, ?, ?, ?, ?)",
+            (int(datetime.now().timestamp()), actor, "reject", intake_id, None),
+        )
+        conn.commit()
+    return jsonify({"ok": True})
 
 @app.post("/api/admin/delete-order")
 def delete_order():
@@ -732,17 +1006,142 @@ def update_settings():
 
 @app.post("/api/admin/suppliers")
 def update_suppliers():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
+    if not is_admin_request(data):
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+
     suppliers = data.get("suppliers")
-    if not suppliers: return jsonify({"ok": False, "error": "Missing suppliers"}), 400
-    
+    actor = data.get("actor") or "admin"
+    if not isinstance(suppliers, list):
+        return jsonify({"ok": False, "error": "Missing suppliers"}), 400
+
+    cleaned = []
+    for s in suppliers:
+        ok, err = validate_supplier(s)
+        if not ok:
+            return jsonify({"ok": False, "error": err}), 400
+        ss = dict(s)
+        if ss.get("id") is None:
+            ss["id"] = int(datetime.now().timestamp() * 1000)
+        if isinstance(ss.get("categories"), str):
+            ss["categories"] = [c.strip() for c in ss["categories"].split(",") if c.strip()]
+        cleaned.append(ss)
+
     with get_conn() as conn:
         row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
-        state = json.loads(row['state'])
-        state["suppliers"] = suppliers
+        if not row:
+            return jsonify({"ok": False, "error": "No state"}), 404
+        state = json.loads(row["state"])
+
+        old_suppliers = state.get("suppliers") or []
+        old_by_id = {str(s.get("id")): s for s in old_suppliers if isinstance(s, dict) and s.get("id") is not None}
+        new_by_id = {str(s.get("id")): s for s in cleaned if isinstance(s, dict) and s.get("id") is not None}
+
+        def audit(action, supplier_id, payload):
+            conn.execute(
+                "INSERT INTO suppliers_audit (ts, actor, action, supplier_id, payload) VALUES (?, ?, ?, ?, ?)",
+                (int(datetime.now().timestamp()), actor, action, supplier_id, json.dumps(payload) if payload is not None else None),
+            )
+
+        # Detect deletions
+        for sid, s in old_by_id.items():
+            if sid not in new_by_id:
+                audit("delete", sid, {"old": s})
+
+        # Detect creates/updates/renames
+        rename_map = {}
+        for sid, s in new_by_id.items():
+            old = old_by_id.get(sid)
+            if not old:
+                audit("create", sid, {"new": s})
+                continue
+            old_name = old.get("name")
+            new_name = s.get("name")
+            if old_name and new_name and old_name != new_name:
+                rename_map[old_name] = new_name
+                audit("rename", sid, {"from": old_name, "to": new_name})
+            if old != s:
+                audit("update", sid, {"old": old, "new": s})
+
+        # Apply rename map to product price dictionaries and archived items
+        if rename_map:
+            products = state.get("products") or []
+            for p in products:
+                if not isinstance(p, dict):
+                    continue
+                prices = p.get("prices") or {}
+                if not isinstance(prices, dict):
+                    continue
+                for old_name, new_name in rename_map.items():
+                    if old_name in prices and new_name not in prices:
+                        prices[new_name] = prices.pop(old_name)
+                    elif old_name in prices and new_name in prices:
+                        prices.pop(old_name, None)
+                p["prices"] = prices
+            state["products"] = products
+
+            archive = state.get("archive") or []
+            for o in archive:
+                if not isinstance(o, dict):
+                    continue
+                items = o.get("items") or []
+                if not isinstance(items, list):
+                    continue
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    sup = it.get("supplier")
+                    if sup in rename_map:
+                        it["supplier"] = rename_map[sup]
+            state["archive"] = archive
+
+        # Remove prices for deleted suppliers (by name)
+        deleted_names = {s.get("name") for sid, s in old_by_id.items() if sid not in new_by_id and isinstance(s, dict)}
+        if deleted_names:
+            products = state.get("products") or []
+            for p in products:
+                if not isinstance(p, dict):
+                    continue
+                prices = p.get("prices") or {}
+                if not isinstance(prices, dict):
+                    continue
+                for dn in deleted_names:
+                    prices.pop(dn, None)
+                p["prices"] = prices
+            state["products"] = products
+
+        state["suppliers"] = cleaned
         conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+        conn.execute(
+            "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+            (int(datetime.now().timestamp()), "suppliers_save", json.dumps(state)),
+        )
         conn.commit()
+
     return jsonify({"ok": True})
+
+@app.get("/api/admin/suppliers-audit")
+def suppliers_audit_list():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, ts, actor, action, supplier_id, payload FROM suppliers_audit ORDER BY id DESC LIMIT 200"
+        ).fetchall()
+        return jsonify(
+            {
+                "ok": True,
+                "audit": [
+                    {
+                        "id": r["id"],
+                        "ts": r["ts"],
+                        "actor": r["actor"],
+                        "action": r["action"],
+                        "supplierId": r["supplier_id"],
+                        "payload": json.loads(r["payload"]) if r["payload"] else None,
+                    }
+                    for r in rows
+                ],
+            }
+        )
 
 @app.post("/api/admin/migrate")
 def migrate_state():
@@ -754,7 +1153,7 @@ def migrate_state():
             "homeSubtitle": "Benvenuto. Il database è sincronizzato in tempo reale su Railway.",
             "homeVisuals": True,
             "homeCardsEnabled": True,
-            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"},
+            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Catalogo Prodotti"},
             "aiWeights": {"price": 80, "porto": 20},
         }
 
@@ -815,6 +1214,14 @@ def index():
     resp = send_from_directory(FRONTEND_FILE.parent, "index.html")
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+@app.get("/catalogo-master")
+def redirect_catalogo_master():
+    return redirect("/?admin=1&view=catalog", code=301)
+
+@app.get("/catalog-master")
+def redirect_catalog_master():
+    return redirect("/?admin=1&view=catalog", code=301)
 
 @app.get("/assets/<path:filename>")
 def assets(filename):
