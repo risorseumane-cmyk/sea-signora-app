@@ -289,6 +289,7 @@
                 </div>
             </div>
 
+            <!-- Modal Prodotto -->
             <div id="modal-product" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
                 <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                     <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
@@ -532,6 +533,7 @@
         </main>
     </div>
 
+    <!-- Modal Chiarimento Ordine -->
     <div id="modal-clarify" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div class="p-6 bg-amber-500 text-white flex justify-between items-center">
@@ -573,7 +575,7 @@
             reparti: ['Cucina','Sala','Bar','Wine'],
             inbox: [], archive: []
         };
-        let charts = {}; 
+        let charts = {}; // Spostato fuori da appState per permettere il salvataggio JSON
         let approvalContext = null;
         let homeAssistantInitialized = false;
         let homeSearchState = { query: "", cat: "", productId: null };
@@ -582,7 +584,6 @@
 
         const API_BASE = window.location.origin.startsWith('file://') ? 'http://localhost:8080' : '';
         let isPushing = false;
-
         async function sync() {
             if(isPushing) return;
             const status = document.getElementById('save-status');
@@ -677,7 +678,7 @@
             document.getElementById('inbox-badge').style.display = appState.inbox.length ? 'block' : 'none';
             
             const totalSpent = appState.archive.reduce((s,a) => s + (a.total || 0), 0);
-            const saving = totalSpent * 0.12; 
+            const saving = totalSpent * 0.12; // Stimato 12% saving ottimizzando fornitori
             document.getElementById('kpi-saving').innerText = saving.toFixed(2);
             
             // UI Brand Settings
@@ -1198,7 +1199,6 @@
             
             list.innerHTML = filtered.map(p => {
                 const best = Object.entries(p.prices).sort((a,b)=>a[1]-b[1])[0];
-                if (!best) return '';
                 return `
                     <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl border">
                         <div>
@@ -1682,7 +1682,7 @@
                     <thead><tr><th>OrderID</th><th>Data</th><th>Reparto</th><th>Referente</th><th>Totale</th><th>Dettagli</th></tr></thead>
                     <tbody>${htmlRows}</tbody>
                 </table>
-                <script>window.onload=()=>{window.print();}<\/script>
+                <script>window.onload=()=>{window.print();}</script>
                 </body></html>
             `);
             w.document.close();
@@ -1759,121 +1759,137 @@
             });
         }
 
-        async function finalizeApproval() {
-            const { req, finalItems } = approvalContext;
-            if(finalItems.length === 0) {
-                alert("Nessun prodotto riconosciuto. L'ordine resta in Inbox: apri di nuovo e usa i suggerimenti oppure aggiungi i prodotti al catalogo.");
-                approvalContext = null;
-                return;
-            }
+        async function askAI() {
+            const q = document.getElementById('chat-q').value; if(!q) return;
+            const btn = document.getElementById('chat-btn'); 
+            const box = document.getElementById('chat-a');
+            const oldText = btn.innerText;
+            
+            btn.innerText = "IA sta pensando..."; btn.disabled = true;
+            box.classList.add('hidden');
 
-            let total = finalItems.reduce((s, i) => s + (i.bestPrice * i.qty), 0);
-            let summary = finalItems.map(p => {
-                let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
-                const um = p.um ? ` ${p.um}` : '';
-                return `${formatQty(p.qty)}${um} ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
-            }).join('\n');
-
-            if(confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
-                // Aggiorna porto franco dei fornitori
-                finalItems.forEach(p => {
-                    const sup = appState.suppliers.find(s => s.name === p.supplier);
-                    if(sup) sup.current = (sup.current || 0) + (p.bestPrice * p.qty);
+            try {
+                const res = await fetch(`${API_BASE}/api/ai/help`, { 
+                    method: 'POST', 
+                    headers: {'Content-Type':'application/json'}, 
+                    body: JSON.stringify({
+                        question: q,
+                        context: {
+                            currentView: document.querySelector('.view-section.active')?.id,
+                            productsCount: appState.products.length,
+                            suppliers: appState.suppliers.map(s => ({ name: s.name, current: s.current, min: s.min })),
+                            inboxCount: appState.inbox.length,
+                            lastOrders: appState.archive.slice(0, 5)
+                        }
+                    }) 
                 });
-
-                appState.archive.unshift({ 
-                    orderId: req.id,
-                    dept: req.dept, 
-                    total: total, 
-                    ts: Date.now(),
-                    date: new Date().toLocaleString('it-IT'), 
-                    text: req.text,
-                    staff: req.staff,
-                    items: finalItems 
-                });
-                
-                appState.inbox = appState.inbox.filter(r => r.id !== req.id);
-                await push();
-                switchView('dashboard');
+                const d = await res.json();
+                if(d.ok) {
+                    box.innerText = d.answer;
+                    box.classList.remove('hidden');
+                    document.getElementById('chat-q').value = "";
+                } else {
+                    box.innerText = "Errore IA: " + (d.error || "Risposta non valida");
+                    box.classList.remove('hidden');
+                }
+            } catch(e) {
+                box.innerText = "Errore di connessione con il server IA."; 
+                box.classList.remove('hidden');
+            } finally {
+                btn.innerText = oldText; btn.disabled = false;
             }
-            approvalContext = null;
         }
 
-        function fallbackApprove(req) {
-            let total = 0;
-            const match = appState.products.filter(p => req.text.toLowerCase().includes(p.name.toLowerCase().split(' ')[0]));
-            const items = [];
-            match.forEach(p => {
-                const choice = chooseSupplierForProduct(p);
-                if(!choice) return;
-                const best = choice.best;
-                const sup = appState.suppliers.find(s => s.name === best.name);
-                if(sup) { sup.current = (sup.current||0) + best.price; }
-                total += best.price;
-                items.push({ name: p.name, qty: 1, um: p.um || 'pz', bestPrice: best.price, supplier: best.name, others: choice.others.map(x => [x.name, x.price]) });
-            });
-            appState.archive.unshift({ orderId: req.id, dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, items: items, cat: match[0]?.cat || 'Vario' });
-            appState.inbox = appState.inbox.filter(r => r.id !== req.id);
-            push();
-            refresh();
+        function renderInbox() {
+            const cont = document.getElementById('inbox-list');
+            cont.innerHTML = appState.inbox.map(req => `
+                <div class="glass-card p-8 border-l-4 border-amber-500 bg-white">
+                    <div class="flex justify-between items-center border-b pb-4 mb-4">
+                        <div class="flex flex-col">
+                            <span class="bg-amber-50 px-3 py-1 rounded-full text-[10px] font-black uppercase text-amber-700 w-fit mb-1">${req.dept}</span>
+                            <span class="text-[10px] font-bold text-slate-400">Inviato da: <b class="text-slate-800">${req.staff || 'Staff'}</b> • ${req.date}</span>
+                        </div>
+                        <button onclick="if(confirm('Rifiutare questo ordine?')) { appState.inbox=appState.inbox.filter(r=>r.id!=${req.id}); push(); refresh(); }" class="text-rose-500 font-bold text-[10px] uppercase tracking-wider hover:bg-rose-50 px-3 py-2 rounded-xl transition-all">Rifiuta</button>
+                    </div>
+                    <p class="text-lg italic text-slate-700 mb-8 leading-relaxed">"${req.text}"</p>
+                    <div class="flex gap-4">
+                        <button onclick="approveReq(${req.id})" class="flex-1 brand-gradient text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-all">🧠 Analisi IA & Approva</button>
+                    </div>
+                </div>
+            `).join('') || '<div class="py-20 text-center"><p class="text-slate-400 font-black uppercase text-xs tracking-widest">📭 Nessun ordine in arrivo</p></div>';
         }
 
-        async function applyUI(shouldPush = true) {
-            const c = document.getElementById('set-color')?.value || appState.settings.color || '#EF7818';
-            const b = document.getElementById('set-brand')?.value || appState.settings.brandName || 'Sea Signora';
-            const ht = document.getElementById('set-home-title')?.value || appState.settings.homeTitle || 'Corporate Home';
-            const hs = document.getElementById('set-home-subtitle')?.value ?? appState.settings.homeSubtitle ?? '';
-            const hv = document.getElementById('set-home-visuals') ? document.getElementById('set-home-visuals').checked : (appState.settings.homeVisuals !== false);
-            const hcEnabled = document.getElementById('set-home-cards') ? document.getElementById('set-home-cards').checked : (appState.settings.homeCardsEnabled !== false);
-            const cardInbox = document.getElementById('set-card-inbox')?.value || appState.settings.homeCards?.inbox || 'Ordini Inbox';
-            const cardSaving = document.getElementById('set-card-saving')?.value || appState.settings.homeCards?.saving || 'Saving Ottimizzato';
-            const cardCatalog = document.getElementById('set-card-catalog')?.value || appState.settings.homeCards?.catalog || 'Master Data';
+        async function approveReq(id) {
+            const req = appState.inbox.find(r => r.id === id); if(!req) return;
             
-            document.documentElement.style.setProperty('--brand-accent', c);
-            if(document.getElementById('ui-brand-name')) document.getElementById('ui-brand-name').innerText = b;
-            if(document.getElementById('home-title')) document.getElementById('home-title').innerText = ht;
-            if(document.getElementById('home-subtitle')) document.getElementById('home-subtitle').innerText = hs;
-            if(document.getElementById('home-hero')) {
-                document.getElementById('home-hero').classList.toggle('brand-hero', !!hv);
-            }
-            
-            document.querySelectorAll('.brand-gradient').forEach(el => {
-                el.style.background = `linear-gradient(135deg, ${c} 0%, var(--brand-dark) 100%)`;
-            });
-            
-            appState.settings = { 
-                ...appState.settings, 
-                brandName: b, 
-                color: c, 
-                homeTitle: ht, 
-                homeSubtitle: hs,
-                homeVisuals: !!hv,
-                homeCardsEnabled: !!hcEnabled,
-                homeCards: { inbox: cardInbox, saving: cardSaving, catalog: cardCatalog }
-            };
-            if(document.getElementById('ui-logo-img')) document.getElementById('ui-logo-img').alt = b;
-            refresh();
-            
-            if(shouldPush) {
-                await fetch(`${API_BASE}/api/admin/page-settings`, {
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "Analisi in corso..."; btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ai/order-parse`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ settings: appState.settings })
+                    body: JSON.stringify({ text: req.text, catalog: appState.products })
                 });
-            }
-        }
+                const data = await res.json();
+                
+                if(data.ok && data.parsed && data.parsed.items) {
+                    approvalContext = {
+                        req: req,
+                        parsedItems: data.parsed.items,
+                        finalItems: [],
+                        linesToClarify: []
+                    };
 
-        async function checkDiagnostics() {
-            try {
-                const res = await fetch(`${API_BASE}/api/diag`);
-                const d = await res.json();
-                alert(`DIAGNOSTICA:\nDB: ${d.db}\nENGINE: ${d.engine}`);
+                    if(Array.isArray(data.parsed.unmatched) && data.parsed.unmatched.length) {
+                        approvalContext.linesToClarify = data.parsed.unmatched;
+                    } else {
+                        // Trova le righe originali che non hanno un match (fallback)
+                        const originalLines = req.text.split('\n').map(l => l.trim()).filter(l => l);
+                        originalLines.forEach(line => {
+                            const isMapped = data.parsed.items.some(item => {
+                                const words = item.name.toLowerCase().split(' ');
+                                return words.some(w => line.toLowerCase().includes(w));
+                            });
+
+                            if(!isMapped) {
+                                approvalContext.linesToClarify.push({ line });
+                            }
+                        });
+                    }
+
+                    // Aggiungi gli articoli già riconosciuti ai finalItems
+                    data.parsed.items.forEach(item => {
+                        const product = appState.products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name?.toLowerCase());
+                        if(product) {
+                            const choice = chooseSupplierForProduct(product);
+                            if(!choice) return;
+                            const bestPrice = choice.best;
+                            const priceEntries = choice.others.map(x => [x.name, x.price]);
+                            approvalContext.finalItems.push({
+                                name: product.name,
+                                qty: item.qty || 1,
+                                um: item.um || product.um || 'pz',
+                                bestPrice: bestPrice.price,
+                                supplier: bestPrice.name,
+                                others: priceEntries
+                            });
+                        }
+                    });
+
+                    clarifyNextItem();
+                } else {
+                    alert("L'IA non è riuscita a mappare l'ordine. Procedo con il match manuale.");
+                    fallbackApprove(req);
+                }
             } catch(e) {
-                alert("Errore nel recupero diagnostica.");
+                console.error(e);
+                fallbackApprove(req);
+            } finally {
+                btn.innerText = oldText; btn.disabled = false;
             }
         }
-
-        // --- FUNZIONI AGGIUNTE PER RISOLVERE IL BUG A SCHERMO ---
 
         function clarifyNextItem() {
             if(approvalContext.linesToClarify.length === 0) {
@@ -1989,6 +2005,7 @@
                 const bestPrice = choice ? choice.best : null
                 const priceEntries = choice ? choice.others.map(x => [x.name, x.price]) : [];
                 
+                // Estrai quantità dalla riga se possibile
                 const currentObj = approvalContext.linesToClarify[0] || {};
                 const currentLine = currentObj.line || String(currentObj);
                 const extracted = extractQtyUnit(currentLine);
@@ -2016,8 +2033,10 @@
             const currentObj = approvalContext.linesToClarify[0] || {};
             const currentLine = currentObj.line || String(currentObj);
             closeClarifyModal();
+            // Prepariamo il modal prodotto con il testo della riga
             openProductModal();
             document.getElementById('edit-prod-name').value = currentLine;
+            // Sovrascriviamo la funzione di salvataggio temporaneamente? No, meglio gestire nel saveProductFromModal
             approvalContext.isAddingNew = true;
         }
 
@@ -2031,8 +2050,606 @@
             document.getElementById('modal-clarify').classList.add('hidden');
         }
 
-        document.addEventListener('DOMContentLoaded', sync);
+        async function finalizeApproval() {
+            const { req, finalItems } = approvalContext;
+            if(finalItems.length === 0) {
+                alert("Nessun prodotto riconosciuto. L'ordine resta in Inbox: apri di nuovo e usa i suggerimenti oppure aggiungi i prodotti al catalogo.");
+                approvalContext = null;
+                return;
+            }
 
+            let total = finalItems.reduce((s, i) => s + (i.bestPrice * i.qty), 0);
+            let summary = finalItems.map(p => {
+                let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
+                const um = p.um ? ` ${p.um}` : '';
+                return `${formatQty(p.qty)}${um} ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
+            }).join('\n');
+
+            if(confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
+                // Aggiorna porto franco dei fornitori
+                finalItems.forEach(p => {
+                    const sup = appState.suppliers.find(s => s.name === p.supplier);
+                    if(sup) sup.current = (sup.current || 0) + (p.bestPrice * p.qty);
+                });
+
+                appState.archive.unshift({ 
+                    orderId: req.id,
+                    dept: req.dept, 
+                    total: total, 
+                    ts: Date.now(),
+                    date: new Date().toLocaleString('it-IT'), 
+                    text: req.text,
+                    staff: req.staff,
+                    items: finalItems 
+                });
+                
+                appState.inbox = appState.inbox.filter(r => r.id !== req.id);
+                await push();
+                switchView('dashboard');
+            }
+            approvalContext = null;
+        }
+
+        function fallbackApprove(req) {
+            let total = 0;
+            const match = appState.products.filter(p => req.text.toLowerCase().includes(p.name.toLowerCase().split(' ')[0]));
+            const items = [];
+            match.forEach(p => {
+                const choice = chooseSupplierForProduct(p);
+                if(!choice) return;
+                const best = choice.best;
+                const sup = appState.suppliers.find(s => s.name === best.name);
+                if(sup) { sup.current = (sup.current||0) + best.price; }
+                total += best.price;
+                items.push({ name: p.name, qty: 1, um: p.um || 'pz', bestPrice: best.price, supplier: best.name, others: choice.others.map(x => [x.name, x.price]) });
+            });
+            appState.archive.unshift({ orderId: req.id, dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, items: items, cat: match[0]?.cat || 'Vario' });
+            appState.inbox = appState.inbox.filter(r => r.id !== req.id);
+            push();
+            refresh();
+        }
+
+        async function applyUI(shouldPush = true) {
+            const c = document.getElementById('set-color')?.value || appState.settings.color || '#EF7818';
+            const b = document.getElementById('set-brand')?.value || appState.settings.brandName || 'Sea Signora';
+            const ht = document.getElementById('set-home-title')?.value || appState.settings.homeTitle || 'Corporate Home';
+            const hs = document.getElementById('set-home-subtitle')?.value ?? appState.settings.homeSubtitle ?? '';
+            const hv = document.getElementById('set-home-visuals') ? document.getElementById('set-home-visuals').checked : (appState.settings.homeVisuals !== false);
+            const hcEnabled = document.getElementById('set-home-cards') ? document.getElementById('set-home-cards').checked : (appState.settings.homeCardsEnabled !== false);
+            const cardInbox = document.getElementById('set-card-inbox')?.value || appState.settings.homeCards?.inbox || 'Ordini Inbox';
+            const cardSaving = document.getElementById('set-card-saving')?.value || appState.settings.homeCards?.saving || 'Saving Ottimizzato';
+            const cardCatalog = document.getElementById('set-card-catalog')?.value || appState.settings.homeCards?.catalog || 'Master Data';
+            
+            document.documentElement.style.setProperty('--brand-accent', c);
+            if(document.getElementById('ui-brand-name')) document.getElementById('ui-brand-name').innerText = b;
+            if(document.getElementById('home-title')) document.getElementById('home-title').innerText = ht;
+            if(document.getElementById('home-subtitle')) document.getElementById('home-subtitle').innerText = hs;
+            if(document.getElementById('home-hero')) {
+                document.getElementById('home-hero').classList.toggle('brand-hero', !!hv);
+            }
+            
+            document.querySelectorAll('.brand-gradient').forEach(el => {
+                el.style.background = `linear-gradient(135deg, ${c} 0%, var(--brand-dark) 100%)`;
+            });
+            
+            appState.settings = { 
+                ...appState.settings, 
+                brandName: b, 
+                color: c, 
+                homeTitle: ht, 
+                homeSubtitle: hs,
+                homeVisuals: !!hv,
+                homeCardsEnabled: !!hcEnabled,
+                homeCards: { inbox: cardInbox, saving: cardSaving, catalog: cardCatalog }
+            };
+            if(document.getElementById('ui-logo-img')) document.getElementById('ui-logo-img').alt = b;
+            refresh();
+            
+            if(shouldPush) {
+                await fetch(`${API_BASE}/api/admin/page-settings`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ settings: appState.settings })
+                });
+            }
+        }
+
+        function switchConfig(id) {
+            document.querySelectorAll('.config-sec').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('.config-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`sec-${id}`).classList.remove('hidden');
+            document.getElementById(`tab-${id}`).classList.add('active');
+            if(id === 'qr') renderQR();
+            if(id === 'suppliers') renderSuppliersEdit();
+            if(id === 'ai') renderAiConfig();
+        }
+
+        function validateAiWeights() {
+            const p = parseInt(document.getElementById('ai-w-price')?.value || '0', 10);
+            const o = parseInt(document.getElementById('ai-w-porto')?.value || '0', 10);
+            const msg = document.getElementById('ai-w-msg');
+            const btn = document.getElementById('ai-w-save');
+            const sum = p + o;
+            const ok = Number.isFinite(sum) && sum === 100 && p >= 0 && o >= 0 && p <= 100 && o <= 100;
+            if(msg) {
+                msg.innerText = ok ? `Somma: ${sum}%` : `Somma: ${sum}% (deve essere 100%)`;
+                msg.style.color = ok ? '#334155' : '#b91c1c';
+            }
+            if(btn) btn.disabled = !ok;
+        }
+
+        async function saveAiWeights() {
+            const p = parseInt(document.getElementById('ai-w-price')?.value || '0', 10);
+            const o = parseInt(document.getElementById('ai-w-porto')?.value || '0', 10);
+            const sum = p + o;
+            if(sum !== 100) return alert("La somma delle percentuali deve essere 100%.");
+
+            appState.settings = { ...appState.settings, aiWeights: { price: p, porto: o } };
+            await applyUI(true);
+            await renderAiConfig();
+            alert("Pesi AI salvati. Verranno applicati immediatamente ai nuovi ordini.");
+        }
+
+        async function renderAiConfig() {
+            hydrateSettingsInputs();
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/ai-audit`);
+                const d = await res.json();
+                const body = document.getElementById('ai-audit-body');
+                if(!body) return;
+                if(!d.ok) {
+                    body.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-xs font-bold text-slate-500">Audit non disponibile</td></tr>`;
+                    return;
+                }
+                body.innerHTML = (d.audit || []).map(a => {
+                    const dt = new Date((a.ts || 0) * 1000).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                    const oldw = a.old ? `${a.old.price || 0}/${a.old.porto || 0}` : '—';
+                    const neww = a.new ? `${a.new.price || 0}/${a.new.porto || 0}` : '—';
+                    return `<tr>
+                        <td class="py-3 pr-4 text-xs font-bold">${dt}</td>
+                        <td class="py-3 pr-4 text-xs font-bold">${a.actor || 'admin'}</td>
+                        <td class="py-3 pr-4 text-xs font-bold">${oldw}</td>
+                        <td class="py-3 pr-4 text-xs font-bold">${neww}</td>
+                    </tr>`;
+                }).join('') || `<tr><td colspan="4" class="py-6 text-center text-xs font-bold text-slate-500">Nessuna modifica registrata</td></tr>`;
+            } catch(_) {
+                const body = document.getElementById('ai-audit-body');
+                if(body) body.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-xs font-bold text-slate-500">Errore di rete</td></tr>`;
+            }
+        }
+
+        function renderSuppliersEdit() {
+            const grid = document.getElementById('suppliers-edit-grid');
+            grid.innerHTML = appState.suppliers.map((s, idx) => `
+                <div class="p-4 border rounded-2xl bg-slate-50 relative group">
+                    <button onclick="deleteSupplier('${s.name}')" class="absolute -top-2 -right-2 bg-rose-500 text-white w-6 h-6 rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">×</button>
+                    <label class="text-[9px] font-black uppercase text-slate-400">${s.name}</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs font-bold text-slate-500">Min: €</span>
+                        <input type="number" value="${s.min}" 
+                            onchange="appState.suppliers[${idx}].min = parseFloat(this.value)"
+                            class="w-full p-2 border rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-slate-900">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black uppercase text-slate-400">Lead (gg)</span>
+                            <input type="number" min="0" value="${typeof s.leadDays === 'number' ? s.leadDays : 2}"
+                                onchange="appState.suppliers[${idx}].leadDays = parseFloat(this.value)"
+                                class="w-full p-2 border rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-slate-900">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black uppercase text-slate-400">Affid %</span>
+                            <input type="number" min="0" max="100" value="${typeof s.reliability === 'number' ? Math.round(s.reliability * 100) : 85}"
+                                onchange="appState.suppliers[${idx}].reliability = parseFloat(this.value) / 100"
+                                class="w-full p-2 border rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-slate-900">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addSupplier() {
+            const input = document.getElementById('new-sup-name');
+            const name = input.value.trim();
+            if(!name) return alert("Inserisci un nome!");
+            if(appState.suppliers.some(s => s.name.toLowerCase() === name.toLowerCase())) return alert("Fornitore già esistente!");
+            
+            appState.suppliers.push({ name, min: 200, current: 0 });
+            input.value = "";
+            await push();
+            renderSuppliersEdit();
+            refresh();
+        }
+
+        async function deleteSupplier(name) {
+            if(!confirm(`Sei sicuro di voler eliminare ${name}? Tutti i prezzi associati a questo fornitore verranno rimossi dai prodotti.`)) return;
+            
+            appState.suppliers = appState.suppliers.filter(s => s.name !== name);
+            appState.products.forEach(p => {
+                if(p.prices[name]) delete p.prices[name];
+            });
+            
+            await push();
+            renderSuppliersEdit();
+            refresh();
+        }
+
+        async function saveSuppliers() {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/suppliers`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ suppliers: appState.suppliers })
+                });
+                const d = await res.json();
+                if(d.ok) {
+                    alert("Porto Franco aggiornato con successo!");
+                    refresh();
+                } else alert("Errore: " + d.error);
+            } catch(e) { alert("Errore di connessione."); }
+        }
+
+        function renderQR() {
+            const grid = document.getElementById('qr-grid');
+            grid.innerHTML = appState.reparti.map(r => `
+                <div class="glass-card p-6 flex flex-col items-center gap-4 border hover:shadow-lg transition-all">
+                    <div id="qr-${r}" class="p-2 bg-white rounded-lg"></div>
+                    <div class="text-center">
+                        <b class="text-xs uppercase block">${r}</b>
+                        <button onclick="printQR('${r}')" class="mt-3 text-[9px] font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-all">🖨️ Stampa QR</button>
+                    </div>
+                </div>
+            `).join('');
+            appState.reparti.forEach(r => { 
+                new QRCode(document.getElementById(`qr-${r}`), { 
+                    text: window.location.origin + "?reparto=" + r, 
+                    width: 120, 
+                    height: 120,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                }); 
+            });
+        }
+
+        function printQR(reparto) {
+            const qrDiv = document.getElementById(`qr-${reparto}`);
+            const qrImg = qrDiv.querySelector('img').src;
+            const printWin = window.open('', '', 'width=600,height=600');
+            printWin.document.write(`
+                <html>
+                    <head>
+                        <title>Stampa QR - ${reparto}</title>
+                        <style>
+                            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                            .container { border: 2px solid #000; padding: 40px; border-radius: 20px; text-align: center; }
+                            img { width: 300px; height: 300px; }
+                            h1 { font-size: 40px; margin-top: 20px; text-transform: uppercase; }
+                            p { font-size: 18px; color: #666; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <p>SEA SIGNORA MILANO</p>
+                            <img src="${qrImg}">
+                            <h1>REPARTO ${reparto}</h1>
+                            <p>Scansiona per inviare un ordine</p>
+                        </div>
+                        <script>
+                            window.onload = () => { window.print(); window.close(); };
+                        <\/script>
+                    </body>
+                </html>
+            `);
+            printWin.document.close();
+        }
+
+        function initCharts() {
+            if(charts.pie) charts.pie.destroy();
+            const ctx = document.getElementById('chartPie').getContext('2d');
+            const period = document.getElementById('trend-period').value;
+            
+            // Filtra archivio per periodo
+            const now = new Date();
+            const filteredArchive = appState.archive.filter(a => {
+                const orderDate = new Date(a.date.split('/').reverse().join('-')); // Gestisce formato DD/MM/YYYY
+                const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+                return diffDays <= parseInt(period);
+            });
+
+            const deptTotals = appState.reparti.map(r => {
+                return filteredArchive
+                    .filter(a => a.dept === r)
+                    .reduce((s,a) => s + (a.total || 0), 0);
+            });
+            
+            const colors = ['#09121e', appState.settings.color || '#c5a059', '#1e3a5f', '#cbd5e1', '#94a3b8'];
+
+            charts.pie = new Chart(ctx, { 
+                type: 'doughnut', 
+                data: { 
+                    labels: appState.reparti, 
+                    datasets: [{ 
+                        data: deptTotals.some(v=>v>0) ? deptTotals : [1,1,1,1], 
+                        backgroundColor: colors,
+                        borderWidth: 0,
+                        hoverOffset: 20
+                    }] 
+                }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '75%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' }, padding: 20, usePointStyle: true } }
+                    }
+                } 
+            });
+            
+            updateGaussianTrend();
+        }
+
+        function updateGaussianTrend() {
+            const cat = document.getElementById('trend-filter-cat').value;
+            const prodId = document.getElementById('trend-filter-prod').value;
+            const period = document.getElementById('trend-period').value;
+            const ctx = document.getElementById('chartGaussian').getContext('2d');
+            
+            if(charts.gaussian) charts.gaussian.destroy();
+            
+            let labels = [];
+            let data = [];
+            const now = new Date();
+
+            if(period == "7") {
+                labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+                data = new Array(7).fill(0);
+            } else if(period == "30") {
+                labels = ['Sett 1', 'Sett 2', 'Sett 3', 'Sett 4'];
+                data = new Array(4).fill(0);
+            } else {
+                labels = ['Mese 1', 'Mese 2', 'Mese 3'];
+                data = new Array(3).fill(0);
+            }
+            
+            // Se ci sono dati reali nell'archivio, usali
+            const filtered = appState.archive.filter(a => {
+                const matchCat = !cat || (a.items || []).some(i => i.cat === cat);
+                const matchProd = !prodId || (a.items || []).some(i => i.productId == prodId);
+                const orderDate = new Date(a.date.split('/').reverse().join('-'));
+                const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+                return matchCat && matchProd && diffDays <= parseInt(period);
+            });
+
+            if(filtered.length > 0) {
+                if(period == "7") {
+                    filtered.forEach(a => {
+                        const d = new Date(a.date.split('/').reverse().join('-')).getDay();
+                        data[d === 0 ? 6 : d-1] += a.total;
+                    });
+                } else if(period == "30") {
+                    filtered.forEach(a => {
+                        const diff = Math.floor((now - new Date(a.date.split('/').reverse().join('-'))) / (1000*60*60*24*7));
+                        if(diff < 4) data[3-diff] += a.total;
+                    });
+                } else {
+                    filtered.forEach(a => {
+                        const m = new Date(a.date.split('/').reverse().join('-')).getMonth();
+                        const diff = (now.getMonth() - m + 12) % 12;
+                        if(diff < 3) data[2-diff] += a.total;
+                    });
+                }
+            } else {
+                // Demo data se archivio vuoto
+                if(period == "7") data = labels.map(() => Math.floor(Math.random() * 50) + 10);
+                else if(period == "30") data = labels.map(() => Math.floor(Math.random() * 200) + 50);
+                else data = labels.map(() => Math.floor(Math.random() * 800) + 200);
+            }
+
+            charts.gaussian = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Spesa (€)',
+                        data: data,
+                        borderColor: appState.settings.color || '#c5a059',
+                        backgroundColor: (appState.settings.color || '#c5a059') + '33',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: appState.settings.color || '#c5a059'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `Totale: €${ctx.raw.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 } } },
+                        x: { grid: { display: false }, ticks: { font: { size: 9, weight: 'bold' } } }
+                    }
+                }
+            });
+            
+            renderTrends();
+        }
+
+        function populateSupplierSelect() {
+            const s = document.getElementById('update-supplier-select');
+            const current = s.value;
+            s.innerHTML = '<option value="">Seleziona Fornitore...</option>' + appState.suppliers.map(x => `<option value="${x.name}">${x.name}</option>`).join('');
+            s.value = current;
+        }
+
+        function renderPriceUpdateTable() {
+            const sup = document.getElementById('update-supplier-select').value;
+            const body = document.getElementById('update-table-body');
+            if(!sup) { body.innerHTML = ''; return; }
+            body.innerHTML = appState.products.filter(p => p.prices[sup]).map(p => {
+                const oldPrice = p.prices[sup];
+                return `
+                    <tr>
+                        <td class="py-3 font-bold">${p.name}</td>
+                        <td class="text-center text-slate-400">€ ${oldPrice.toFixed(2)}</td>
+                        <td>
+                            <input type="number" step="0.01" value="${oldPrice}" 
+                                onchange="updatePrice(${p.id}, '${sup}', this.value, ${oldPrice})" 
+                                class="w-20 p-2 border rounded-lg text-xs font-bold text-center focus:ring-2 focus:ring-amber-400 outline-none">
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+
+        function updatePrice(id, supplier, newVal, oldVal) {
+            const val = parseFloat(newVal);
+            if(isNaN(val)) return;
+            const product = appState.products.find(x => x.id == id);
+            product.prices[supplier] = val;
+            
+            if(val > oldVal * 1.05) { // Aumento > 5%
+                alert(`⚠️ Attenzione: Aumento prezzo rilevato per ${product.name} (+${(((val/oldVal)-1)*100).toFixed(1)}%)`);
+            }
+        }
+        function savePrices() { push(); alert("Listino aggiornato!"); }
+
+        async function sendOrder() {
+            loadDeptCart();
+            const manual = document.getElementById('order-text').value;
+            const nome = document.getElementById('staff-nome').value;
+            const cognome = document.getElementById('staff-cognome').value;
+            
+            const cartLines = (deptCartState.items || []).map(it => `${formatQty(it.qty)} ${it.um || 'pz'} ${it.name}`);
+            const text = [
+                cartLines.join('\n'),
+                (manual || '').trim() ? `NOTE:\n${manual.trim()}` : ''
+            ].filter(Boolean).join('\n\n');
+
+            if(!text || !nome || !cognome) return alert("Compila tutti i campi (Nome, Cognome e Ordine)!");
+            
+            const staff = `${nome} ${cognome}`;
+            const dept = document.getElementById('dept-display').innerText;
+            const btn = document.getElementById('btn-send');
+            
+            btn.innerText = "Invio in corso..."; btn.disabled = true;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/order`, {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ dept, staff, text })
+                });
+                const d = await res.json();
+                if(d.ok) {
+                    alert("Ordine inviato con successo! L'amministratore riceverà una mail di notifica.");
+                    document.getElementById('order-text').value = "";
+                    deptCartState.items = [];
+                    saveDeptCart();
+                    renderDeptCart();
+                } else {
+                    alert("Errore nell'invio: " + d.error);
+                }
+            } catch(e) {
+                alert("Errore di rete.");
+            }
+            btn.innerText = "🚀 Invia Ordine"; btn.disabled = false;
+        }
+
+        async function resetDatabase() {
+            if(!confirm("ATTENZIONE: Questa azione è irreversibile. Resettare il database ai valori iniziali?")) return;
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "Reset in corso..."; btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/reset-db`, { method: 'POST' });
+                const d = await res.json();
+                if(d.ok) {
+                    alert("Database resettato con successo. Ricarico l'app...");
+                    window.location.reload();
+                } else {
+                    alert("Errore nel reset: " + (d.error || "Errore sconosciuto"));
+                }
+            } catch(e) {
+                alert("Errore di connessione al server durante il reset.");
+            } finally {
+                btn.innerText = oldText; btn.disabled = false;
+            }
+        }
+
+        async function processImport() {
+            const area = document.getElementById('import-area');
+            const text = area.value.trim();
+            if(!text) return alert("Incolla dei dati prima di elaborare!");
+
+            const lines = text.split('\n');
+            const newProducts = [];
+            const suppliersSet = new Set();
+
+            lines.forEach(line => {
+                // Nome;Categoria;Sub;UM;Prezzo;Fornitore
+                const parts = line.split(';').map(s => s.trim());
+                if(parts.length < 3) return; // Salta se troppo corta
+
+                const [name, cat, sub, um, priceStr, supplier] = parts;
+                if(!name || !priceStr || !supplier) return;
+
+                const price = parseFloat(priceStr.replace(',', '.'));
+                if(isNaN(price)) return;
+
+                let p = newProducts.find(x => x.name.toLowerCase() === name.toLowerCase());
+                if(!p) {
+                    p = {
+                        id: Date.now() + Math.floor(Math.random() * 1000),
+                        name: name,
+                        cat: cat || 'Vario',
+                        sub: sub || '',
+                        um: um || 'pz',
+                        prices: {}
+                    };
+                    newProducts.push(p);
+                }
+                p.prices[supplier] = price;
+                suppliersSet.add(supplier);
+            });
+
+            if(newProducts.length === 0) return alert("Nessun dato valido trovato. Assicurati di usare il formato: Nome;Categoria;Sub;UM;Prezzo;Fornitore");
+
+            // Aggiorna appState preservando impostazioni esistenti
+            appState.products = newProducts;
+            
+            // Aggiorna fornitori (preserva porto franco se esistente)
+            const currentSuppliersMin = new Map(appState.suppliers.map(s => [s.name, s.min]));
+            appState.suppliers = Array.from(suppliersSet).map(s => ({
+                name: s,
+                min: currentSuppliersMin.get(s) || 200,
+                current: 0
+            }));
+
+            await push();
+            refresh();
+            alert(`Importazione completata con successo!\n- Prodotti: ${newProducts.length}\n- Fornitori: ${suppliersSet.size}`);
+            area.value = "";
+        }
+
+        async function checkDiagnostics() {
+            try {
+                const res = await fetch(`${API_BASE}/api/diag`);
+                const d = await res.json();
+                alert(`DIAGNOSTICA:\nDB: ${d.db}\nENGINE: ${d.engine}`);
+            } catch(e) {
+                alert("Errore nel recupero diagnostica.");
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', sync);
     </script>
 </body>
 </html>
