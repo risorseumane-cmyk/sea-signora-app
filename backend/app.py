@@ -47,6 +47,14 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, state TEXT)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_state_versions ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts INTEGER NOT NULL, "
+            "note TEXT, "
+            "state TEXT NOT NULL"
+            ")"
+        )
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM app_state")
         count = cur.fetchone()[0]
@@ -82,6 +90,10 @@ def init_db():
                 "archive": []
             }
             conn.execute("INSERT INTO app_state (id, state) VALUES (1, ?)", (json.dumps(default_state),))
+            conn.execute(
+                "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+                (int(datetime.now().timestamp()), "seed", json.dumps(default_state)),
+            )
             conn.commit()
         else:
             row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
@@ -121,6 +133,10 @@ def init_db():
 
             state["settings"] = settings
             conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+            conn.execute(
+                "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+                (int(datetime.now().timestamp()), "migrate", json.dumps(state)),
+            )
             conn.commit()
 
 init_db()
@@ -375,7 +391,19 @@ def post_state():
                 if isinstance(ex_s, list) and isinstance(in_s, list) and len(ex_s) > 0 and len(in_s) == 0:
                     return jsonify({"ok": False, "error": "Refused save: incoming suppliers empty. Use force=true if intended."}), 409
 
+            if existing_row:
+                conn.execute(
+                    "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+                    (int(datetime.now().timestamp()), "pre_save", json.dumps(existing)),
+                )
             conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(incoming),))
+            conn.execute(
+                "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+                (int(datetime.now().timestamp()), "save", json.dumps(incoming)),
+            )
+            conn.execute(
+                "DELETE FROM app_state_versions WHERE id NOT IN (SELECT id FROM app_state_versions ORDER BY id DESC LIMIT 300)"
+            )
             conn.commit()
         return jsonify({"ok": True})
     except Exception as e:
@@ -449,6 +477,7 @@ def diagnostics():
         "db": "unknown",
         "db_path": str(DB_PATH),
         "db_exists": DB_PATH.exists(),
+        "db_persistent_hint": str(DB_PATH).startswith("/data/") or str(DB_PATH).startswith("/data\\"),
         "engine": "Local Smart Matcher (OK)",
         "email": {
             "smtp_host": SMTP_HOST,
@@ -468,6 +497,49 @@ def diagnostics():
     except Exception as e:
         diag["db"] = f"Error: {str(e)}"
     return jsonify(diag)
+
+@app.get("/api/admin/versions")
+def list_versions():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, ts, note FROM app_state_versions ORDER BY id DESC LIMIT 50"
+        ).fetchall()
+        return jsonify(
+            {
+                "ok": True,
+                "versions": [
+                    {"id": r["id"], "ts": r["ts"], "note": r["note"]} for r in rows
+                ],
+            }
+        )
+
+@app.post("/api/admin/restore-version")
+def restore_version():
+    data = request.get_json(silent=True) or {}
+    vid = data.get("id")
+    if not isinstance(vid, int):
+        return jsonify({"ok": False, "error": "Missing version id"}), 400
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT state FROM app_state_versions WHERE id = ?", (vid,)
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Version not found"}), 404
+        state = json.loads(row["state"])
+        existing_row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
+        if existing_row:
+            existing = json.loads(existing_row["state"])
+            conn.execute(
+                "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+                (int(datetime.now().timestamp()), f"pre_restore_{vid}", json.dumps(existing)),
+            )
+        conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+        conn.execute(
+            "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+            (int(datetime.now().timestamp()), f"restore_{vid}", json.dumps(state)),
+        )
+        conn.commit()
+    return jsonify({"ok": True})
 
 @app.post("/api/admin/test-email")
 def test_email():

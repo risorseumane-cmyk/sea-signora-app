@@ -73,6 +73,7 @@
                 <div class="flex items-center gap-4">
                     <h2 id="page-title-ui" class="text-2xl font-black uppercase tracking-tighter">Corporate Portal</h2>
                     <div id="save-status" class="hidden text-[8px] font-black uppercase bg-emerald-500 text-white px-2 py-1 rounded-full animate-pulse">Sincronizzazione...</div>
+                    <div id="storage-status" class="hidden text-[8px] font-black uppercase bg-rose-500 text-white px-2 py-1 rounded-full">Storage non persistente</div>
                 </div>
                 <select id="role-selector" onchange="handleRoleChange()" class="p-2 border rounded-xl text-[10px] font-black uppercase outline-none">
                     <option value="admin">Amministratore</option>
@@ -481,6 +482,7 @@
         let approvalContext = null;
         let homeAssistantInitialized = false;
         let homeSearchState = { query: "", cat: "", productId: null };
+        let hasSyncedOnce = false;
 
         const API_BASE = window.location.origin.startsWith('file://') ? 'http://localhost:8080' : '';
         let isPushing = false;
@@ -497,6 +499,7 @@
                         ...d.state,
                         settings: { ...appState.settings, ...d.state.settings }
                     };
+                    hasSyncedOnce = true;
                     hydrateSettingsInputs();
                     applyUI(false); 
                     refresh();
@@ -512,6 +515,10 @@
         }
 
         async function push() {
+            if(!hasSyncedOnce) {
+                await sync();
+                return;
+            }
             isPushing = true;
             const status = document.getElementById('save-status');
             if(status) {
@@ -526,6 +533,14 @@
                     headers: {'Content-Type':'application/json'}, 
                     body: JSON.stringify({state: appState}) 
                 });
+                if(res.status === 409) {
+                    if(status) {
+                        status.innerText = "DATI SERVER PROTETTI";
+                        status.classList.replace('bg-emerald-500', 'bg-rose-500');
+                    }
+                    await sync();
+                    return;
+                }
                 if(!res.ok) throw new Error("Salvataggio fallito.");
                 console.log("State pushed successfully.");
                 if(status) {
@@ -934,6 +949,15 @@
                 } else {
                     sync();
                 }
+                fetch(`${API_BASE}/api/diag`)
+                    .then(r => r.json())
+                    .then(d => {
+                        const storage = document.getElementById('storage-status');
+                        if(storage && d && d.db_persistent_hint === false) {
+                            storage.classList.remove('hidden');
+                        }
+                    })
+                    .catch(() => {});
             }
             
             setInterval(sync, 10000); 
