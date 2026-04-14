@@ -61,7 +61,7 @@
                 <button onclick="switchView('home')" class="tab-btn active p-3 text-sm font-bold flex items-center gap-3">🏠 Home</button>
                 <button onclick="switchView('dashboard')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">📊 KPI Logistica</button>
                 <button onclick="switchView('reports')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">📈 Analytics & Heatmap</button>
-                <button onclick="switchView('price-update')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">🧾 Aggiorna Fatture</button>
+                <button onclick="switchView('price-update')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">🧾 Fatture & Storico</button>
                 <button onclick="switchView('inbox')" class="tab-btn p-3 text-sm font-bold flex items-center justify-between">📬 Inbox <span id="inbox-badge" class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full hidden">0</span></button>
                 <button onclick="switchView('catalog')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">📦 Catalogo Master</button>
                 <button onclick="switchView('config')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3 border-t mt-4">⚙️ Impostazioni</button>
@@ -205,7 +205,20 @@
                     <div id="heatmap-wrap" class="overflow-x-auto min-h-[400px]"></div>
                 </div>
 
-                <div class="glass-card p-8 mt-8">
+            </div>
+
+            <div id="view-inbox" class="view-section"><div id="inbox-list" class="max-w-4xl mx-auto space-y-6"></div></div>
+
+            <div id="view-price-update" class="view-section">
+                <div class="glass-card p-10 mb-8">
+                    <h3 class="text-xl font-black uppercase mb-6">Fatture & Storico</h3>
+                    <div class="text-[10px] font-black uppercase text-slate-400 mb-6">Aggiorna prezzi da fattura</div>
+                    <select id="update-supplier-select" onchange="renderPriceUpdateTable()" class="p-3 bg-slate-50 border rounded-xl text-xs font-bold w-64 mb-8 outline-none"></select>
+                    <table class="w-full text-left text-sm"><tbody id="update-table-body" class="divide-y"></tbody></table>
+                    <div class="mt-8 flex justify-end"><button onclick="savePrices()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Modifiche</button></div>
+                </div>
+
+                <div class="glass-card p-10">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <h4 class="font-black uppercase text-xs text-slate-400">Storico Ordini (per Reparto / Mese)</h4>
                         <div class="flex flex-wrap gap-2">
@@ -254,17 +267,6 @@
                             </table>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div id="view-inbox" class="view-section"><div id="inbox-list" class="max-w-4xl mx-auto space-y-6"></div></div>
-
-            <div id="view-price-update" class="view-section">
-                <div class="glass-card p-10">
-                    <h3 class="text-xl font-black uppercase mb-6">Aggiorna Prezzi da Fattura</h3>
-                    <select id="update-supplier-select" onchange="renderPriceUpdateTable()" class="p-3 bg-slate-50 border rounded-xl text-xs font-bold w-64 mb-8 outline-none"></select>
-                    <table class="w-full text-left text-sm"><tbody id="update-table-body" class="divide-y"></tbody></table>
-                    <div class="mt-8 flex justify-end"><button onclick="savePrices()" class="brand-gradient text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Modifiche</button></div>
                 </div>
             </div>
 
