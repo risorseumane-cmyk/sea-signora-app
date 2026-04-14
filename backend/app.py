@@ -2,10 +2,10 @@ import json
 import os
 import sqlite3
 import smtplib
-import urllib.error
 import urllib.parse
 import urllib.request
 import difflib
+import re
 from datetime import datetime
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -23,7 +23,7 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "noreply@seasignorarest.com")
+SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER or "noreply@seasignorarest.com")
 SMTP_TO = os.getenv("SMTP_TO", "amministrazione@seasignorarest.com")
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "")
 
@@ -127,26 +127,116 @@ def send_email_alert(dept, staff, text):
         try:
             msg = MIMEText(body)
             msg['Subject'] = subject
-            msg['From'] = SMTP_FROM
+            msg['From'] = SMTP_FROM or SMTP_USER
             msg['To'] = SMTP_TO
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+                server.ehlo()
                 server.starttls()
+                server.ehlo()
                 server.login(SMTP_USER, SMTP_PASS)
                 server.send_message(msg)
-            return True
+            return {"sent": True, "channel": "smtp", "to": SMTP_TO, "error": None}
         except Exception as e:
-            print(f"SMTP Error: {e}")
+            err = str(e)
+            print(f"SMTP Error: {err}")
+            smtp_error = err
+    else:
+        smtp_error = "SMTP credentials missing"
             
     # Formspree Fallback
     if FORMSPREE_ENDPOINT:
         try:
             data = urllib.parse.urlencode({"_subject": subject, "message": body}).encode()
             urllib.request.urlopen(FORMSPREE_ENDPOINT, data=data, timeout=5)
-            return True
+            return {"sent": True, "channel": "formspree", "to": SMTP_TO, "error": None}
         except Exception as e:
-            print(f"Formspree Error: {e}")
+            err = str(e)
+            print(f"Formspree Error: {err}")
+            return {"sent": False, "channel": "formspree", "to": SMTP_TO, "error": err}
             
-    return False
+    return {"sent": False, "channel": "smtp", "to": SMTP_TO, "error": smtp_error}
+
+def normalize_unit(unit: str | None) -> str | None:
+    if not unit:
+        return None
+    u = unit.strip().lower()
+    aliases = {
+        "g": "g",
+        "gr": "g",
+        "grammo": "g",
+        "grammi": "g",
+        "hg": "hg",
+        "etto": "hg",
+        "kg": "kg",
+        "kilo": "kg",
+        "l": "l",
+        "lt": "l",
+        "litro": "l",
+        "litri": "l",
+        "ml": "ml",
+        "cl": "cl",
+        "pz": "pz",
+        "pezzo": "pz",
+        "pezzi": "pz",
+    }
+    return aliases.get(u, u)
+
+def convert_qty(qty: float, unit_in: str | None, unit_target: str | None) -> float:
+    u_in = normalize_unit(unit_in)
+    u_t = normalize_unit(unit_target)
+    if not u_in or not u_t or u_in == u_t:
+        return qty
+
+    # Weight
+    if u_in in {"g", "hg", "kg"} and u_t in {"g", "hg", "kg"}:
+        # Convert to grams
+        grams = qty
+        if u_in == "kg":
+            grams = qty * 1000
+        elif u_in == "hg":
+            grams = qty * 100
+        # Convert grams to target
+        if u_t == "g":
+            return grams
+        if u_t == "hg":
+            return grams / 100
+        if u_t == "kg":
+            return grams / 1000
+
+    # Volume
+    if u_in in {"ml", "cl", "l"} and u_t in {"ml", "cl", "l"}:
+        ml = qty
+        if u_in == "l":
+            ml = qty * 1000
+        elif u_in == "cl":
+            ml = qty * 10
+        if u_t == "ml":
+            return ml
+        if u_t == "cl":
+            return ml / 10
+        if u_t == "l":
+            return ml / 1000
+
+    return qty
+
+def extract_qty_and_unit(raw_line: str) -> tuple[float, str | None, str]:
+    line = raw_line.strip().lower()
+    # Pattern handles "500g", "500 g", "0,5kg", "2pz"
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grammi|grammo|hg|etto|l|lt|litri|litro|ml|cl|pz|pezzi|pezzo)\b", line)
+    if m:
+        qty = float(m.group(1).replace(",", "."))
+        unit = normalize_unit(m.group(2))
+        cleaned = (line[:m.start()] + " " + line[m.end():]).strip()
+        return qty, unit, cleaned
+
+    # Fallback: take first number only
+    m2 = re.search(r"(\d+(?:[.,]\d+)?)", line)
+    if m2:
+        qty = float(m2.group(1).replace(",", "."))
+        cleaned = (line[:m2.start()] + " " + line[m2.end():]).strip()
+        return qty, None, cleaned
+
+    return 1.0, None, line
 
 def local_smart_parse(text, products):
     """Motore di parsing locale 'Smart Matcher' (senza chiavi API)."""
@@ -155,49 +245,37 @@ def local_smart_parse(text, products):
     product_names = [p['name'] for p in products]
     
     # Parole comuni da ignorare nel match del nome
-    stop_words = {'di', 'da', 'il', 'la', 'un', 'una', 'con', 'per', 'kg', 'casse', 'cassa', 'pz', 'pezzi', 'lt', 'litri'}
+    stop_words = {'di', 'da', 'il', 'la', 'un', 'una', 'con', 'per', 'kg', 'g', 'gr', 'grammi', 'hg', 'etto', 'l', 'lt', 'litri', 'ml', 'cl', 'casse', 'cassa', 'pz', 'pezzi', 'pezzo'}
 
     for line in lines:
-        line = line.strip().lower()
-        if not line: continue
-        
-        # Estrazione Quantità avanzata
-        qty = 1.0
-        words = line.split()
-        
-        # Cerca il primo numero nella riga
-        for i, word in enumerate(words):
-            clean_word = word.replace(',', '.', 1)
-            # Gestisce formati come "5kg" o "10pz"
-            num_part = ""
-            for char in clean_word:
-                if char.isdigit() or char == '.':
-                    num_part += char
-                else:
-                    break
-            
-            if num_part and num_part.replace('.', '', 1).isdigit():
-                qty = float(num_part)
-                # Rimuovi la parola che conteneva il numero per non sporcare il match del nome
-                words.pop(i)
-                break
-        
-        # Pulisci la riga dai termini di unità di misura rimasti
+        raw = line.strip()
+        if not raw:
+            continue
+
+        qty_in, unit_in, cleaned = extract_qty_and_unit(raw)
+        words = cleaned.split()
+
         clean_words = [w for w in words if w not in stop_words]
-        clean_line = " ".join(clean_words)
+        clean_line = " ".join(clean_words).strip()
         
-        if not clean_line: continue
+        if not clean_line:
+            continue
 
         # Match fuzzy sul nome prodotto
         matches = difflib.get_close_matches(clean_line, [n.lower() for n in product_names], n=1, cutoff=0.25)
         if matches:
             match_name = matches[0]
             p_orig = next(p for p in products if p['name'].lower() == match_name)
+            target_um = normalize_unit(p_orig.get("um"))
+            qty = convert_qty(qty_in, unit_in, target_um)
             items.append({
                 "productId": p_orig['id'],
                 "name": p_orig['name'],
                 "qty": qty,
-                "cat": p_orig['cat']
+                "um": target_um or p_orig.get("um") or "pz",
+                "inputQty": qty_in,
+                "inputUm": unit_in,
+                "cat": p_orig.get('cat', '')
             })
     return {"items": items}
 
@@ -253,9 +331,9 @@ def create_order():
             conn.commit()
             
         # Notifica via mail (non blocca la risposta se fallisce o è lenta)
-        sent = send_email_alert(dept, staff, text)
+        email = send_email_alert(dept, staff, text)
         
-        return jsonify({"ok": True, "notified": sent})
+        return jsonify({"ok": True, "notified": bool(email.get("sent")), "email": email})
     except Exception as e:
         print(f"Order error: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -287,7 +365,19 @@ def ai_help():
 
 @app.get("/api/diag")
 def diagnostics():
-    diag = {"db": "unknown", "engine": "Local Smart Matcher (OK)"}
+    diag = {
+        "db": "unknown",
+        "engine": "Local Smart Matcher (OK)",
+        "email": {
+            "smtp_host": SMTP_HOST,
+            "smtp_port": SMTP_PORT,
+            "smtp_user_present": bool(SMTP_USER),
+            "smtp_pass_present": bool(SMTP_PASS),
+            "smtp_from": SMTP_FROM,
+            "smtp_to": SMTP_TO,
+            "formspree_present": bool(FORMSPREE_ENDPOINT),
+        },
+    }
     try:
         with get_conn() as conn:
             cur = conn.cursor()
@@ -296,6 +386,20 @@ def diagnostics():
     except Exception as e:
         diag["db"] = f"Error: {str(e)}"
     return jsonify(diag)
+
+@app.post("/api/admin/test-email")
+def test_email():
+    data = request.get_json(silent=True) or {}
+    to_override = data.get("to")
+    global SMTP_TO
+    original_to = SMTP_TO
+    if isinstance(to_override, str) and "@" in to_override:
+        SMTP_TO = to_override.strip()
+    try:
+        result = send_email_alert("TEST", "Irina", "Questo è un test di invio email alert.")
+        return jsonify({"ok": True, "result": result})
+    finally:
+        SMTP_TO = original_to
 
 @app.post("/api/admin/reset-db")
 def reset_db():

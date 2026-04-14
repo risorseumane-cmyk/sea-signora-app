@@ -790,13 +790,14 @@
                     const bestPrice = priceEntries[0];
                     
                     const currentLine = approvalContext.linesToClarify[0];
-                    let qty = 1;
-                    const match = currentLine.match(/(\d+([.,]\d+)?)/);
-                    if(match) qty = parseFloat(match[1].replace(',', '.'));
+                    const extracted = extractQtyUnit(currentLine);
+                    const targetUm = um || 'pz';
+                    const qty = convertQty(extracted.qty, extracted.unit, targetUm);
 
                     approvalContext.finalItems.push({
                         name: name,
                         qty: qty,
+                        um: targetUm,
                         bestPrice: bestPrice ? bestPrice[1] : 0,
                         supplier: bestPrice ? bestPrice[0] : 'N/D',
                         others: priceEntries.slice(1)
@@ -1157,6 +1158,7 @@
                             approvalContext.finalItems.push({
                                 name: product.name,
                                 qty: item.qty || 1,
+                                um: item.um || product.um || 'pz',
                                 bestPrice: bestPrice[1],
                                 supplier: bestPrice[0],
                                 others: priceEntries.slice(1)
@@ -1221,6 +1223,62 @@
             return matches / Math.max(words1.length, words2.length);
         }
 
+        function normalizeUnit(u) {
+            if(!u) return null;
+            const unit = String(u).trim().toLowerCase();
+            const map = {
+                g: 'g', gr: 'g', grammo: 'g', grammi: 'g',
+                hg: 'hg', etto: 'hg',
+                kg: 'kg', kilo: 'kg',
+                l: 'l', lt: 'l', litro: 'l', litri: 'l',
+                ml: 'ml', cl: 'cl',
+                pz: 'pz', pezzo: 'pz', pezzi: 'pz'
+            };
+            return map[unit] || unit;
+        }
+
+        function convertQty(qty, unitIn, unitTarget) {
+            const uIn = normalizeUnit(unitIn);
+            const uT = normalizeUnit(unitTarget);
+            if(!uIn || !uT || uIn === uT) return qty;
+
+            if(['g','hg','kg'].includes(uIn) && ['g','hg','kg'].includes(uT)) {
+                let grams = qty;
+                if(uIn === 'kg') grams = qty * 1000;
+                if(uIn === 'hg') grams = qty * 100;
+                if(uT === 'g') return grams;
+                if(uT === 'hg') return grams / 100;
+                if(uT === 'kg') return grams / 1000;
+            }
+
+            if(['ml','cl','l'].includes(uIn) && ['ml','cl','l'].includes(uT)) {
+                let ml = qty;
+                if(uIn === 'l') ml = qty * 1000;
+                if(uIn === 'cl') ml = qty * 10;
+                if(uT === 'ml') return ml;
+                if(uT === 'cl') return ml / 10;
+                if(uT === 'l') return ml / 1000;
+            }
+
+            return qty;
+        }
+
+        function extractQtyUnit(line) {
+            const s = String(line || '').toLowerCase();
+            const m = s.match(/(\d+([.,]\d+)?)\s*(kg|g|gr|grammi|grammo|hg|etto|l|lt|litri|litro|ml|cl|pz|pezzi|pezzo)\b/);
+            if(m) return { qty: parseFloat(m[1].replace(',', '.')), unit: normalizeUnit(m[3]) };
+            const m2 = s.match(/(\d+([.,]\d+)?)/);
+            if(m2) return { qty: parseFloat(m2[1].replace(',', '.')), unit: null };
+            return { qty: 1, unit: null };
+        }
+
+        function formatQty(q) {
+            const n = Number(q);
+            if(Number.isNaN(n)) return '1';
+            if(Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+            return n.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+        }
+
         function selectClarifySuggestion(prodId) {
             const product = appState.products.find(p => p.id === prodId);
             if(product) {
@@ -1229,13 +1287,14 @@
                 
                 // Estrai quantità dalla riga se possibile
                 const currentLine = approvalContext.linesToClarify[0];
-                let qty = 1;
-                const match = currentLine.match(/(\d+([.,]\d+)?)/);
-                if(match) qty = parseFloat(match[1].replace(',', '.'));
+                const extracted = extractQtyUnit(currentLine);
+                const targetUm = product.um || 'pz';
+                const qty = convertQty(extracted.qty, extracted.unit, targetUm);
 
                 approvalContext.finalItems.push({
                     name: product.name,
                     qty: qty,
+                    um: targetUm,
                     bestPrice: bestPrice ? bestPrice[1] : 0,
                     supplier: bestPrice ? bestPrice[0] : 'N/D',
                     others: priceEntries.slice(1)
@@ -1279,7 +1338,8 @@
             let total = finalItems.reduce((s, i) => s + (i.bestPrice * i.qty), 0);
             let summary = finalItems.map(p => {
                 let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
-                return `${p.qty}x ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
+                const um = p.um ? ` ${p.um}` : '';
+                return `${formatQty(p.qty)}${um} ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
             }).join('\n');
 
             if(confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`)) {
