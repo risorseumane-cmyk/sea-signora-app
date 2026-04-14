@@ -59,7 +59,7 @@
             </div>
             <nav class="flex flex-col gap-1">
                 <button onclick="switchView('home')" class="tab-btn active p-3 text-sm font-bold flex items-center gap-3">🏠 Home</button>
-                <button onclick="switchView('dashboard')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">📊 KPI Logistica</button>
+                <button onclick="switchView('dashboard')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">📦 Ordini Attivi</button>
                 <button onclick="switchView('reports')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">📈 Analytics & Heatmap</button>
                 <button onclick="switchView('price-update')" class="tab-btn p-3 text-sm font-bold flex items-center gap-3">🧾 Fatture & Storico</button>
                 <button onclick="switchView('inbox')" class="tab-btn p-3 text-sm font-bold flex items-center justify-between">📬 Inbox <span id="inbox-badge" class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full hidden">0</span></button>
@@ -149,19 +149,63 @@
             </div>
 
             <div id="view-dashboard" class="view-section">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div class="glass-card p-8 border-l-8 border-emerald-500">
-                        <span class="text-[10px] font-black uppercase text-slate-400">Saving Totale Stimato</span>
-                        <p class="text-5xl font-black mt-2">€ <span id="kpi-saving">0.00</span></p>
-                    </div>
-                    <div class="glass-card p-8 border-l-8 border-amber-400">
-                        <span class="text-[10px] font-black uppercase text-slate-400">Ordini in Inbox</span>
-                        <p id="kpi-pending" class="text-5xl font-black mt-2">0</p>
-                    </div>
-                </div>
                 <div class="glass-card p-10">
-                    <h3 class="text-sm font-black uppercase mb-8 text-slate-400">📦 Stato Porto Franco Fornitori</h3>
-                    <div id="logistics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                        <h3 class="text-xl font-black uppercase">Ordini Attivi</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="exportActiveOrdersCSV()" class="px-6 py-3 rounded-xl font-black text-[10px] uppercase border" style="border-color: rgba(72,69,61,0.25); color: var(--brand-ink); background: rgba(255,255,255,0.8);">Export Excel (CSV)</button>
+                            <button onclick="printActiveOrdersPDF()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Export PDF</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 mb-6">
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Da (data)</label>
+                            <input id="active-from" type="date" onchange="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">A (data)</label>
+                            <input id="active-to" type="date" onchange="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Fornitore</label>
+                            <select id="active-supplier" onchange="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Categoria</label>
+                            <select id="active-cat" onchange="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Stato Evasione</label>
+                            <select id="active-status" onchange="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                <option value="">Tutti</option>
+                                <option value="DA_ORDINARE">Da ordinare</option>
+                                <option value="ORDINATO">Ordinato</option>
+                                <option value="CONSEGNATO">Consegnato</option>
+                                <option value="CHIUSO">Chiuso</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Ordina</label>
+                            <select id="active-sort" onchange="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                <option value="date_desc">Data (desc)</option>
+                                <option value="date_asc">Data (asc)</option>
+                                <option value="total_desc">Totale (desc)</option>
+                                <option value="total_asc">Totale (asc)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="text-[10px] font-black uppercase text-slate-400">Ricerca</label>
+                        <input id="active-q" type="text" placeholder="Referente, prodotto, fornitore..." oninput="renderActiveOrders(true)" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                    </div>
+
+                    <div id="active-summary" class="text-[10px] font-black uppercase text-slate-400 mb-4"></div>
+                    <div id="active-orders" class="space-y-6"></div>
+                    <div class="flex justify-center mt-8">
+                        <button id="active-more" onclick="renderActiveOrders(false)" class="hidden px-8 py-3 rounded-xl font-black text-[10px] uppercase border" style="border-color: rgba(72,69,61,0.25); color: var(--brand-ink); background: rgba(255,255,255,0.8);">Carica altri</button>
+                    </div>
                 </div>
             </div>
 
@@ -736,7 +780,7 @@
             document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
             document.getElementById(`view-${id}`).classList.add('active');
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.innerText.toLowerCase().includes(id.toLowerCase()));
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => (b.getAttribute('onclick') || '').includes(`switchView('${id}')`));
             if(btn) btn.classList.add('active');
             refresh();
         }
@@ -748,14 +792,14 @@
         }
 
         function refresh() {
-            // KPI principali
-            document.getElementById('kpi-pending').innerText = appState.inbox.length;
-            document.getElementById('inbox-badge').innerText = appState.inbox.length;
-            document.getElementById('inbox-badge').style.display = appState.inbox.length ? 'block' : 'none';
+            const inboxBadge = document.getElementById('inbox-badge');
+            if(inboxBadge) {
+                inboxBadge.innerText = appState.inbox.length;
+                inboxBadge.style.display = appState.inbox.length ? 'block' : 'none';
+            }
             
             const totalSpent = appState.archive.reduce((s,a) => s + (a.total || 0), 0);
-            const saving = totalSpent * 0.12; // Stimato 12% saving ottimizzando fornitori
-            document.getElementById('kpi-saving').innerText = saving.toFixed(2);
+            const saving = totalSpent * 0.12;
             
             // UI Brand Settings
             if(appState.settings.brandName) document.getElementById('ui-brand-name').innerText = appState.settings.brandName;
@@ -784,27 +828,7 @@
                 `;
             }
             renderHomeAssistant();
-
-            // Griglia Logistica
-            const lg = document.getElementById('logistics-grid');
-            lg.innerHTML = appState.suppliers.map(s => {
-                const cur = s.current || 0;
-                const pct = Math.min((cur/s.min)*100, 100);
-                const color = pct >= 100 ? 'bg-emerald-500' : (pct > 70 ? 'bg-amber-400' : 'bg-rose-400');
-                return `
-                    <div class="p-6 border rounded-3xl bg-white shadow-sm hover:shadow-md transition-all">
-                        <div class="flex justify-between mb-3">
-                            <b class="text-xs uppercase tracking-wider">${s.name}</b>
-                            <span class="text-xs font-black">€ ${cur.toFixed(2)} / €${s.min}</span>
-                        </div>
-                        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full ${color}" style="width:${pct}%"></div>
-                        </div>
-                        <p class="text-[9px] mt-2 font-bold text-slate-400 uppercase">
-                            ${pct >= 100 ? '✅ Porto Franco raggiunto' : `Mancano €${(s.min - cur).toFixed(2)}`}
-                        </p>
-                    </div>`;
-            }).join('');
+            renderActiveOrders(true);
 
             renderCatalog();
             renderHeatmap();
@@ -1788,6 +1812,327 @@
             w.addEventListener('load', () => w.print());
         }
 
+        let activeOrdersRender = { filtered: [], rendered: 0, pageSize: 50 };
+
+        function getOrderKey(o) {
+            return String(o?.orderId ?? o?.id ?? o?.ts ?? o?.__ts ?? '');
+        }
+
+        function getOrderTs(o) {
+            return o?.__ts || parseOrderTimestamp(o);
+        }
+
+        function getOrderFulfillment(o) {
+            return o?.fulfillmentStatus || 'DA_ORDINARE';
+        }
+
+        function getProductIndex() {
+            const byId = new Map();
+            const byName = new Map();
+            (appState.products || []).forEach(p => {
+                if(p && p.id != null) byId.set(String(p.id), p);
+                if(p && p.name) byName.set(String(p.name).toLowerCase(), p);
+            });
+            return { byId, byName };
+        }
+
+        function getItemCategory(item, productIndex) {
+            const p = item?.productId != null ? productIndex.byId.get(String(item.productId)) : null;
+            if(p?.cat) return p.cat;
+            const p2 = item?.name ? productIndex.byName.get(String(item.name).toLowerCase()) : null;
+            return p2?.cat || '';
+        }
+
+        function populateActiveOrdersFilters() {
+            const supSel = document.getElementById('active-supplier');
+            const catSel = document.getElementById('active-cat');
+            if(supSel) {
+                const current = supSel.value;
+                const sups = (appState.suppliers || []).map(s => s.name).filter(Boolean).sort();
+                supSel.innerHTML = `<option value="">Tutti</option>` + sups.map(s => `<option value="${s}">${s}</option>`).join('');
+                supSel.value = current;
+            }
+            if(catSel) {
+                const current = catSel.value;
+                const cats = [...new Set((appState.products || []).map(p => p.cat).filter(Boolean))].sort();
+                catSel.innerHTML = `<option value="">Tutte</option>` + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+                catSel.value = current;
+            }
+        }
+
+        function getFilteredActiveOrders() {
+            const from = document.getElementById('active-from')?.value || '';
+            const to = document.getElementById('active-to')?.value || '';
+            const supplier = document.getElementById('active-supplier')?.value || '';
+            const cat = document.getElementById('active-cat')?.value || '';
+            const status = document.getElementById('active-status')?.value || '';
+            const q = (document.getElementById('active-q')?.value || '').trim().toLowerCase();
+
+            const fromTs = from ? new Date(from + 'T00:00:00').getTime() : null;
+            const toTs = to ? new Date(to + 'T23:59:59').getTime() : null;
+            const productIndex = getProductIndex();
+
+            return (appState.archive || [])
+                .map(o => ({ ...o, __ts: getOrderTs(o), __key: getOrderKey(o), __ful: getOrderFulfillment(o) }))
+                .filter(o => (o.status || 'INVIATO') === 'INVIATO')
+                .filter(o => fromTs === null || o.__ts >= fromTs)
+                .filter(o => toTs === null || o.__ts <= toTs)
+                .filter(o => !status || o.__ful === status)
+                .filter(o => {
+                    if(!supplier) return true;
+                    const items = Array.isArray(o.items) ? o.items : [];
+                    return items.some(it => (it.supplier || '') === supplier);
+                })
+                .filter(o => {
+                    if(!cat) return true;
+                    const items = Array.isArray(o.items) ? o.items : [];
+                    return items.some(it => getItemCategory(it, productIndex) === cat);
+                })
+                .filter(o => {
+                    if(!q) return true;
+                    if(String(o.dept || '').toLowerCase().includes(q)) return true;
+                    if(String(o.staff || '').toLowerCase().includes(q)) return true;
+                    const items = Array.isArray(o.items) ? o.items : [];
+                    return items.some(it =>
+                        String(it.name || '').toLowerCase().includes(q) ||
+                        String(it.supplier || '').toLowerCase().includes(q)
+                    );
+                });
+        }
+
+        function sortActiveOrders(list) {
+            const sort = document.getElementById('active-sort')?.value || 'date_desc';
+            const arr = list.slice();
+            if(sort === 'date_asc') arr.sort((a,b) => a.__ts - b.__ts);
+            else if(sort === 'total_desc') arr.sort((a,b) => (b.total||0) - (a.total||0));
+            else if(sort === 'total_asc') arr.sort((a,b) => (a.total||0) - (b.total||0));
+            else arr.sort((a,b) => b.__ts - a.__ts);
+            return arr;
+        }
+
+        function renderActiveOrders(reset) {
+            const wrap = document.getElementById('active-orders');
+            const summary = document.getElementById('active-summary');
+            const more = document.getElementById('active-more');
+            const view = document.getElementById('view-dashboard');
+            if(!wrap || !view || !view.classList.contains('active')) return;
+
+            populateActiveOrdersFilters();
+
+            if(reset) {
+                const filtered = sortActiveOrders(getFilteredActiveOrders());
+                activeOrdersRender.filtered = filtered;
+                activeOrdersRender.rendered = 0;
+                wrap.innerHTML = '';
+            }
+
+            const list = activeOrdersRender.filtered || [];
+            const next = list.slice(activeOrdersRender.rendered, activeOrdersRender.rendered + activeOrdersRender.pageSize);
+            activeOrdersRender.rendered += next.length;
+
+            if(summary) summary.innerText = `Ordini: ${list.length} • Mostrati: ${Math.min(activeOrdersRender.rendered, list.length)}`;
+
+            const productIndex = getProductIndex();
+            const weights = getAiWeights();
+            const memo = new Map();
+            const getRecommended = (product) => {
+                const key = `${weights.price}/${weights.porto}/${product?.id}`;
+                if(memo.has(key)) return memo.get(key);
+                const choice = chooseSupplierForProduct(product);
+                memo.set(key, choice?.best || null);
+                return memo.get(key);
+            };
+
+            const html = next.map(o => {
+                const dt = new Date(o.__ts).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                const dept = o.dept || '—';
+                const staff = o.staff || '—';
+                const ful = o.__ful || 'DA_ORDINARE';
+                const oid = o.__key;
+                const items = Array.isArray(o.items) ? o.items : [];
+
+                const rows = items.map(it => {
+                    const p = it?.productId != null ? productIndex.byId.get(String(it.productId)) : (it?.name ? productIndex.byName.get(String(it.name).toLowerCase()) : null);
+                    const cat = getItemCategory(it, productIndex) || '—';
+                    const rec = p ? getRecommended(p) : null;
+                    const recName = rec?.name || (it.supplier || 'N/D');
+                    const recPrice = typeof rec?.price === 'number' ? rec.price : (it.bestPrice || 0);
+                    const chosen = it.supplier || 'N/D';
+                    const chosenDiff = chosen && recName && chosen !== recName;
+                    const qty = formatQty(it.qty || 0);
+                    const um = it.um || (p?.um || 'pz');
+                    return `
+                        <tr class="border-b">
+                            <td class="p-3 font-bold text-slate-800">${it.name || ''}</td>
+                            <td class="p-3 text-[10px] font-black uppercase text-slate-500">${cat}</td>
+                            <td class="p-3 text-right font-black">${qty} <span class="text-[10px] uppercase">${um}</span></td>
+                            <td class="p-3">
+                                <div class="text-[10px] font-black uppercase" style="color: var(--brand-dark);">${recName}</div>
+                                <div class="text-[10px] font-bold text-slate-500">€ ${Number(recPrice).toFixed(2)}</div>
+                                ${chosenDiff ? `<div class="text-[10px] font-bold text-amber-600 mt-1">Scelto: ${chosen}</div>` : ``}
+                            </td>
+                        </tr>
+                    `;
+                }).join('') || `<tr><td colspan="4" class="p-6 text-xs font-bold text-slate-500">Nessun dettaglio articoli.</td></tr>`;
+
+                return `
+                    <div class="border rounded-3xl bg-white overflow-hidden">
+                        <div class="p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-3">
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase text-white" style="background: var(--brand-dark);">${dept}</span>
+                                    <span class="text-[10px] font-bold text-slate-500">#${oid} • ${dt}</span>
+                                </div>
+                                <div class="mt-2 text-sm font-black text-slate-800">${staff}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 items-center justify-end">
+                                <select onchange="setActiveOrderStatus('${oid}', this.value)" class="p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                    ${['DA_ORDINARE','ORDINATO','CONSEGNATO','CHIUSO'].map(s => `<option value="${s}" ${s===ful?'selected':''}>${s.replace('_',' ')}</option>`).join('')}
+                                </select>
+                                <div class="text-right">
+                                    <div class="text-[10px] font-black uppercase text-slate-400">Totale</div>
+                                    <div class="text-lg font-black">€ ${(o.total || 0).toFixed(2)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50">
+                                    <tr class="text-[10px] font-black uppercase text-slate-400">
+                                        <th class="p-3">Articolo</th>
+                                        <th class="p-3">Categoria</th>
+                                        <th class="p-3 text-right">Qta</th>
+                                        <th class="p-3">Miglior Fornitore</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            wrap.insertAdjacentHTML('beforeend', html);
+
+            if(more) {
+                if(activeOrdersRender.rendered < list.length) more.classList.remove('hidden');
+                else more.classList.add('hidden');
+            }
+        }
+
+        async function setActiveOrderStatus(orderKey, status) {
+            const key = String(orderKey);
+            const idx = (appState.archive || []).findIndex(o => String(o.orderId ?? o.id ?? o.ts) === key);
+            if(idx === -1) return;
+            appState.archive[idx] = { ...appState.archive[idx], status: 'INVIATO', fulfillmentStatus: status, fulfillmentUpdatedAt: Date.now(), fulfillmentUpdatedBy: 'admin' };
+            await push();
+            refresh();
+        }
+
+        function exportActiveOrdersCSV() {
+            const rows = sortActiveOrders(getFilteredActiveOrders());
+            const productIndex = getProductIndex();
+            const weights = getAiWeights();
+            const memo = new Map();
+            const getRecommended = (product) => {
+                const key = `${weights.price}/${weights.porto}/${product?.id}`;
+                if(memo.has(key)) return memo.get(key);
+                const choice = chooseSupplierForProduct(product);
+                memo.set(key, choice?.best || null);
+                return memo.get(key);
+            };
+
+            const lines = [];
+            lines.push(["OrderID","Data","Reparto","Referente","Stato","Prodotto","Categoria","Qta","UM","FornitoreConsigliato","PrezzoConsigliato","FornitoreSelezionato","PrezzoSelezionato","TotaleOrdine"].join(","));
+            rows.forEach(o => {
+                const oid = getOrderKey(o);
+                const dt = new Date(o.__ts).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }).replaceAll('"','""');
+                const dept = String(o.dept || '').replaceAll('"','""');
+                const staff = String(o.staff || '').replaceAll('"','""');
+                const st = String(getOrderFulfillment(o) || '').replaceAll('"','""');
+                const orderTotal = typeof o.total === 'number' ? o.total : 0;
+                const items = Array.isArray(o.items) ? o.items : [];
+                items.forEach(it => {
+                    const p = it?.productId != null ? productIndex.byId.get(String(it.productId)) : (it?.name ? productIndex.byName.get(String(it.name).toLowerCase()) : null);
+                    const cat = (getItemCategory(it, productIndex) || '').replaceAll('"','""');
+                    const rec = p ? getRecommended(p) : null;
+                    const recName = (rec?.name || it.supplier || '').replaceAll('"','""');
+                    const recPrice = typeof rec?.price === 'number' ? rec.price : (it.bestPrice || 0);
+                    const chosen = (it.supplier || '').replaceAll('"','""');
+                    const chosenPrice = typeof it.bestPrice === 'number' ? it.bestPrice : 0;
+                    const name = String(it.name || '').replaceAll('"','""');
+                    const qty = formatQty(it.qty || 0);
+                    const um = String(it.um || '').replaceAll('"','""');
+                    lines.push([oid, `"${dt}"`, `"${dept}"`, `"${staff}"`, `"${st}"`, `"${name}"`, `"${cat}"`, qty, `"${um}"`, `"${recName}"`, recPrice.toFixed(2), `"${chosen}"`, chosenPrice.toFixed(2), orderTotal.toFixed(2)].join(","));
+                });
+            });
+
+            const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `ordini_attivi_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function printActiveOrdersPDF() {
+            const rows = sortActiveOrders(getFilteredActiveOrders());
+            const productIndex = getProductIndex();
+            const weights = getAiWeights();
+            const memo = new Map();
+            const getRecommended = (product) => {
+                const key = `${weights.price}/${weights.porto}/${product?.id}`;
+                if(memo.has(key)) return memo.get(key);
+                const choice = chooseSupplierForProduct(product);
+                memo.set(key, choice?.best || null);
+                return memo.get(key);
+            };
+
+            const htmlRows = rows.map(o => {
+                const oid = getOrderKey(o);
+                const dt = new Date(o.__ts).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                const dept = o.dept || '—';
+                const staff = o.staff || '—';
+                const st = getOrderFulfillment(o) || '';
+                const items = Array.isArray(o.items) ? o.items : [];
+                const detail = items.length ? `<ul>${items.map(it => {
+                    const p = it?.productId != null ? productIndex.byId.get(String(it.productId)) : (it?.name ? productIndex.byName.get(String(it.name).toLowerCase()) : null);
+                    const rec = p ? getRecommended(p) : null;
+                    const recName = rec?.name || it.supplier || 'N/D';
+                    const recPrice = typeof rec?.price === 'number' ? rec.price : (it.bestPrice || 0);
+                    const cat = getItemCategory(it, productIndex) || '';
+                    return `<li>${formatQty(it.qty||0)} ${it.um||''} ${it.name} (${cat}) → ${recName} (€ ${Number(recPrice).toFixed(2)})</li>`;
+                }).join("")}</ul>` : `<div>${(o.text || '').toString()}</div>`;
+                return `<tr><td>${oid}</td><td>${dt}</td><td>${dept}</td><td>${staff}</td><td>${st}</td><td style="text-align:right">€ ${(o.total||0).toFixed(2)}</td><td>${detail}</td></tr>`;
+            }).join("");
+
+            const w = window.open("", "_blank");
+            if(!w) return alert("Popup bloccato dal browser. Consenti i popup e riprova.");
+            w.document.write(`
+                <html><head><title>Ordini Attivi</title>
+                <style>
+                    body{font-family:Arial, sans-serif; padding:24px;}
+                    h1{font-size:18px; margin:0 0 12px;}
+                    table{width:100%; border-collapse:collapse; font-size:12px;}
+                    th,td{border:1px solid #ddd; padding:8px; vertical-align:top;}
+                    th{background:#f5f5f5; text-transform:uppercase; font-size:10px;}
+                    ul{margin:0; padding-left:16px;}
+                </style>
+                </head><body>
+                <h1>Ordini Attivi</h1>
+                <table>
+                    <thead><tr><th>OrderID</th><th>Data</th><th>Reparto</th><th>Referente</th><th>Stato</th><th>Totale</th><th>Dettagli</th></tr></thead>
+                    <tbody>${htmlRows}</tbody>
+                </table>
+                </body></html>
+            `);
+            w.document.close();
+            w.addEventListener('load', () => w.print());
+        }
+
         function renderOrderHistoryTrend() {
             const period = document.getElementById('history-period')?.value || '30';
             const monthKey = document.getElementById('history-month')?.value || monthKeyFromTs(Date.now());
@@ -2442,6 +2787,10 @@
                     date: new Date().toLocaleString('it-IT'), 
                     text: req.text,
                     staff: req.staff,
+                    status: 'INVIATO',
+                    acceptedAt: Date.now(),
+                    acceptedBy: 'admin',
+                    fulfillmentStatus: 'DA_ORDINARE',
                     items: finalItems 
                 });
                 
@@ -2465,7 +2814,7 @@
                 total += best.price;
                 items.push({ productId: p.id, name: p.name, qty: 1, um: p.um || 'pz', bestPrice: best.price, supplier: best.name, others: choice.others.map(x => [x.name, x.price]) });
             });
-            appState.archive.unshift({ orderId: req.id, dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, items: items, cat: match[0]?.cat || 'Vario' });
+            appState.archive.unshift({ orderId: req.id, dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, status: 'INVIATO', acceptedAt: Date.now(), acceptedBy: 'admin', fulfillmentStatus: 'DA_ORDINARE', items: items, cat: match[0]?.cat || 'Vario' });
             appState.inbox = appState.inbox.filter(r => r.id !== req.id);
             push();
             refresh();
