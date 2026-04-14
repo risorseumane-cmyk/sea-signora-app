@@ -55,6 +55,15 @@ def init_db():
             "state TEXT NOT NULL"
             ")"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS ai_weights_audit ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts INTEGER NOT NULL, "
+            "actor TEXT, "
+            "old_weights TEXT, "
+            "new_weights TEXT"
+            ")"
+        )
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM app_state")
         count = cur.fetchone()[0]
@@ -66,7 +75,8 @@ def init_db():
             "homeSubtitle": "Benvenuto. Il database è sincronizzato in tempo reale su Railway.",
             "homeVisuals": True,
             "homeCardsEnabled": True,
-            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"}
+            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"},
+            "aiWeights": {"price": 80, "porto": 20},
         }
 
         if count == 0:
@@ -128,6 +138,10 @@ def init_db():
                     current_cards = settings.get("homeCards") or {}
                     merged_cards = {**default_settings["homeCards"], **current_cards}
                     settings["homeCards"] = merged_cards
+                elif k == "aiWeights":
+                    current_w = settings.get("aiWeights") or {}
+                    merged_w = {**default_settings["aiWeights"], **current_w}
+                    settings["aiWeights"] = merged_w
                 else:
                     settings.setdefault(k, v)
 
@@ -142,6 +156,19 @@ def init_db():
 init_db()
 
 # --- UTILITIES ---
+def validate_ai_weights(weights):
+    if not isinstance(weights, dict):
+        return False, "aiWeights must be an object"
+    price = weights.get("price")
+    porto = weights.get("porto")
+    if not isinstance(price, (int, float)) or not isinstance(porto, (int, float)):
+        return False, "aiWeights.price and aiWeights.porto must be numbers"
+    if price < 0 or porto < 0:
+        return False, "aiWeights values must be >= 0"
+    if int(price + porto) != 100:
+        return False, "aiWeights sum must be 100"
+    return True, None
+
 def get_public_base_url(req):
     env_url = os.getenv("PUBLIC_APP_URL", "").strip()
     if env_url:
@@ -573,8 +600,28 @@ def update_settings():
     with get_conn() as conn:
         row = conn.execute("SELECT state FROM app_state WHERE id = 1").fetchone()
         state = json.loads(row['state'])
-        state["settings"] = settings
+        old_settings = state.get("settings") or {}
+        new_settings = settings
+
+        new_ai = (new_settings or {}).get("aiWeights")
+        if new_ai is not None:
+            ok, err = validate_ai_weights(new_ai)
+            if not ok:
+                return jsonify({"ok": False, "error": err}), 400
+
+        old_ai = (old_settings or {}).get("aiWeights")
+        if new_ai is not None and old_ai != new_ai:
+            conn.execute(
+                "INSERT INTO ai_weights_audit (ts, actor, old_weights, new_weights) VALUES (?, ?, ?, ?)",
+                (int(datetime.now().timestamp()), "admin", json.dumps(old_ai), json.dumps(new_ai)),
+            )
+
+        state["settings"] = new_settings
         conn.execute("UPDATE app_state SET state = ? WHERE id = 1", (json.dumps(state),))
+        conn.execute(
+            "INSERT INTO app_state_versions (ts, note, state) VALUES (?, ?, ?)",
+            (int(datetime.now().timestamp()), "settings_save", json.dumps(state)),
+        )
         conn.commit()
     return jsonify({"ok": True})
 
@@ -602,7 +649,8 @@ def migrate_state():
             "homeSubtitle": "Benvenuto. Il database è sincronizzato in tempo reale su Railway.",
             "homeVisuals": True,
             "homeCardsEnabled": True,
-            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"}
+            "homeCards": {"inbox": "Ordini Inbox", "saving": "Saving Ottimizzato", "catalog": "Master Data"},
+            "aiWeights": {"price": 80, "porto": 20},
         }
 
         with get_conn() as conn:
@@ -620,6 +668,9 @@ def migrate_state():
                 if k == "homeCards":
                     current_cards = settings.get("homeCards") or {}
                     settings["homeCards"] = {**default_settings["homeCards"], **current_cards}
+                elif k == "aiWeights":
+                    current_w = settings.get("aiWeights") or {}
+                    settings["aiWeights"] = {**default_settings["aiWeights"], **current_w}
                 else:
                     settings.setdefault(k, v)
             state["settings"] = settings
@@ -630,6 +681,28 @@ def migrate_state():
         return jsonify({"ok": True, "seedVersion": state.get("seedVersion")})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.get("/api/admin/ai-audit")
+def ai_audit_list():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, ts, actor, old_weights, new_weights FROM ai_weights_audit ORDER BY id DESC LIMIT 100"
+        ).fetchall()
+        return jsonify(
+            {
+                "ok": True,
+                "audit": [
+                    {
+                        "id": r["id"],
+                        "ts": r["ts"],
+                        "actor": r["actor"],
+                        "old": json.loads(r["old_weights"]) if r["old_weights"] else None,
+                        "new": json.loads(r["new_weights"]) if r["new_weights"] else None,
+                    }
+                    for r in rows
+                ],
+            }
+        )
 
 # --- SERVING FRONTEND ---
 @app.route("/")

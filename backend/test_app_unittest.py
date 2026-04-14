@@ -66,6 +66,42 @@ class TestParsingAndEmail(unittest.TestCase):
                 base = app_module.get_public_base_url(app_module.request)
                 self.assertEqual(base, "https://example.com")
 
+    def test_ai_weights_validation_and_audit(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["APP_DB_PATH"] = os.path.join(td, "test.db")
+            app_module = self._load_app_module()
+            client = app_module.app.test_client()
+
+            bad = {"settings": {"aiWeights": {"price": 80, "porto": 10}}}
+            r = client.post("/api/admin/page-settings", json=bad)
+            self.assertEqual(r.status_code, 400)
+
+            good = {"settings": {"aiWeights": {"price": 70, "porto": 30}}}
+            r2 = client.post("/api/admin/page-settings", json=good)
+            self.assertEqual(r2.status_code, 200)
+            self.assertTrue(r2.get_json().get("ok"))
+
+            audit = client.get("/api/admin/ai-audit").get_json()
+            self.assertTrue(audit.get("ok"))
+            self.assertTrue(len(audit.get("audit", [])) >= 1)
+
+    def test_state_save_guard_refuses_empty_catalog(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["APP_DB_PATH"] = os.path.join(td, "test.db")
+            app_module = self._load_app_module()
+            client = app_module.app.test_client()
+
+            current = client.get("/api/state").get_json()["state"]
+            current["products"] = [{"id": 1, "name": "X", "cat": "C", "um": "pz", "prices": {"A": 1.0}}]
+            current["suppliers"] = [{"name": "A", "min": 10, "current": 0}]
+            ok = client.post("/api/state", json={"state": current}).get_json()
+            self.assertTrue(ok.get("ok"))
+
+            incoming = dict(current)
+            incoming["products"] = []
+            r = client.post("/api/state", json={"state": incoming})
+            self.assertEqual(r.status_code, 409)
+
 
 if __name__ == "__main__":
     unittest.main()

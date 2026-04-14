@@ -1,0 +1,58 @@
+## Manuale Amministratore (Sea Signora)
+
+### 1) Carrello (vista Reparto)
+
+Gli utenti di reparto accedono tramite QR code.
+
+- Aggiungi prodotti dal catalogo con ricerca e autocompletamento.
+- Imposta quantità e UM (pz/kg/g/l/ml).
+- Premi **Aggiungi al Carrello**.
+- Per cancellare tutto: **Svuota Carrello** → conferma → messaggio di conferma.
+- Premi **Invia Ordine** per inviare l’ordine all’amministrazione.
+
+Note:
+
+- È possibile inserire note manuali nel campo “NOTE”.
+- Se un prodotto non è nel catalogo, scriverlo nelle note: l’admin potrà aggiungerlo.
+
+### 2) Inbox e Approva Ordine
+
+In **Inbox** trovi gli ordini in arrivo.
+
+- Durante l’approvazione, se una riga non viene riconosciuta, appare una finestra con:
+  - suggerimenti di prodotti simili
+  - possibilità di aggiungere un nuovo prodotto al catalogo
+  - possibilità di ignorare la riga
+
+### 3) Storico Ordini
+
+In **Analytics** → **Storico Ordini**:
+
+- filtra per reparto, mese, intervallo date e referente
+- espandi una riga con **Apri** per vedere i dettagli completi (prodotti, quantità, fornitori e prezzi)
+- esporta:
+  - **Export Excel (CSV)** per analisi su Excel/Google Sheets
+  - **Export PDF** (stampa) per archiviazione
+
+### 4) AI Fornitori (pesi)
+
+In **Impostazioni → AI Fornitori** puoi configurare i pesi:
+
+- Prezzo (%) – default 80
+- Porto Franco + Servizio (%) – default 20
+
+Regole:
+
+- la somma deve essere sempre 100%
+- quando salvi, la selezione del fornitore viene aggiornata immediatamente per i nuovi ordini
+
+Audit:
+
+- nella stessa sezione trovi l’elenco modifiche (prima/dopo).
+
+### 5) Recupero dati e sicurezza modifiche
+
+Il sistema protegge catalogo e fornitori da salvataggi “vuoti” accidentali.
+
+In caso di bisogno, esiste uno storico interno di versioni lato server (contattare lo sviluppatore per ripristino).
+

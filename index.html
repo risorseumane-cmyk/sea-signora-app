@@ -217,6 +217,24 @@
                             </select>
                         </div>
                     </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-6">
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">Da (data)</label>
+                            <input id="history-from" type="date" onchange="renderOrderHistory()" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-slate-400">A (data)</label>
+                            <input id="history-to" type="date" onchange="renderOrderHistory()" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                        </div>
+                        <div class="lg:col-span-2">
+                            <label class="text-[10px] font-black uppercase text-slate-400">Referente (nome/cognome)</label>
+                            <input id="history-staff" type="text" placeholder="Es: Mario Rossi" oninput="renderOrderHistory()" class="w-full mt-1 p-3 bg-slate-50 border rounded-xl text-xs font-bold outline-none">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3 justify-end mb-6">
+                        <button onclick="exportOrderHistoryCSV()" class="px-6 py-3 rounded-xl font-black text-[10px] uppercase border" style="border-color: rgba(72,69,61,0.25); color: var(--brand-ink); background: rgba(255,255,255,0.8);">Export Excel (CSV)</button>
+                        <button onclick="printOrderHistoryPDF()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Export PDF</button>
+                    </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div class="h-[280px]">
                             <canvas id="chartOrdersTrend"></canvas>
@@ -229,6 +247,7 @@
                                         <th class="p-3">Reparto</th>
                                         <th class="p-3">Referente</th>
                                         <th class="p-3 text-right">Totale</th>
+                                        <th class="p-3 text-right">Dettagli</th>
                                     </tr>
                                 </thead>
                                 <tbody id="history-body" class="divide-y"></tbody>
@@ -310,6 +329,7 @@
                     <div class="flex gap-8 border-b mb-8">
                         <div onclick="switchConfig('ui')" id="tab-ui" class="config-tab active">Layout</div>
                         <div onclick="switchConfig('suppliers')" id="tab-suppliers" class="config-tab">Fornitori</div>
+                        <div onclick="switchConfig('ai')" id="tab-ai" class="config-tab">AI Fornitori</div>
                         <div onclick="switchConfig('data')" id="tab-data" class="config-tab">Importazione</div>
                         <div onclick="switchConfig('qr')" id="tab-qr" class="config-tab">QR Reparti</div>
                     </div>
@@ -361,6 +381,43 @@
                             <div>
                                 <label class="text-[10px] font-black uppercase text-slate-400">Card 3 (Catalogo)</label>
                                 <input id="set-card-catalog" type="text" oninput="applyUI()" class="w-full p-3 border rounded-xl font-bold mt-1" value="Master Data">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sec-ai" class="config-sec hidden space-y-6">
+                        <div class="bg-slate-50 p-6 rounded-2xl border">
+                            <div class="text-[10px] font-black uppercase text-slate-400 mb-4">Pesi AI per Selezione Fornitore</div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="text-[10px] font-black uppercase text-slate-400">Prezzo (%)</label>
+                                    <input id="ai-w-price" type="number" min="0" max="100" class="w-full p-3 border rounded-xl font-bold mt-1" onchange="validateAiWeights()" value="80">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black uppercase text-slate-400">Porto Franco + Servizio (%)</label>
+                                    <input id="ai-w-porto" type="number" min="0" max="100" class="w-full p-3 border rounded-xl font-bold mt-1" onchange="validateAiWeights()" value="20">
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <div id="ai-w-msg" class="text-[10px] font-black uppercase text-slate-400">Somma: 100%</div>
+                                <button id="ai-w-save" onclick="saveAiWeights()" class="brand-gradient text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Salva Pesi</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl border">
+                            <div class="text-[10px] font-black uppercase text-slate-400 mb-4">Audit Log Modifiche</div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead>
+                                        <tr class="text-[10px] font-black uppercase text-slate-400 border-b">
+                                            <th class="py-2 pr-4">Data</th>
+                                            <th class="py-2 pr-4">Attore</th>
+                                            <th class="py-2 pr-4">Prima</th>
+                                            <th class="py-2 pr-4">Dopo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ai-audit-body" class="divide-y"></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -417,7 +474,47 @@
                     </div>
 
                     <label class="text-[10px] font-black uppercase text-slate-400">Cosa ti serve?</label>
-                    <textarea id="order-text" placeholder="Scrivi quello che ti serve..." class="w-full h-40 p-6 bg-slate-50 border rounded-2xl text-lg font-medium mb-6 resize-none outline-none focus:ring-2 focus:ring-amber-400 mt-1"></textarea>
+                    <div class="mt-2 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                            <div class="md:col-span-3">
+                                <label class="text-[10px] font-black uppercase text-slate-400">Aggiungi Prodotto (Catalogo)</label>
+                                <div class="relative mt-1">
+                                    <input id="dept-product-search" type="text" autocomplete="off" placeholder="Cerca prodotto..." class="w-full p-4 bg-slate-50 border rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-[color:var(--brand-accent)]">
+                                    <div id="dept-suggest-list" class="absolute left-0 right-0 mt-2 bg-white border rounded-2xl shadow-2xl overflow-hidden hidden z-50"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black uppercase text-slate-400">Quantità</label>
+                                <input id="dept-qty" type="number" step="0.01" value="1" class="w-full p-4 bg-slate-50 border rounded-2xl text-sm font-bold outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black uppercase text-slate-400">UM</label>
+                                <select id="dept-um" class="w-full p-4 bg-slate-50 border rounded-2xl text-[10px] font-black uppercase outline-none">
+                                    <option value="pz">pz</option>
+                                    <option value="kg">kg</option>
+                                    <option value="g">g</option>
+                                    <option value="l">l</option>
+                                    <option value="ml">ml</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row gap-3 mt-4">
+                            <button onclick="deptAddSelectedToCart()" class="md:flex-1 brand-gradient text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">+ Aggiungi al Carrello</button>
+                            <button onclick="deptClearCart()" class="md:w-56 px-6 py-4 rounded-2xl font-black text-[10px] uppercase border" style="border-color: rgba(72,69,61,0.25); color: var(--brand-ink); background: rgba(255,255,255,0.8);">Svuota Carrello</button>
+                        </div>
+                        <div id="dept-cart-msg" class="hidden mt-3 text-[10px] font-black uppercase rounded-xl px-4 py-3"></div>
+
+                        <div class="mt-4 border rounded-2xl bg-white overflow-hidden">
+                            <div class="px-5 py-4 border-b flex justify-between items-center">
+                                <div class="text-[10px] font-black uppercase text-slate-400">Carrello</div>
+                                <div class="text-[10px] font-black uppercase text-slate-600"><span id="dept-cart-count">0</span> articoli</div>
+                            </div>
+                            <div id="dept-cart-list" class="max-h-44 overflow-y-auto"></div>
+                        </div>
+                    </div>
+
+                    <textarea id="order-text" placeholder="Oppure scrivi a mano (note, richieste speciali, prodotti non in catalogo)..." class="w-full h-28 p-6 bg-slate-50 border rounded-2xl text-sm font-medium mb-6 resize-none outline-none focus:ring-2 focus:ring-amber-400 mt-1"></textarea>
                     <button id="btn-send" onclick="sendOrder()" class="w-full py-6 brand-gradient text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all">🚀 Invia Ordine</button>
                 </div>
             </div>
@@ -483,6 +580,7 @@
         let homeAssistantInitialized = false;
         let homeSearchState = { query: "", cat: "", productId: null };
         let hasSyncedOnce = false;
+        let deptCartState = { dept: "", selectedProductId: null, items: [] };
 
         const API_BASE = window.location.origin.startsWith('file://') ? 'http://localhost:8080' : '';
         let isPushing = false;
@@ -642,6 +740,7 @@
             populateHeatmapFilters();
             populateHistoryFilters();
             renderOrderHistory();
+            renderDeptOrderUI();
         }
 
         function initHomeAssistant() {
@@ -724,6 +823,194 @@
             return hits ? 30 + hits : 0;
         }
 
+        function getAiWeights() {
+            const w = (appState.settings && appState.settings.aiWeights) ? appState.settings.aiWeights : null;
+            const price = typeof w?.price === 'number' ? w.price : 80;
+            const porto = typeof w?.porto === 'number' ? w.porto : 20;
+            return { price, porto };
+        }
+
+        function chooseSupplierForProduct(product) {
+            const entries = Object.entries(product.prices || {}).filter(([,v]) => typeof v === 'number' && v > 0);
+            if(!entries.length) return null;
+
+            const pricesOnly = entries.map(([,v]) => v);
+            const minP = Math.min(...pricesOnly);
+            const maxP = Math.max(...pricesOnly);
+            const range = Math.max(0.000001, maxP - minP);
+            const weights = getAiWeights();
+
+            const ranked = entries.map(([name, price]) => {
+                const sup = appState.suppliers.find(s => s.name === name) || {};
+                const leadDays = typeof sup.leadDays === 'number' ? sup.leadDays : 2;
+                const reliability = typeof sup.reliability === 'number' ? sup.reliability : 0.85;
+                const progress = sup.min ? Math.min(1, (sup.current || 0) / sup.min) : 0;
+
+                const priceNorm = (price - minP) / range; // 0 best
+                const portoNorm = (1 - progress); // 0 best when close to porto franco
+                const leadNorm = Math.min(1, Math.max(0, leadDays / 7)); // 0..1
+                const relNorm = Math.min(1, Math.max(0, 1 - reliability)); // 0 best
+
+                const portoComposite = (portoNorm * 0.60) + (leadNorm * 0.25) + (relNorm * 0.15);
+                const score = (priceNorm * (weights.price / 100)) + (portoComposite * (weights.porto / 100));
+                return { name, price, score };
+            }).sort((a,b) => a.score - b.score);
+
+            return { best: ranked[0], others: ranked.slice(1) };
+        }
+
+        function showDeptMsg(text, kind) {
+            const el = document.getElementById('dept-cart-msg');
+            if(!el) return;
+            el.innerText = text;
+            el.classList.remove('hidden');
+            if(kind === 'ok') {
+                el.style.background = 'rgba(16,185,129,0.12)';
+                el.style.color = '#065f46';
+                el.style.border = '1px solid rgba(16,185,129,0.30)';
+            } else {
+                el.style.background = 'rgba(239,68,68,0.10)';
+                el.style.color = '#7f1d1d';
+                el.style.border = '1px solid rgba(239,68,68,0.25)';
+            }
+            setTimeout(() => el.classList.add('hidden'), 2500);
+        }
+
+        function deptStorageKey() {
+            const dept = document.getElementById('dept-display')?.innerText || deptCartState.dept || 'Reparto';
+            return `ss_cart_${dept}`;
+        }
+
+        function loadDeptCart() {
+            const dept = document.getElementById('dept-display')?.innerText || '';
+            if(dept && deptCartState.dept !== dept) {
+                deptCartState.dept = dept;
+                deptCartState.selectedProductId = null;
+                deptCartState.items = [];
+                try {
+                    const raw = localStorage.getItem(deptStorageKey());
+                    if(raw) {
+                        const parsed = JSON.parse(raw);
+                        if(Array.isArray(parsed)) deptCartState.items = parsed;
+                    }
+                } catch(_) {}
+            }
+        }
+
+        function saveDeptCart() {
+            try { localStorage.setItem(deptStorageKey(), JSON.stringify(deptCartState.items || [])); } catch(_) {}
+        }
+
+        function renderDeptCart() {
+            const list = document.getElementById('dept-cart-list');
+            const count = document.getElementById('dept-cart-count');
+            const c = deptCartState.items || [];
+            if(count) count.innerText = String(c.length);
+            if(!list) return;
+            list.innerHTML = c.map((it, idx) => `
+                <div class="px-5 py-4 border-b flex justify-between items-center">
+                    <div>
+                        <div class="text-sm font-black uppercase text-slate-800">${it.name}</div>
+                        <div class="text-[10px] font-bold text-slate-400">${formatQty(it.qty)} ${it.um || 'pz'}</div>
+                    </div>
+                    <button onclick="deptRemoveFromCart(${idx})" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(239,68,68,0.12); color:#b91c1c;">Rimuovi</button>
+                </div>
+            `).join('') || `<div class="px-5 py-6 text-xs font-bold text-slate-500">Carrello vuoto.</div>`;
+        }
+
+        function renderDeptSuggestions() {
+            const input = document.getElementById('dept-product-search');
+            const list = document.getElementById('dept-suggest-list');
+            if(!input || !list) return;
+
+            const q = (input.value || '').trim();
+            if(!q) {
+                list.classList.add('hidden');
+                return;
+            }
+
+            const candidates = appState.products
+                .map(p => ({ p, score: scoreProductMatch(q, p.name) }))
+                .filter(x => x.score > 0)
+                .sort((a,b) => b.score - a.score)
+                .slice(0, 8);
+
+            list.innerHTML = candidates.map(({p}) => `
+                <button type="button" class="w-full px-4 py-3 text-left hover:bg-slate-50 flex justify-between items-center" onclick="deptSelectProduct(${p.id})">
+                    <div>
+                        <div class="text-sm font-black uppercase text-slate-800">${p.name}</div>
+                        <div class="text-[10px] font-bold uppercase text-slate-400">${p.cat || ''}</div>
+                    </div>
+                    <div class="text-[10px] font-black uppercase" style="color: var(--brand-accent);">Seleziona</div>
+                </button>
+            `).join('') || `<div class="p-4 text-xs font-bold text-slate-500">Nessun match.</div>`;
+
+            list.classList.remove('hidden');
+        }
+
+        function deptSelectProduct(productId) {
+            const p = appState.products.find(x => x.id == productId);
+            if(!p) return;
+            deptCartState.selectedProductId = p.id;
+            const input = document.getElementById('dept-product-search');
+            if(input) input.value = p.name;
+            const um = document.getElementById('dept-um');
+            if(um) um.value = normalizeUnit(p.um) || 'pz';
+            const list = document.getElementById('dept-suggest-list');
+            if(list) list.classList.add('hidden');
+        }
+
+        function deptAddSelectedToCart() {
+            loadDeptCart();
+            const pid = deptCartState.selectedProductId;
+            const qtyInput = document.getElementById('dept-qty');
+            const umInput = document.getElementById('dept-um');
+            const qty = parseFloat(qtyInput?.value || '1');
+            const um = normalizeUnit(umInput?.value || 'pz') || 'pz';
+            const p = appState.products.find(x => x.id == pid);
+            if(!p) return showDeptMsg("Seleziona un prodotto dal catalogo.", "err");
+            if(Number.isNaN(qty) || qty <= 0) return showDeptMsg("Quantità non valida.", "err");
+
+            deptCartState.items.push({ productId: p.id, name: p.name, qty: qty, um: um });
+            saveDeptCart();
+            renderDeptCart();
+            showDeptMsg("Aggiunto al carrello.", "ok");
+        }
+
+        function deptRemoveFromCart(idx) {
+            loadDeptCart();
+            deptCartState.items.splice(idx, 1);
+            saveDeptCart();
+            renderDeptCart();
+            showDeptMsg("Rimosso dal carrello.", "ok");
+        }
+
+        function deptClearCart() {
+            loadDeptCart();
+            if(!deptCartState.items.length) return showDeptMsg("Carrello già vuoto.", "ok");
+            if(!confirm("Vuoi svuotare completamente il carrello?")) return;
+            deptCartState.items = [];
+            saveDeptCart();
+            renderDeptCart();
+            showDeptMsg("Carrello svuotato.", "ok");
+        }
+
+        function renderDeptOrderUI() {
+            const view = document.getElementById('view-department');
+            if(!view || !view.classList.contains('active')) return;
+            loadDeptCart();
+            renderDeptCart();
+
+            const input = document.getElementById('dept-product-search');
+            const list = document.getElementById('dept-suggest-list');
+            if(input && !input.dataset.bound) {
+                input.dataset.bound = "1";
+                input.addEventListener('input', renderDeptSuggestions);
+                input.addEventListener('focus', renderDeptSuggestions);
+                input.addEventListener('blur', () => setTimeout(() => list?.classList.add('hidden'), 120));
+            }
+        }
+
         function renderHomeSuggestions() {
             const list = document.getElementById("home-suggest-list");
             const search = document.getElementById("home-product-search");
@@ -782,15 +1069,6 @@
             };
         }
 
-        function supplierScore(price, meta) {
-            const urgency = Math.min(10, appState.inbox.length || 0);
-            const wPrice = 1.0;
-            const wLead = 0.12 + (urgency * 0.01);
-            const wRel = 0.25;
-            const wPorto = 0.10;
-            return (price * wPrice) + (meta.leadDays * wLead) + ((1 - meta.reliability) * wRel * 10) + ((1 - meta.portoProgress) * wPorto * 10);
-        }
-
         function renderHomeBestSupplier() {
             const box = document.getElementById("home-best-supplier");
             const meta = document.getElementById("home-best-meta");
@@ -817,23 +1095,23 @@
                 return;
             }
 
-            const ranked = prices
-                .map(([s, price]) => ({ supplier: s, price, meta: getSupplierMeta(s) }))
-                .sort((a,b) => supplierScore(a.price, a.meta) - supplierScore(b.price, b.meta));
+            const choice = chooseSupplierForProduct(product);
+            const best = choice?.best;
+            if(!best) return;
+            const bestMeta = getSupplierMeta(best.name);
+            box.innerHTML = `<div class="text-xl font-black uppercase" style="color: var(--brand-dark);">${best.name}</div><div class="text-sm font-black text-slate-700 mt-1">€ ${best.price.toFixed(2)} / ${product.um || "pz"}</div>`;
+            meta.innerText = `Lead time stimato: ${bestMeta.leadDays}g • Affidabilità: ${Math.round(bestMeta.reliability * 100)}% • Porto Franco: ${Math.round(bestMeta.portoProgress * 100)}%`;
 
-            const best = ranked[0];
-            box.innerHTML = `<div class="text-xl font-black uppercase" style="color: var(--brand-dark);">${best.supplier}</div><div class="text-sm font-black text-slate-700 mt-1">€ ${best.price.toFixed(2)} / ${product.um || "pz"}</div>`;
-            meta.innerText = `Lead time stimato: ${best.meta.leadDays}g • Affidabilità: ${Math.round(best.meta.reliability * 100)}% • Porto Franco: ${Math.round(best.meta.portoProgress * 100)}%`;
-
-            const others = ranked.slice(1, 4);
+            const others = (choice?.others || []).slice(0, 3);
             alt.innerHTML = others.length ? others.map(o => `
                 <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border">
-                    <div class="text-[10px] font-black uppercase text-slate-700">${o.supplier}</div>
+                    <div class="text-[10px] font-black uppercase text-slate-700">${o.name}</div>
                     <div class="text-[10px] font-black uppercase text-slate-600">€ ${o.price.toFixed(2)}</div>
                 </div>
             `).join("") : "";
 
-            tip.innerText = `Per ${product.name}, consiglio ${best.supplier}. Se hai urgenza alta, aggiorna lead time nei fornitori.`;
+            const w = getAiWeights();
+            tip.innerText = `Per ${product.name}, consiglio ${best.name}. Pesi attivi: Prezzo ${w.price}% / Porto+Servizio ${w.porto}%.`;
         }
 
         function renderHomeIncoming() {
@@ -864,6 +1142,8 @@
             const cardInbox = document.getElementById('set-card-inbox');
             const cardSaving = document.getElementById('set-card-saving');
             const cardCatalog = document.getElementById('set-card-catalog');
+            const aiPrice = document.getElementById('ai-w-price');
+            const aiPorto = document.getElementById('ai-w-porto');
 
             if(brand && activeId !== 'set-brand') brand.value = appState.settings.brandName || 'Sea Signora';
             if(color && activeId !== 'set-color') color.value = appState.settings.color || '#EF7818';
@@ -876,6 +1156,11 @@
             if(cardInbox && activeId !== 'set-card-inbox') cardInbox.value = hc.inbox || 'Ordini Inbox';
             if(cardSaving && activeId !== 'set-card-saving') cardSaving.value = hc.saving || 'Saving Ottimizzato';
             if(cardCatalog && activeId !== 'set-card-catalog') cardCatalog.value = hc.catalog || 'Master Data';
+
+            const w = getAiWeights();
+            if(aiPrice && activeId !== 'ai-w-price') aiPrice.value = w.price;
+            if(aiPorto && activeId !== 'ai-w-porto') aiPorto.value = w.porto;
+            validateAiWeights();
         }
 
         function populateHeatmapFilters() {
@@ -940,6 +1225,7 @@
                 document.getElementById('admin-header').style.display = 'none';
                 document.getElementById('dept-display').innerText = repartoParam;
                 switchView('department');
+                sync();
             } else {
                 const migrated = localStorage.getItem('ss_seed_brand_v1');
                 if(!migrated) {
@@ -1080,10 +1366,13 @@
 
                 // Se stavamo chiarendo un ordine, aggiungi questo nuovo prodotto ai finalItems
                 if(approvalContext && approvalContext.isAddingNew) {
-                    const priceEntries = Object.entries(prices).sort((a,b) => a[1]-b[1]);
-                    const bestPrice = priceEntries[0];
+                    const tempProduct = { id: newProd.id, name, cat, um, prices };
+                    const choice = chooseSupplierForProduct(tempProduct);
+                    const bestPrice = choice ? choice.best : null;
+                    const priceEntries = choice ? choice.others.map(x => [x.name, x.price]) : [];
                     
-                    const currentLine = approvalContext.linesToClarify[0];
+                    const currentObj = approvalContext.linesToClarify[0] || {};
+                    const currentLine = currentObj.line || String(currentObj);
                     const extracted = extractQtyUnit(currentLine);
                     const targetUm = um || 'pz';
                     const qty = convertQty(extracted.qty, extracted.unit, targetUm);
@@ -1092,9 +1381,9 @@
                         name: name,
                         qty: qty,
                         um: targetUm,
-                        bestPrice: bestPrice ? bestPrice[1] : 0,
-                        supplier: bestPrice ? bestPrice[0] : 'N/D',
-                        others: priceEntries.slice(1)
+                        bestPrice: bestPrice ? bestPrice.price : 0,
+                        supplier: bestPrice ? bestPrice.name : 'N/D',
+                        others: priceEntries
                     });
                     approvalContext.linesToClarify.shift();
                     approvalContext.isAddingNew = false;
@@ -1249,35 +1538,160 @@
                 .sort((a, b) => b.__ts - a.__ts);
         }
 
+        let historyExpanded = new Set();
+        function getFilteredHistoryRows() {
+            const monthKey = document.getElementById('history-month')?.value || '';
+            const staffQ = (document.getElementById('history-staff')?.value || '').trim().toLowerCase();
+            const from = document.getElementById('history-from')?.value || '';
+            const to = document.getElementById('history-to')?.value || '';
+
+            let fromTs = null;
+            let toTs = null;
+            if(from) fromTs = new Date(from + 'T00:00:00').getTime();
+            if(to) toTs = new Date(to + 'T23:59:59').getTime();
+
+            return getHistoryByDept()
+                .filter(o => !monthKey || monthKeyFromTs(o.__ts) === monthKey)
+                .filter(o => !staffQ || String(o.staff || '').toLowerCase().includes(staffQ))
+                .filter(o => fromTs === null || o.__ts >= fromTs)
+                .filter(o => toTs === null || o.__ts <= toTs);
+        }
+
         function renderOrderHistory() {
             const body = document.getElementById('history-body');
             if(!body) return;
 
-            const monthKey = document.getElementById('history-month')?.value || '';
-            const rows = getHistoryByDept().filter(o => !monthKey || monthKeyFromTs(o.__ts) === monthKey);
+            const rows = getFilteredHistoryRows();
             body.innerHTML = rows.map(o => {
                 const ts = o.__ts;
                 const dt = new Date(ts).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 const staff = o.staff || '—';
                 const dept = o.dept || '—';
                 const total = typeof o.total === 'number' ? o.total : 0;
+                const oid = o.orderId || o.id || ts;
+                const isOpen = historyExpanded.has(String(oid));
+
+                const items = Array.isArray(o.items) ? o.items : [];
+                const detailsHtml = items.length ? `
+                    <div class="p-4">
+                        <div class="text-[10px] font-black uppercase text-slate-400 mb-2">Dettaglio Ordine</div>
+                        <div class="space-y-2">
+                            ${items.map(it => `
+                                <div class="p-3 bg-slate-50 rounded-xl border flex justify-between items-center">
+                                    <div>
+                                        <div class="text-[10px] font-black uppercase text-slate-700">${it.name}</div>
+                                        <div class="text-[10px] font-bold text-slate-400">${formatQty(it.qty)} ${it.um || ''} • ${it.supplier || 'N/D'}</div>
+                                    </div>
+                                    <div class="text-[10px] font-black uppercase text-slate-700">€ ${(it.bestPrice || 0).toFixed(2)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : `
+                    <div class="p-4 text-xs font-bold text-slate-500">Nessun dettaglio prodotti (ordine legacy). Testo: ${(o.text || '').toString().slice(0,180)}${(o.text || '').toString().length>180?'…':''}</div>
+                `;
                 return `
                     <tr class="hover:bg-slate-50 transition-all">
                         <td class="p-3 font-bold">${dt}</td>
                         <td class="p-3 text-[10px] font-black uppercase text-amber-600">${dept}</td>
                         <td class="p-3 font-bold">${staff}</td>
                         <td class="p-3 text-right font-black">€ ${total.toFixed(2)}</td>
+                        <td class="p-3 text-right">
+                            <button onclick="toggleHistoryDetails('${String(oid)}')" class="text-[10px] font-black uppercase px-3 py-2 rounded-xl" style="background: rgba(29,29,27,0.06); color: var(--brand-ink);">${isOpen ? 'Chiudi' : 'Apri'}</button>
+                        </td>
                     </tr>
+                    ${isOpen ? `<tr><td colspan="5" class="bg-white">${detailsHtml}</td></tr>` : ``}
                 `;
-            }).join('') || '<tr><td colspan="4" class="p-10 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine per i filtri selezionati</td></tr>';
+            }).join('') || '<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold uppercase text-xs">Nessun ordine per i filtri selezionati</td></tr>';
 
             renderOrderHistoryTrend();
+        }
+
+        function toggleHistoryDetails(id) {
+            const key = String(id);
+            if(historyExpanded.has(key)) historyExpanded.delete(key);
+            else historyExpanded.add(key);
+            renderOrderHistory();
+        }
+
+        function exportOrderHistoryCSV() {
+            const rows = getFilteredHistoryRows();
+            const lines = [];
+            lines.push(["OrderID","Data","Reparto","Referente","Prodotto","Qta","UM","Fornitore","Prezzo","TotaleRiga","TotaleOrdine"].join(","));
+            rows.forEach(o => {
+                const oid = o.orderId || o.id || o.__ts;
+                const dt = new Date(o.__ts).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const dept = (o.dept || '').replaceAll('"','""');
+                const staff = (o.staff || '').replaceAll('"','""');
+                const orderTotal = typeof o.total === 'number' ? o.total : 0;
+                const items = Array.isArray(o.items) ? o.items : [];
+                if(items.length) {
+                    items.forEach(it => {
+                        const name = (it.name || '').replaceAll('"','""');
+                        const qty = formatQty(it.qty || 0);
+                        const um = (it.um || '').replaceAll('"','""');
+                        const sup = (it.supplier || '').replaceAll('"','""');
+                        const price = typeof it.bestPrice === 'number' ? it.bestPrice : 0;
+                        const lineTotal = price * (it.qty || 0);
+                        lines.push([oid, `"${dt}"`, `"${dept}"`, `"${staff}"`, `"${name}"`, qty, `"${um}"`, `"${sup}"`, price.toFixed(2), lineTotal.toFixed(2), orderTotal.toFixed(2)].join(","));
+                    });
+                } else {
+                    const text = (o.text || '').toString().replaceAll('"','""');
+                    lines.push([oid, `"${dt}"`, `"${dept}"`, `"${staff}"`, `"${text}"`, "", "", "", "", "", orderTotal.toFixed(2)].join(","));
+                }
+            });
+
+            const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `storico_ordini_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function printOrderHistoryPDF() {
+            const rows = getFilteredHistoryRows();
+            const htmlRows = rows.map(o => {
+                const oid = o.orderId || o.id || o.__ts;
+                const dt = new Date(o.__ts).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const dept = o.dept || '—';
+                const staff = o.staff || '—';
+                const total = typeof o.total === 'number' ? o.total.toFixed(2) : '0.00';
+                const items = Array.isArray(o.items) ? o.items : [];
+                const detail = items.length ? `<ul>${items.map(it => `<li>${formatQty(it.qty)} ${it.um || ''} ${it.name} — ${it.supplier || 'N/D'} (€ ${(it.bestPrice||0).toFixed(2)})</li>`).join("")}</ul>` : `<div>${(o.text || '').toString()}</div>`;
+                return `<tr><td>${oid}</td><td>${dt}</td><td>${dept}</td><td>${staff}</td><td style="text-align:right">€ ${total}</td><td>${detail}</td></tr>`;
+            }).join("");
+
+            const w = window.open("", "_blank");
+            w.document.write(`
+                <html><head><title>Storico Ordini</title>
+                <style>
+                    body{font-family:Arial, sans-serif; padding:24px;}
+                    h1{font-size:18px; margin:0 0 12px;}
+                    table{width:100%; border-collapse:collapse; font-size:12px;}
+                    th,td{border:1px solid #ddd; padding:8px; vertical-align:top;}
+                    th{background:#f5f5f5; text-transform:uppercase; font-size:10px;}
+                    ul{margin:0; padding-left:16px;}
+                </style>
+                </head><body>
+                <h1>Storico Ordini</h1>
+                <table>
+                    <thead><tr><th>OrderID</th><th>Data</th><th>Reparto</th><th>Referente</th><th>Totale</th><th>Dettagli</th></tr></thead>
+                    <tbody>${htmlRows}</tbody>
+                </table>
+                <script>window.onload=()=>{window.print();}</script>
+                </body></html>
+            `);
+            w.document.close();
         }
 
         function renderOrderHistoryTrend() {
             const period = document.getElementById('history-period')?.value || '30';
             const monthKey = document.getElementById('history-month')?.value || monthKeyFromTs(Date.now());
-            const base = getHistoryByDept();
+            const base = getFilteredHistoryRows();
 
             const ctxEl = document.getElementById('chartOrdersTrend');
             if(!ctxEl) return;
@@ -1449,15 +1863,17 @@
                     data.parsed.items.forEach(item => {
                         const product = appState.products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name?.toLowerCase());
                         if(product) {
-                            const priceEntries = Object.entries(product.prices).sort((a,b) => a[1]-b[1]);
-                            const bestPrice = priceEntries[0];
+                            const choice = chooseSupplierForProduct(product);
+                            if(!choice) return;
+                            const bestPrice = choice.best;
+                            const priceEntries = choice.others.map(x => [x.name, x.price]);
                             approvalContext.finalItems.push({
                                 name: product.name,
                                 qty: item.qty || 1,
                                 um: item.um || product.um || 'pz',
-                                bestPrice: bestPrice[1],
-                                supplier: bestPrice[0],
-                                others: priceEntries.slice(1)
+                                bestPrice: bestPrice.price,
+                                supplier: bestPrice.name,
+                                others: priceEntries
                             });
                         }
                     });
@@ -1585,8 +2001,9 @@
         function selectClarifySuggestion(prodId) {
             const product = appState.products.find(p => p.id === prodId);
             if(product) {
-                const priceEntries = Object.entries(product.prices).sort((a,b) => a[1]-b[1]);
-                const bestPrice = priceEntries[0];
+                const choice = chooseSupplierForProduct(product);
+                const bestPrice = choice ? choice.best : null
+                const priceEntries = choice ? choice.others.map(x => [x.name, x.price]) : [];
                 
                 // Estrai quantità dalla riga se possibile
                 const currentObj = approvalContext.linesToClarify[0] || {};
@@ -1602,9 +2019,9 @@
                     name: product.name,
                     qty: qty,
                     um: targetUm,
-                    bestPrice: bestPrice ? bestPrice[1] : 0,
-                    supplier: bestPrice ? bestPrice[0] : 'N/D',
-                    others: priceEntries.slice(1)
+                    bestPrice: bestPrice ? bestPrice.price : 0,
+                    supplier: bestPrice ? bestPrice.name : 'N/D',
+                    others: priceEntries
                 });
             }
             approvalContext.linesToClarify.shift();
@@ -1656,6 +2073,7 @@
                 });
 
                 appState.archive.unshift({ 
+                    orderId: req.id,
                     dept: req.dept, 
                     total: total, 
                     ts: Date.now(),
@@ -1675,12 +2093,17 @@
         function fallbackApprove(req) {
             let total = 0;
             const match = appState.products.filter(p => req.text.toLowerCase().includes(p.name.toLowerCase().split(' ')[0]));
+            const items = [];
             match.forEach(p => {
-                const best = Object.entries(p.prices).sort((a,b)=>a[1]-b[1])[0];
-                const sup = appState.suppliers.find(s => s.name === best[0]);
-                if(sup) { sup.current = (sup.current||0) + best[1]; total += best[1]; }
+                const choice = chooseSupplierForProduct(p);
+                if(!choice) return;
+                const best = choice.best;
+                const sup = appState.suppliers.find(s => s.name === best.name);
+                if(sup) { sup.current = (sup.current||0) + best.price; }
+                total += best.price;
+                items.push({ name: p.name, qty: 1, um: p.um || 'pz', bestPrice: best.price, supplier: best.name, others: choice.others.map(x => [x.name, x.price]) });
             });
-            appState.archive.unshift({ dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, cat: match[0]?.cat || 'Vario' });
+            appState.archive.unshift({ orderId: req.id, dept: req.dept, total: total, ts: Date.now(), date: new Date().toLocaleString('it-IT'), text: req.text, staff: req.staff, items: items, cat: match[0]?.cat || 'Vario' });
             appState.inbox = appState.inbox.filter(r => r.id !== req.id);
             push();
             refresh();
@@ -1738,6 +2161,61 @@
             document.getElementById(`tab-${id}`).classList.add('active');
             if(id === 'qr') renderQR();
             if(id === 'suppliers') renderSuppliersEdit();
+            if(id === 'ai') renderAiConfig();
+        }
+
+        function validateAiWeights() {
+            const p = parseInt(document.getElementById('ai-w-price')?.value || '0', 10);
+            const o = parseInt(document.getElementById('ai-w-porto')?.value || '0', 10);
+            const msg = document.getElementById('ai-w-msg');
+            const btn = document.getElementById('ai-w-save');
+            const sum = p + o;
+            const ok = Number.isFinite(sum) && sum === 100 && p >= 0 && o >= 0 && p <= 100 && o <= 100;
+            if(msg) {
+                msg.innerText = ok ? `Somma: ${sum}%` : `Somma: ${sum}% (deve essere 100%)`;
+                msg.style.color = ok ? '#334155' : '#b91c1c';
+            }
+            if(btn) btn.disabled = !ok;
+        }
+
+        async function saveAiWeights() {
+            const p = parseInt(document.getElementById('ai-w-price')?.value || '0', 10);
+            const o = parseInt(document.getElementById('ai-w-porto')?.value || '0', 10);
+            const sum = p + o;
+            if(sum !== 100) return alert("La somma delle percentuali deve essere 100%.");
+
+            appState.settings = { ...appState.settings, aiWeights: { price: p, porto: o } };
+            await applyUI(true);
+            await renderAiConfig();
+            alert("Pesi AI salvati. Verranno applicati immediatamente ai nuovi ordini.");
+        }
+
+        async function renderAiConfig() {
+            hydrateSettingsInputs();
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/ai-audit`);
+                const d = await res.json();
+                const body = document.getElementById('ai-audit-body');
+                if(!body) return;
+                if(!d.ok) {
+                    body.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-xs font-bold text-slate-500">Audit non disponibile</td></tr>`;
+                    return;
+                }
+                body.innerHTML = (d.audit || []).map(a => {
+                    const dt = new Date((a.ts || 0) * 1000).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                    const oldw = a.old ? `${a.old.price || 0}/${a.old.porto || 0}` : '—';
+                    const neww = a.new ? `${a.new.price || 0}/${a.new.porto || 0}` : '—';
+                    return `<tr>
+                        <td class="py-3 pr-4 text-xs font-bold">${dt}</td>
+                        <td class="py-3 pr-4 text-xs font-bold">${a.actor || 'admin'}</td>
+                        <td class="py-3 pr-4 text-xs font-bold">${oldw}</td>
+                        <td class="py-3 pr-4 text-xs font-bold">${neww}</td>
+                    </tr>`;
+                }).join('') || `<tr><td colspan="4" class="py-6 text-center text-xs font-bold text-slate-500">Nessuna modifica registrata</td></tr>`;
+            } catch(_) {
+                const body = document.getElementById('ai-audit-body');
+                if(body) body.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-xs font-bold text-slate-500">Errore di rete</td></tr>`;
+            }
         }
 
         function renderSuppliersEdit() {
@@ -2043,10 +2521,17 @@
         function savePrices() { push(); alert("Listino aggiornato!"); }
 
         async function sendOrder() {
-            const text = document.getElementById('order-text').value;
+            loadDeptCart();
+            const manual = document.getElementById('order-text').value;
             const nome = document.getElementById('staff-nome').value;
             const cognome = document.getElementById('staff-cognome').value;
             
+            const cartLines = (deptCartState.items || []).map(it => `${formatQty(it.qty)} ${it.um || 'pz'} ${it.name}`);
+            const text = [
+                cartLines.join('\n'),
+                (manual || '').trim() ? `NOTE:\n${manual.trim()}` : ''
+            ].filter(Boolean).join('\n\n');
+
             if(!text || !nome || !cognome) return alert("Compila tutti i campi (Nome, Cognome e Ordine)!");
             
             const staff = `${nome} ${cognome}`;
@@ -2065,8 +2550,9 @@
                 if(d.ok) {
                     alert("Ordine inviato con successo! L'amministratore riceverà una mail di notifica.");
                     document.getElementById('order-text').value = "";
-                    document.getElementById('staff-nome').value = "";
-                    document.getElementById('staff-cognome').value = "";
+                    deptCartState.items = [];
+                    saveDeptCart();
+                    renderDeptCart();
                 } else {
                     alert("Errore nell'invio: " + d.error);
                 }
