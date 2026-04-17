@@ -318,10 +318,26 @@
             </div>
 
             <div id="view-catalog" class="view-section">
-                <div class="glass-card p-10">
-                    <div class="flex flex-col md:flex-row gap-4 mb-8">
-                        <input id="cat-search" oninput="renderCatalog()" type="text" placeholder="Cerca nel database..." class="flex-1 p-4 bg-slate-50 border-none rounded-2xl text-sm font-bold shadow-inner outline-none">
-                        <button onclick="openProductModal()" class="brand-gradient text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">+ Nuovo Prodotto</button>
+                <div class="glass-card p-6 md:p-10">
+                    <div class="flex flex-col gap-4 mb-6">
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <input id="cat-search" oninput="renderCatalog()" type="text" placeholder="Cerca nel database..." class="flex-1 p-4 bg-slate-50 border-none rounded-2xl text-sm font-bold shadow-inner outline-none">
+                            <button onclick="openProductModal()" class="brand-gradient text-white px-6 md:px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg">+ Nuovo Prodotto</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <select id="cat-filter" onchange="renderCatalog()" class="w-full p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                <option value="">Tutte le categorie</option>
+                            </select>
+                            <select id="cat-sort" onchange="renderCatalog()" class="w-full p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                <option value="name-asc">Nome A-Z</option>
+                                <option value="name-desc">Nome Z-A</option>
+                                <option value="price-asc">Prezzo crescente</option>
+                                <option value="price-desc">Prezzo decrescente</option>
+                            </select>
+                            <select id="cat-price-supplier" onchange="renderCatalog()" class="w-full p-3 bg-slate-50 border rounded-xl text-[10px] font-black uppercase outline-none">
+                                <option value="">Miglior prezzo</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm border-separate border-spacing-y-2">
@@ -1552,8 +1568,34 @@
 
         function renderCatalog() {
             const term = document.getElementById('cat-search').value.toLowerCase();
+            const catFilter = document.getElementById('cat-filter')?.value || '';
+            const sort = document.getElementById('cat-sort')?.value || 'name-asc';
+            const priceSupplier = document.getElementById('cat-price-supplier')?.value || '';
             const body = document.getElementById('cat-body');
-            body.innerHTML = appState.products.filter(p => p.name.toLowerCase().includes(term) || p.cat.toLowerCase().includes(term)).map(p => `
+            
+            // Filtra prodotti
+            let filtered = appState.products.filter(p => {
+                const matchesSearch = !term || p.name.toLowerCase().includes(term) || p.cat.toLowerCase().includes(term);
+                const matchesCategory = !catFilter || p.cat === catFilter;
+                return matchesSearch && matchesCategory;
+            });
+            
+            // Ordina prodotti
+            filtered.sort((a, b) => {
+                switch(sort) {
+                    case 'name-asc': return a.name.localeCompare(b.name);
+                    case 'name-desc': return b.name.localeCompare(a.name);
+                    case 'price-asc': return getMinPrice(a, priceSupplier) - getMinPrice(b, priceSupplier);
+                    case 'price-desc': return getMinPrice(b, priceSupplier) - getMinPrice(a, priceSupplier);
+                    default: return 0;
+                }
+            });
+            
+            body.innerHTML = filtered.map(p => {
+                const prices = Object.entries(p.prices || {});
+                const bestPrice = prices.length ? Math.min(...prices.map(([_, pr]) => pr)) : null;
+                
+                return `
                 <tr class="bg-white rounded-xl shadow-sm border border-slate-50 group hover:border-amber-200 transition-all">
                     <td class="p-4">
                         <div class="font-bold text-sm text-slate-800">${p.name}</div>
@@ -1564,12 +1606,19 @@
                     </td>
                     <td class="p-4 text-right">
                         <div class="flex flex-wrap justify-end gap-1">
-                            ${Object.entries(p.prices).map(([s,pr]) => `
-                                <span class="bg-slate-50 border px-2 py-1 rounded-lg text-[10px] font-black flex flex-col items-center">
-                                    <span class="text-slate-400 uppercase scale-75">${s}</span>
-                                    <span>€${pr.toFixed(2)}</span>
-                                </span>
-                            `).join('')}
+                            ${prices.map(([s,pr]) => {
+                                const isBest = pr === bestPrice;
+                                const isSelected = priceSupplier === s;
+                                const bgClass = isBest ? 'bg-emerald-100 border-emerald-300' : (isSelected ? 'bg-amber-100 border-amber-300' : 'bg-slate-50 border-slate-200');
+                                const textClass = isBest ? 'text-emerald-800' : (isSelected ? 'text-amber-800' : 'text-slate-600');
+                                return `
+                                    <span class="${bgClass} border px-2 py-1 rounded-lg text-[10px] font-black flex flex-col items-center ${textClass}">
+                                        <span class="uppercase scale-75">${s}</span>
+                                        <span>€${pr.toFixed(2)}</span>
+                                        ${isBest ? '<span class="text-[8px] font-bold">MIGLIOR</span>' : ''}
+                                    </span>
+                                `;
+                            }).join('')}
                         </div>
                     </td>
                     <td class="p-4 text-right">
@@ -1579,9 +1628,37 @@
                         </div>
                     </td>
                 </tr>
-            `).join('') || '<tr><td colspan="3" class="text-center py-20 text-slate-400 font-bold uppercase text-xs">Nessun prodotto trovato</td></tr>';
+            `}).join('') || '<tr><td colspan="3" class="text-center py-20 text-slate-400 font-bold uppercase text-xs">Nessun prodotto trovato</td></tr>';
             
-            // Aggiorna datalist categorie
+            // Aggiorna filtri
+            updateCatalogFilters();
+        }
+        
+        function getMinPrice(product, preferredSupplier) {
+            if (!preferredSupplier) {
+                const prices = Object.values(product.prices || {});
+                return prices.length ? Math.min(...prices) : 0;
+            }
+            return product.prices[preferredSupplier] || 0;
+        }
+        
+        function updateCatalogFilters() {
+            const catFilter = document.getElementById('cat-filter');
+            if(catFilter) {
+                const current = catFilter.value;
+                const cats = [...new Set(appState.products.map(p => p.cat))].sort();
+                catFilter.innerHTML = '<option value="">Tutte le categorie</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+                catFilter.value = current;
+            }
+            
+            const supplierFilter = document.getElementById('cat-price-supplier');
+            if(supplierFilter) {
+                const current = supplierFilter.value;
+                const suppliers = [...new Set(appState.products.flatMap(p => Object.keys(p.prices || {})))].sort();
+                supplierFilter.innerHTML = '<option value="">Miglior prezzo</option>' + suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
+                supplierFilter.value = current;
+            }
+            
             const datalist = document.getElementById('cats-list');
             if(datalist) {
                 const cats = [...new Set(appState.products.map(p => p.cat))];
@@ -3233,6 +3310,24 @@
             await finalizeApproval(true);
         }
 
+        // Funzioni helper per prodotti ittici
+        function isFishProduct(name) {
+            if (!name) return false;
+            const fishKeywords = ['merluzzo', 'salmone', 'tonno', 'branzino', 'orata', 'spigola', 'sogliola', 'pesce', 'gambero', 'gamberetti', 'calamaro', 'polpo', 'seppia', 'cozze', 'vongole', 'aragosta', 'astice', 'carpaccio', 'tartare', 'filetto', 'filetti'];
+            const lower = name.toLowerCase();
+            return fishKeywords.some(k => lower.includes(k));
+        }
+        
+        function extractFishSize(name) {
+            if (!name) return name;
+            const sizeMatch = name.match(/(\d+(?:[.,]\d+)?)\s*(g|gr|kg|oz)\b/i);
+            if (sizeMatch) {
+                const size = sizeMatch[1].replace(',', '.') + sizeMatch[2].toLowerCase().replace('gr', 'g');
+                return `${name} (${size})`;
+            }
+            return name;
+        }
+
         async function finalizeApproval(confirmed = false) {
             const { req, finalItems } = approvalContext;
             if(finalItems.length === 0) {
@@ -3243,9 +3338,11 @@
 
             let total = finalItems.reduce((s, i) => s + (i.bestPrice * i.qty), 0);
             let summary = finalItems.map(p => {
-                let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${o[1]}`).join(', ')})` : "";
+                let othersStr = p.others.length ? ` (Altri: ${p.others.map(o => `${o[0]} €${Number(o[1]).toFixed(2)}`).join(', ')})` : "";
                 const um = p.um ? ` ${p.um}` : '';
-                return `${formatQty(p.qty)}${um} ${p.name}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
+                const isFish = isFishProduct(p.name);
+                const displayName = isFish ? extractFishSize(p.name) : p.name;
+                return `${formatQty(p.qty)}${um} ${displayName}: **€${p.bestPrice.toFixed(2)}** da **${p.supplier}**${othersStr}`;
             }).join('\n');
 
             const ok = confirmed ? true : confirm(`📦 Analisi completata!\n\nTotale stimato: €${total.toFixed(2)}\n\n${summary}\n\nConfermare l'archiviazione?`);
