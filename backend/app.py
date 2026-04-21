@@ -38,7 +38,20 @@ SMTP_TO = os.getenv("SMTP_TO", "amministrazione@seasignorarest.com")
 FORMSPREE_ENDPOINT = os.getenv("FORMSPREE_ENDPOINT", "https://formspree.io/f/xykbonje")
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# CORS più permissivo per tutte le API
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+@app.get("/api/ping")
+def ping():
+    """Endpoint di test semplice che non usa database"""
+    return jsonify({"ok": True, "message": "pong", "timestamp": datetime.now().isoformat()})
 
 # --- DATABASE ---
 def get_conn():
