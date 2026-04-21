@@ -938,13 +938,13 @@
 
         const API_BASE = window.location.origin.startsWith('file://') ? 'http://localhost:8080' : '';
         let isPushing = false;
+        let syncRetryTimer = null;
         async function sync() {
             if(isPushing) return;
             const status = document.getElementById('save-status');
-            console.log('DEBUG: sync() started, status element:', status);
             try {
                 const res = await fetch(`${API_BASE}/api/state?t=${Date.now()}`);
-                if(!res.ok) throw new Error("Server non raggiungibile");
+                if(!res.ok) throw new Error("Server non raggiungibile (" + res.status + ")");
                 const d = await res.json();
                 if(d.ok && d.state) { 
                     appState = {
@@ -954,7 +954,6 @@
                     };
                     hasSyncedOnce = true;
                     if(status) {
-                        console.log('DEBUG: Setting status to ONLINE');
                         status.innerText = "ONLINE";
                         status.classList.remove('bg-rose-500');
                         status.classList.add('bg-emerald-500');
@@ -967,6 +966,9 @@
                         initialViewApplied = true;
                         switchView(pendingInitialView);
                     }
+                    // Retry cancellato - siamo online
+                    if(syncRetryTimer) { clearTimeout(syncRetryTimer); syncRetryTimer = null; }
+                    return;
                 }
             } catch(e) {
                 console.error("Sync error:", e);
@@ -976,6 +978,12 @@
                     status.classList.remove('hidden');
                 }
             }
+            // Retry automatico ogni 3 secondi finché non ha successo
+            if(syncRetryTimer) clearTimeout(syncRetryTimer);
+            syncRetryTimer = setTimeout(() => {
+                console.log('DEBUG: Auto-retrying sync...');
+                sync();
+            }, 3000);
         }
 
         async function push() {
