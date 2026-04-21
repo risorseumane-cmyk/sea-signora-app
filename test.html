@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TEST - Sea Signora</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .ok { color: green; }
+        .err { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Test Diagnostico</h1>
+    <div id="result">Caricamento...</div>
+    <script>
+        const API_BASE = '';
+        async function test() {
+            const div = document.getElementById('result');
+            try {
+                const res = await fetch(API_BASE + '/api/ping');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                div.innerHTML = '<p class="ok">✓ API PING: ' + JSON.stringify(data) + '</p>';
+                
+                const res2 = await fetch(API_BASE + '/api/state');
+                if (!res2.ok) throw new Error('HTTP ' + res2.status);
+                const data2 = await res2.json();
+                div.innerHTML += '<p class="ok">✓ API STATE: ok=' + data2.ok + ', products=' + (data2.state?.products?.length || 0) + '</p>';
+                div.innerHTML += '<p class="ok"><b>TUTTO FUNZIONA!</b> <a href="/">Vai all app</a></p>';
+            } catch(e) {
+                div.innerHTML = '<p class="err">✗ ERRORE: ' + e.message + '</p><p>Il backend non risponde correttamente.</p>';
+            }
+        }
+        test();
+    </script>
+</body>
+</html>
