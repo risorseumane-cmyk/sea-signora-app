@@ -952,6 +952,11 @@
                         settings: { ...appState.settings, ...d.state.settings }
                     };
                     hasSyncedOnce = true;
+                    if(status) {
+                        status.innerText = "ONLINE";
+                        status.classList.replace('bg-rose-500', 'bg-emerald-500');
+                        status.classList.remove('hidden');
+                    }
                     hydrateSettingsInputs();
                     applyUI(false); 
                     refresh();
