@@ -631,12 +631,16 @@ def ai_help():
 
 @app.get("/api/diag")
 def diagnostics():
+    import traceback
     diag = {
-        "db": "unknown",
+        "status": "checking",
         "db_path": str(DB_PATH),
         "db_exists": DB_PATH.exists(),
+        "db_is_file": DB_PATH.is_file() if DB_PATH.exists() else False,
+        "db_parent_exists": DB_PATH.parent.exists(),
+        "db_parent_writable": os.access(DB_PATH.parent, os.W_OK) if DB_PATH.parent.exists() else False,
         "db_persistent_hint": str(DB_PATH).startswith("/data/") or str(DB_PATH).startswith("/data\\"),
-        "engine": "Local Smart Matcher (OK)",
+        "cwd": str(Path.cwd()),
         "email": {
             "smtp_host": SMTP_HOST,
             "smtp_port": SMTP_PORT,
@@ -647,14 +651,42 @@ def diagnostics():
             "formspree_present": bool(FORMSPREE_ENDPOINT),
         },
     }
+    # Test connessione database
     try:
-        with get_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT count(*) FROM app_state")
-            diag["db"] = f"OK (rows: {cur.fetchone()[0]})"
+        conn = sqlite3.connect(str(DB_PATH), timeout=5)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT count(*) FROM app_state")
+        count = cur.fetchone()[0]
+        diag["db_connection"] = "OK"
+        diag["db_rows"] = count
+        # Verifica tabelle
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [r[0] for r in cur.fetchall()]
+        diag["db_tables"] = tables
+        conn.close()
+        diag["status"] = "healthy"
     except Exception as e:
-        diag["db"] = f"Error: {str(e)}"
+        diag["db_connection"] = "FAILED"
+        diag["db_error"] = str(e)
+        diag["db_traceback"] = traceback.format_exc()
+        diag["status"] = "error"
     return jsonify(diag)
+
+@app.post("/api/emergency-reset-db")
+def emergency_reset_db():
+    """Endpoint di emergenza per ricreare il database da zero"""
+    import traceback
+    try:
+        # Chiudi tutte le connessioni al database
+        # Rimuovi il file esistente
+        if DB_PATH.exists():
+            DB_PATH.unlink()
+        # Ricrea il database
+        init_db()
+        return jsonify({"ok": True, "message": "Database reset and reinitialized successfully"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.get("/api/admin/versions")
 def list_versions():
