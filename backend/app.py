@@ -1376,6 +1376,24 @@ def redirect_catalogo_master():
 def redirect_catalog_master():
     return redirect("/?admin=1&view=catalog", code=301)
 
+@app.get("/test.html")
+def test_page():
+    resp = send_from_directory(FRONTEND_FILE.parent, "test.html")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.get("/app.js")
+def serve_appjs():
+    resp = send_from_directory(FRONTEND_FILE.parent, "app.js")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
+
+@app.get("/style.css")
+def serve_stylecss():
+    resp = send_from_directory(FRONTEND_FILE.parent, "style.css")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
+
 @app.get("/assets/<path:filename>")
 def assets(filename):
     assets_dir = FRONTEND_FILE.parent / "assets"
