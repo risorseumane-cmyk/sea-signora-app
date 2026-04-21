@@ -941,8 +941,9 @@
         async function sync() {
             if(isPushing) return;
             const status = document.getElementById('save-status');
+            console.log('DEBUG: sync() started, status element:', status);
             try {
-                const res = await fetch(`${API_BASE}/api/state`);
+                const res = await fetch(`${API_BASE}/api/state?t=${Date.now()}`);
                 if(!res.ok) throw new Error("Server non raggiungibile");
                 const d = await res.json();
                 if(d.ok && d.state) { 
@@ -953,8 +954,10 @@
                     };
                     hasSyncedOnce = true;
                     if(status) {
+                        console.log('DEBUG: Setting status to ONLINE');
                         status.innerText = "ONLINE";
-                        status.classList.replace('bg-rose-500', 'bg-emerald-500');
+                        status.classList.remove('bg-rose-500');
+                        status.classList.add('bg-emerald-500');
                         status.classList.remove('hidden');
                     }
                     hydrateSettingsInputs();
