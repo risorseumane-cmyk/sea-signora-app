@@ -12,6 +12,10 @@
         if(window.performance && performance.navigation && performance.navigation.type === 2) {
             location.reload(true);
         }
+        // Redirect a URL con query string per bypassare cache Safari
+        if(!window.location.search.includes('nocache=')) {
+            window.location.replace(window.location.pathname + '?nocache=1' + window.location.hash);
+        }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
