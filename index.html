@@ -955,14 +955,15 @@
         async function sync() {
             if(isPushing) return;
             const status = document.getElementById('save-status');
-            // DEBUG: alert per verificare che sync() viene chiamata
-            alert('DEBUG: sync() started');
+            // DEBUG: rimosso alert di start
             try {
                 const res = await fetch(`${API_BASE}/api/state?t=${Date.now()}`);
                 if(!res.ok) throw new Error("Server non raggiungibile (" + res.status + ")");
                 const d = await res.json();
-                // DEBUG
-                alert('DEBUG: sync OK, d.ok=' + d.ok);
+                // DEBUG: verifica se d.state esiste e ha dati
+                const stateKeys = d.state ? Object.keys(d.state).join(',') : 'undefined';
+                const productCount = d.state && d.state.products ? d.state.products.length : 'no products';
+                alert('DEBUG: d.ok=' + d.ok + ', state keys=' + stateKeys + ', products=' + productCount);
                 if(d.ok && d.state) { 
                     appState = {
                         ...appState,
