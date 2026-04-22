@@ -960,10 +960,7 @@
                 const res = await fetch(`${API_BASE}/api/state?t=${Date.now()}`);
                 if(!res.ok) throw new Error("Server non raggiungibile (" + res.status + ")");
                 const d = await res.json();
-                // DEBUG: verifica se d.state esiste e ha dati
-                const stateKeys = d.state ? Object.keys(d.state).join(',') : 'undefined';
-                const productCount = d.state && d.state.products ? d.state.products.length : 'no products';
-                alert('DEBUG: d.ok=' + d.ok + ', state keys=' + stateKeys + ', products=' + productCount);
+                // DEBUG rimosso
                 if(d.ok && d.state) { 
                     appState = {
                         ...appState,
@@ -989,7 +986,7 @@
                     return;
                 }
             } catch(e) {
-                alert('DEBUG: sync ERROR: ' + e.message);
+                // DEBUG rimosso
                 console.error("Sync error:", e);
                 if(status) {
                     status.innerText = "OFFLINE";
@@ -1565,8 +1562,9 @@
             if(prodId) filtered = filtered.filter(p => p.id == prodId);
             
             list.innerHTML = filtered.map(p => {
-                const best = Object.entries(p.prices).sort((a,b)=>a[1]-b[1])[0];
-                return `
+                const priceEntries = Object.entries(p.prices || {});
+                const best = priceEntries.length ? priceEntries.sort((a,b)=>a[1]-b[1])[0] : null;
+                return best ? `
                     <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl border">
                         <div>
                             <p class="text-xs font-black uppercase tracking-tighter">${p.name}</p>
@@ -1577,7 +1575,7 @@
                             <p class="text-[8px] font-black text-emerald-500">MIGLIOR PREZZO</p>
                         </div>
                     </div>
-                `;
+                ` : '';
             }).join('') || '<p class="text-center py-10 text-xs text-slate-400 font-bold uppercase">Nessun dato per i filtri selezionati</p>';
         }
 
